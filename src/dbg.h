@@ -7,6 +7,7 @@
 
 #ifdef _DEBUG_
 #include </usr/local/include/dbg.h>
+#define DBG_ENABLE
 #else
 #define dbg(...) (void(0))
 #endif
