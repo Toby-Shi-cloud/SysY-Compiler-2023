@@ -95,6 +95,18 @@ namespace backend {
             }
         }
 
+        void compute_func_start();
+
+        void compute_func_exit();
+
+        void spliceBlocks();
+
+        void mergeBlocks();
+
+        void relocateBlocks();
+
+        void compute_pre_suc(mips::rBlock block);
+
     public:
         explicit Translator(mir::Manager *mirManager, mips::rModule mipsModule)
                 : mirManager(mirManager), mipsModule(mipsModule) {}

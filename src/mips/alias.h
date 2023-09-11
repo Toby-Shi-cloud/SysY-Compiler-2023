@@ -50,4 +50,12 @@ namespace mips {
 
 #undef def
 
+namespace mips {
+    template<typename T>
+    inline std::unique_ptr<T> make_copy(const std::unique_ptr<T> &ptr) {
+        if (ptr == nullptr) return nullptr;
+        return std::make_unique<T>(*ptr);
+    }
+}
+
 #endif //COMPILER_MIPS_ALIAS_H

@@ -14,16 +14,18 @@ namespace mips {
 
 namespace mips {
     struct Instruction {
+        using inst_node_t = std::list<pInstruction>::iterator;
         enum class Ty {
             NOP, ADDU, SUBU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV, SLT, SLTU, MOVN, MOVZ, MUL,
             MULT, MULTU, MADD, MADDU, MSUB, MSUBU, DIV, DIVU, CLO, CLZ, MOVE,
             ADDIU, ANDI, ORI, XORI, SLL, SRL, SRA, SLTI, SLTIU, LUI, LI, REM, REMU,
             LA, LW, LWL, LWR, LB, LH, LHU, LBU, SW, SWL, SWR, SB, SH,
             BEQ, BNE, BGEZ, BGTZ, BLEZ, BLTZ, BGEZAL, BLTZAL,
-            MFHI, MFLO, MTHI, MTLO, J, JR, JAL, JALR, SYSCALL
+            J, JR, JAL, JALR, MFHI, MFLO, MTHI, MTLO, SYSCALL
         } ty;
         std::vector<rRegister> regDef, regUse;
-        rBlock parent = nullptr;
+        inst_node_t node{}; // the position where the inst is. node for jump/branch inst is broken and DO NOT USE!
+        rBlock parent{};
 
         virtual ~Instruction() = default;
 
@@ -32,28 +34,78 @@ namespace mips {
         explicit Instruction(Ty ty) : ty{ty} {}
 
         explicit Instruction(Ty ty, std::vector<rRegister> regDef, std::vector<rRegister> regUse)
-                : ty{ty}, regDef{std::move(regDef)}, regUse{std::move(regUse)} {}
+                : ty{ty}, regDef{std::move(regDef)}, regUse{std::move(regUse)} {
+            for (auto reg: this->regDef) reg->defUsers.insert(this);
+            for (auto reg: this->regUse) reg->useUsers.insert(this);
+        }
 
-        explicit Instruction(Ty ty, std::vector<rRegister> regDef, std::vector<rRegister> regUse, rBlock parent)
-                : ty{ty}, regDef{std::move(regDef)}, regUse{std::move(regUse)}, parent{parent} {}
+        inline void reg_def_push_back(rRegister reg) {
+            regDef.push_back(reg);
+            reg->defUsers.insert(this);
+        }
 
-        [[nodiscard]] inline bool isNop() const { return ty == Ty::NOP; }
+        inline void reg_use_push_back(rRegister reg) {
+            regUse.push_back(reg);
+            reg->useUsers.insert(this);
+        }
 
-        [[nodiscard]] inline bool isBinaryRInst() const { return ty >= Ty::ADDU && ty <= Ty::CLZ; }
+        template<bool visitDef = true, bool visitUse = true, typename T>
+        inline void for_each_reg(T &&func) {
+            if constexpr (visitDef) for (auto reg: regDef) func(reg);
+            if constexpr (visitUse) for (auto reg: regUse) func(reg);
+        }
 
-        [[nodiscard]] inline bool isBinaryIInst() const { return ty >= Ty::ADDIU && ty <= Ty::LUI; }
+        template<typename T>
+        inline void for_each_use_reg(T &&func) { for_each_reg<false, true>(func); }
 
-        [[nodiscard]] inline bool isLoadInst() const { return ty >= Ty::LW && ty <= Ty::LBU; }
+        template<typename T>
+        inline void for_each_def_reg(T &&func) { for_each_reg<true, false>(func); }
 
-        [[nodiscard]] inline bool isStoreInst() const { return ty >= Ty::SW && ty <= Ty::SH; }
+        template<bool visitDef = true, bool visitUse = true, typename T>
+        inline void for_each_vreg(T &&func) {
+            if constexpr (visitDef)
+                for (auto reg: regDef)
+                    if (auto vir = dynamic_cast<mips::rVirRegister>(reg))
+                        func(vir);
+            if constexpr (visitUse)
+                for (auto reg: regUse)
+                    if (auto vir = dynamic_cast<mips::rVirRegister>(reg))
+                        func(vir);
+        }
 
-        [[nodiscard]] inline bool isBranchInst() const { return ty >= Ty::BEQ && ty <= Ty::BLTZAL; }
+        template<typename T>
+        inline void for_each_use_vreg(T &&func) { for_each_vreg<false, true>(func); }
 
-        [[nodiscard]] inline bool isMoveInst() const { return ty >= Ty::MFHI && ty <= Ty::MTLO; }
+        template<typename T>
+        inline void for_each_def_vreg(T &&func) { for_each_vreg<true, false>(func); }
 
-        [[nodiscard]] inline bool isJumpInst() const { return ty >= Ty::J && ty <= Ty::JALR; }
+        template<bool visitDef = true, bool visitUse = true, typename T>
+        inline void for_each_preg(T &&func) {
+            if constexpr (visitDef)
+                for (auto reg: regDef)
+                    if (auto phy = dynamic_cast<mips::rPhyRegister>(reg))
+                        func(phy);
+            if constexpr (visitUse)
+                for (auto reg: regUse)
+                    if (auto phy = dynamic_cast<mips::rPhyRegister>(reg))
+                        func(phy);
+        }
 
-        [[nodiscard]] inline bool isSyscallInst() const { return ty == Ty::SYSCALL; }
+        template<typename T>
+        inline void for_each_use_preg(T &&func) { for_each_preg<false, true>(func); }
+
+        template<typename T>
+        inline void for_each_def_preg(T &&func) { for_each_preg<true, false>(func); }
+
+        [[nodiscard]] inline bool isFuncCall() const {
+            return ty == Ty::JAL || ty == Ty::JALR || ty == Ty::BGEZAL || ty == Ty::BLTZAL;
+        }
+
+        [[nodiscard]] inline bool isJumpBranch() const {
+            return ty >= Ty::BEQ && ty <= Ty::JALR;
+        }
+
+        [[nodiscard]] virtual inline rLabel getJumpLabel() const { return nullptr; }
 
         friend inline std::ostream &operator<<(std::ostream &os, Instruction::Ty t) {
             return os << magic_enum::enum_to_string_lower(t);
@@ -69,8 +121,8 @@ namespace mips {
                 : Instruction{ty, {dst}, {src1, src2}} {}
 
         explicit BinaryRInst(Ty ty, rRegister r1, rRegister r2) : Instruction{ty} {
-            if (ty == Ty::CLO || ty == Ty::CLZ) regDef.push_back(r1), regUse.push_back(r2);
-            else regUse.push_back(r1), regUse.push_back(r2);
+            if (ty == Ty::CLO || ty == Ty::CLZ) reg_def_push_back(r1), reg_use_push_back(r2);
+            else reg_use_push_back(r1), reg_use_push_back(r2);
         }
 
         [[nodiscard]] inline rRegister dst() const { return regDef.empty() ? nullptr : regDef[0]; }
@@ -82,7 +134,7 @@ namespace mips {
         inline std::ostream &output(std::ostream &os) const override {
             bool first = true;
             os << ty << "\t";
-            if (dst()) os << (first ? "" : ", ") << dst(), first = false;
+            if (dst()) os << dst(), first = false;
             if (src1()) os << (first ? "" : ", ") << src1(), first = false;
             if (src2()) os << (first ? "" : ", ") << src2(), first = false;
             return os;
@@ -181,6 +233,8 @@ namespace mips {
 
         [[nodiscard]] inline rRegister src2() const { return regUse.size() <= 1 ? nullptr : regUse[1]; }
 
+        [[nodiscard]] inline rLabel getJumpLabel() const override { return label; }
+
         inline std::ostream &output(std::ostream &os) const override {
             os << ty << "\t" << src1() << ", ";
             if (src2()) os << src2() << ", ";
@@ -193,8 +247,8 @@ namespace mips {
         explicit MoveInst(rRegister dst, rRegister src) : Instruction{Ty::MOVE, {dst}, {src}} {}
 
         explicit MoveInst(Ty ty, rRegister universal) : Instruction{ty} {
-            if (ty == Ty::MFHI || ty == Ty::MFLO) regDef.push_back(universal);
-            else regUse.push_back(universal);
+            if (ty == Ty::MFHI || ty == Ty::MFLO) reg_def_push_back(universal);
+            else reg_use_push_back(universal);
         }
 
         [[nodiscard]] inline rRegister dst() const { return regDef.empty() ? nullptr : regDef[0]; }
@@ -225,6 +279,8 @@ namespace mips {
         [[nodiscard]] inline rRegister target() const { return regUse.empty() ? nullptr : regUse.back(); }
 
         [[nodiscard]] inline rRegister ra() const { return regUse.size() <= 1 ? nullptr : regUse.front(); }
+
+        [[nodiscard]] inline rLabel getJumpLabel() const override { return label; }
 
         inline std::ostream &output(std::ostream &os) const override {
             os << ty << "\t";

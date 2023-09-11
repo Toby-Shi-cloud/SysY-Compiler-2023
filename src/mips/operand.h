@@ -8,6 +8,8 @@
 #include <array>
 #include <variant>
 #include <ostream>
+#include <unordered_set>
+#include <unordered_map>
 #include "alias.h"
 
 namespace mips {
@@ -49,6 +51,22 @@ namespace mips {
     };
 
     struct Register : Operand {
+        std::unordered_set<rInstruction> defUsers;
+        std::unordered_set<rInstruction> useUsers;
+
+        void swapDefTo(rRegister other, rBlock block = nullptr);
+
+        void swapUseTo(rRegister other, rBlock block = nullptr);
+
+        inline void swapTo(rRegister other, rBlock block = nullptr) {
+            swapDefTo(other, block);
+            swapUseTo(other, block);
+        }
+
+        void swapDefIn(rRegister other, rInstruction inst);
+
+        void swapUseIn(rRegister other, rInstruction inst);
+
         [[nodiscard]] inline bool isVirtual() const;
 
         [[nodiscard]] inline bool isPhysical() const;
@@ -113,13 +131,6 @@ namespace mips {
             return os << names[id];
         }
     };
-
-    inline const std::array<pPhyRegister, 34> PhyRegister::registers = []() {
-        std::array<pPhyRegister, 34> registers;
-        for (unsigned i = 0; i < 34; i++)
-            pPhyRegister(new PhyRegister(i)).swap(registers[i]);
-        return registers;
-    }();
 
     struct VirRegister : Register {
         static inline unsigned counter = 0;

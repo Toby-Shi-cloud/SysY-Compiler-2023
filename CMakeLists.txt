@@ -33,7 +33,10 @@ add_executable(Compiler
         src/mips/alias.h
         src/mips/component.h
         src/mips/instruction.h
+        src/mips/mips.cpp
         src/mips/operand.h
+        src/backend/reg_alloca.cpp
+        src/backend/reg_alloca.h
         src/backend/translator.cpp
         src/backend/translator.h
 )

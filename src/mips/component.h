@@ -5,6 +5,7 @@
 #ifndef COMPILER_MIPS_COMPONENT_H
 #define COMPILER_MIPS_COMPONENT_H
 
+#include <list>
 #include <vector>
 #include <ostream>
 #include <unordered_set>
@@ -12,35 +13,81 @@
 
 namespace mips {
     struct Block {
+        using inst_node_t = std::list<pInstruction>::iterator;
+        using inst_pos_t = std::list<pInstruction>::const_iterator;
         pLabel label;
         rFunction parent;
-        std::vector<pInstruction> instructions;
-        std::vector<rBlock> predecessors, successors;
+        std::list<pInstruction> instructions;
+        std::unordered_set<rBlock> predecessors, successors;
         std::unordered_set<rRegister> liveIn, liveOut;
         std::unordered_set<rRegister> use, def;
+        pInstruction conditionalJump, fallthroughJump;
 
-        explicit Block(rFunction parent) : parent(parent) {}
+        explicit Block(rFunction parent) : label(std::make_unique<Label>("")), parent(parent) {}
 
         explicit Block(std::string name, rFunction parent)
                 : label(std::make_unique<Label>(std::move(name))), parent(parent) {}
+
+        inline void push_back(pInstruction &&inst) {
+            auto it = instructions.insert(instructions.cend(), std::move(inst));
+            it->get()->node = it;
+            it->get()->parent = this;
+        }
+
+        inline inst_node_t insert(inst_pos_t pos, pInstruction &&inst) {
+            auto it = instructions.insert(pos, std::move(inst));
+            it->get()->node = it;
+            it->get()->parent = this;
+            return it;
+        }
+
+        template<typename ...Args>
+        inline auto erase(Args ...args) -> decltype(instructions.erase(args...)) {
+            return instructions.erase(args...);
+        }
+
+        [[nodiscard]] inline auto begin() const { return instructions.begin(); }
+
+        [[nodiscard]] inline auto begin() { return instructions.begin(); }
+
+        [[nodiscard]] inline auto end() const { return instructions.end(); }
+
+        [[nodiscard]] inline auto end() { return instructions.end(); }
+
+        [[nodiscard]] inline bool empty() const { return instructions.empty() && !conditionalJump && !fallthroughJump; }
+
+        /**
+         * splice the block into two blocks.
+         * @param pos: position of jal (function call inst)
+         * @return the new block (nullptr if pos is the last instruction)
+         */
+        [[nodiscard]] rBlock splice(inst_node_t pos);
+
+        /**
+         * merge another block to the end. the block won't release after merge.
+         * @param block the block to merge.
+         */
+        void merge(Block *block);
     };
 
     struct Function {
         pLabel label;
         unsigned allocaSize, argSize;
-        pBlock startB = std::make_unique<Block>(this);
-        pBlock exitB = std::make_unique<Block>("$BB." + label->name + ".end", this);
-        std::vector<pBlock> blocks;
+        const bool isMain, isLeaf;
+        std::unordered_set<rPhyRegister> shouldSave;
+        pBlock exitB = std::make_unique<Block>(this);
+        std::list<pBlock> blocks;
         std::unordered_set<pVirRegister> usedVirRegs;
         std::unordered_set<pAddress> usedAddress;
 
-        explicit Function(std::string name)
+        explicit Function(std::string name, bool isMain, bool isLeaf)
                 : label(std::make_unique<Label>(std::move(name))),
-                  allocaSize(0), argSize(0) {}
+                  allocaSize(0), argSize(0), isMain(isMain), isLeaf(isLeaf) {}
 
-        explicit Function(std::string name, unsigned allocaSize, unsigned argSize)
+        explicit Function(std::string name, unsigned allocaSize, unsigned argSize, bool isMain, bool isLeaf)
                 : label(std::make_unique<Label>(std::move(name))),
-                  allocaSize(allocaSize), argSize(argSize) {}
+                  allocaSize(allocaSize), argSize(argSize),
+                  isMain(isMain), isLeaf(isLeaf) {}
 
         inline rVirRegister newVirRegister() {
             auto reg = new VirRegister();
@@ -53,6 +100,24 @@ namespace mips {
             auto addr = new Address(args...);
             usedAddress.emplace(addr);
             return addr;
+        }
+
+        [[nodiscard]] inline auto begin() const { return blocks.begin(); }
+
+        [[nodiscard]] inline auto begin() { return blocks.begin(); }
+
+        [[nodiscard]] inline auto end() const { return blocks.end(); }
+
+        [[nodiscard]] inline auto end() { return blocks.end(); }
+
+        inline void allocName() {
+            size_t counter = 0;
+            for (auto &bb: blocks) {
+                if (bb->empty()) continue;
+                bb->label->name = "$." + label->name + "_" + std::to_string(counter++);
+            }
+            exitB->label->name = "$." + label->name + ".end";
+            blocks.front()->label->name = "";
         }
     };
 
@@ -75,16 +140,18 @@ namespace mips {
     };
 
     inline std::ostream &operator<<(std::ostream &os, const Block &block) {
-        if (block.label) os << block.label << ":" << std::endl;
-        for (auto &inst: block.instructions)
+        if (block.empty()) return os;
+        if (!block.label->name.empty()) os << block.label << ":" << std::endl;
+        for (auto &inst: block)
             os << "\t" << *inst << std::endl;
+        if (block.conditionalJump) os << "\t" << *block.conditionalJump << std::endl;
+        if (block.fallthroughJump) os << "\t" << *block.fallthroughJump << std::endl;
         return os;
     }
 
     inline std::ostream &operator<<(std::ostream &os, const Function &func) {
         os << func.label << ":" << std::endl;
-        os << *func.startB;
-        for (auto &block: func.blocks)
+        for (auto &block: func)
             os << *block;
         os << *func.exitB;
         return os;

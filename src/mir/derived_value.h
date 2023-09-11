@@ -120,7 +120,7 @@ namespace mir {
         } instrTy;
         BasicBlock *parent = nullptr;
 
-        [[nodiscard]] virtual std::ostream &output(std::ostream &os) const = 0;
+        virtual std::ostream &output(std::ostream &os) const = 0;
 
         [[nodiscard]] inline bool isTerminator() const { return instrTy == RET || instrTy == BR; }
 
