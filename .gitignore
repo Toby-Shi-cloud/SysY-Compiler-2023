@@ -1,0 +1,14 @@
+# clion
+/.idea
+
+# vscode
+.vscode
+
+# binary
+/out
+/bin
+/build
+/cmake-build-*
+
+# macos
+.DS_Store
