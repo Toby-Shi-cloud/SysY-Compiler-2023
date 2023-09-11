@@ -10,5 +10,8 @@
 /build
 /cmake-build-*
 
+# zip
+*.zip
+
 # macos
 .DS_Store

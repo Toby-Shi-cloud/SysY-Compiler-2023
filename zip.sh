@@ -2,4 +2,4 @@
 # zip.sh
 
 rm -f source.zip
-zip source.zip main.cpp helper/* src/*
+zip source.zip main.cpp header/* src/*
