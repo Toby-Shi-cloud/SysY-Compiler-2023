@@ -158,12 +158,13 @@ inline std::ostream &operator<<(std::ostream &os, const frontend::lexer::Token &
 #ifdef DBG_ENABLE
 namespace dbg {
     template<>
-    inline bool pretty_print(std::ostream &stream, const frontend::lexer::Token &token) {
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, const frontend::lexer::Token &value) {
         stream << "{ "
-               << "type: " << token.type << ", "
-               << "raw: " << token.raw << ", "
-               << "line: " << token.line << ", "
-               << "column: " << token.column
+               << "type: " << value.type << ", "
+               << "raw: " << value.raw << ", "
+               << "line: " << value.line << ", "
+               << "column: " << value.column
                << " }";
         return true;
     }
