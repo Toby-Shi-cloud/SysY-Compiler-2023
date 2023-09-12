@@ -6,8 +6,17 @@
 #define COMPILER_DBG_H
 
 #ifdef _DEBUG_
-#include </usr/local/include/dbg.h>
 #define DBG_ENABLE
+#if __has_include(<dbg.h>) // has_include(...)
+#include <dbg.h>
+#elif __has_include(</usr/local/include/dbg.h>)
+#include </usr/local/include/dbg.h>
+#elif __has_include("../lib/dbg.h")
+#include "../lib/dbg.h"
+#else
+#undef DBG_ENABLE
+#define dbg(...) (void(0))
+#endif // has_include(...)
 #else
 #define dbg(...) (void(0))
 #endif
