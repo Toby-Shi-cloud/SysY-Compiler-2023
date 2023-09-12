@@ -8,8 +8,7 @@ int main() {
     }
     frontend::lexer::Lexer lexer(src);
     for (auto token : lexer) {
-        dbg(token);
-        std::cout << token << std::endl;
+        std::cout << dbg(token) << std::endl;
     }
     return 0;
 }

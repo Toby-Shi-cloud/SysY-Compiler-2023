@@ -2,6 +2,7 @@
 // Created by toby on 2023/9/11.
 //
 
+#include <algorithm>
 #include "lexer.h"
 
 namespace frontend::lexer {
