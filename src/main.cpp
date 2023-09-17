@@ -1,16 +1,17 @@
+#include <fstream>
 #include <iostream>
 #include "frontend/lexer.h"
 
 int main() {
-    freopen("testfile.txt", "r", stdin);
-    freopen("output.txt", "w", stdout);
+    std::ifstream fin("testfile.txt");
+    std::ofstream fout("testfile.out");
     std::string src, s;
-    while (std::getline(std::cin, s)) {
+    while (std::getline(fin, s)) {
         src += s + '\n';
     }
     frontend::lexer::Lexer lexer(src);
     for (auto token : lexer) {
-        std::cout << dbg(token) << std::endl;
+        fout << dbg(token) << std::endl;
     }
     return 0;
 }
