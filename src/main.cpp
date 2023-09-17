@@ -2,6 +2,8 @@
 #include "frontend/lexer.h"
 
 int main() {
+    freopen("testfile.txt", "r", stdin);
+    freopen("output.txt", "w", stdout);
     std::string src, s;
     while (std::getline(std::cin, s)) {
         src += s + '\n';

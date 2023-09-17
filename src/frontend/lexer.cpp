@@ -52,8 +52,10 @@ namespace frontend::lexer {
     Token_opt Lexer::next_token_try_word() {
         for (auto &p: token_type::words) {
             if (current.substr(0, p.first.size()) == p.first) {
+                auto temp = current.substr(p.first.size());
+                if (std::isalpha(p.first[0]) && (std::isalnum(temp[0]) || temp[0] == '_')) continue;
                 auto _column = column();
-                current = current.substr(p.first.size());
+                current = temp;
                 return Token{p.second, p.first, _line, _column};
             }
         }
