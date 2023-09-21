@@ -1,5 +1,7 @@
 grammar SysY2023;
 
+options { language=Cpp; }
+
 compUnit: decl* funcDef* mainFuncDef;
 
 decl: constDecl | varDecl;
@@ -22,16 +24,16 @@ funcFParam: bType IDENFR (LBRACK RBRACK (LBRACK constExp RBRACK)*)?;
 block: LBRACE blockItem* RBRACE;
 blockItem: decl | stmt;
 
-stmt: lVal ASSIGN exp SEMICN
-    | exp? SEMICN
-    | block
-    | IFTK LPARENT cond RPARENT stmt (ELSETK stmt)?
-    | FORTK LPARENT forStmt? SEMICN cond? SEMICN forStmt? RPARENT stmt
-    | BREAKTK SEMICN
-    | CONTINUETK SEMICN
-    | RETURNTK exp? SEMICN
-    | lVal ASSIGN GETINTTK LPARENT RPARENT SEMICN
-    | PRINTFTK LPARENT STRCON (COMMA exp)* RPARENT SEMICN
+stmt: lVal ASSIGN exp SEMICN # assignStmt
+    | exp? SEMICN # expStmt
+    | block # blockStmt
+    | IFTK LPARENT cond RPARENT stmt (ELSETK stmt)? # ifStmt
+    | FORTK LPARENT forStmt? SEMICN cond? SEMICN forStmt? RPARENT stmt # forLoopStmt
+    | BREAKTK SEMICN # breakStmt
+    | CONTINUETK SEMICN # continueStmt
+    | RETURNTK exp? SEMICN # returnStmt
+    | lVal ASSIGN GETINTTK LPARENT RPARENT SEMICN # getintStmt
+    | PRINTFTK LPARENT STRCON (COMMA exp)* RPARENT SEMICN # printfStmt
     ;
 forStmt: lVal ASSIGN exp;
 exp: addExp;

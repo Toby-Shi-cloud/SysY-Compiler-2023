@@ -10,4 +10,8 @@ endif ()
 add_executable(Compiler
         src/main.cpp src/dbg.h
         src/frontend/lexer.cpp
-        src/frontend/lexer.h)
+        src/frontend/lexer.h
+        src/frontend/grammar.h
+        src/frontend/parser.h
+        src/frontend/visitor.h
+)
