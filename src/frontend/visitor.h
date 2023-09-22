@@ -11,6 +11,14 @@ namespace frontend::visitor {
     using namespace frontend::grammar;
 
     class SysYVisitor {
+        std::ostream &out;
+
+    public:
+        explicit SysYVisitor(std::ostream &out = std::cout) : out(out) {}
+
+        void visitChildren(const GrammarNode &node);
+
+        void visit(const GrammarNode &node);
     };
 }
 

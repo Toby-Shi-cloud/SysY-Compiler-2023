@@ -5,12 +5,98 @@
 #ifndef COMPILER_PARSER_H
 #define COMPILER_PARSER_H
 
+#include <list>
+#include <functional>
+#include <utility>
 #include "grammar.h"
 
 namespace frontend::parser {
+    class SysYParser;
+
     using namespace frontend::grammar;
+    using pGrammarNodeList = std::list<pGrammarNode>;
+    using optGrammarNodeList = std::optional<pGrammarNodeList>;
+    using generator_t = std::function<optGrammarNodeList(SysYParser *)>;
+
+    enum class _option {
+        OPTION
+    };
+    enum class _many {
+        MANY
+    };
+
+    static constexpr _option OPTION = _option::OPTION;
+    static constexpr _many MANY = _many::MANY;
+
+    generator_t operator+(const generator_t &one, const generator_t &other);
+
+    generator_t operator|(const generator_t &one, const generator_t &other);
+
+    generator_t operator*(const generator_t &gen, _option);
+
+    generator_t operator*(const generator_t &gen, _many);
 
     class SysYParser {
+        using token_buffer = std::vector<lexer::Token>;
+        using token_iterator = token_buffer::iterator;
+        token_buffer tokens;
+        token_iterator current;
+        pGrammarNode _comp_unit;
+
+        friend generator_t operator+(const generator_t &, const generator_t &);
+
+        template<lexer::token_type_t type>
+        inline static auto generator() -> generator_t {
+            return [](SysYParser *self) -> optGrammarNodeList {
+                if (auto node = self->need_terminal(type)) {
+                    pGrammarNodeList result{};
+                    result.push_back(std::move(node));
+                    return result;
+                } else {
+                    return std::nullopt;
+                }
+            };
+        }
+
+        template<grammar_type_t type>
+        inline static auto generator() -> generator_t {
+            return [](SysYParser *self) -> optGrammarNodeList {
+                if (auto node = self->parse_impl<type>()) {
+                    pGrammarNodeList result{};
+                    result.push_back(std::move(node));
+                    return result;
+                } else {
+                    return std::nullopt;
+                }
+            };
+        }
+
+        pTerminalNode need_terminal(lexer::token_type_t type);
+
+        inline pGrammarNode grammarNode(grammar_type_t type, const generator_t &gen) {
+            if (auto list = gen(this)) {
+                pGrammarNode ret{new GrammarNode(type)};
+                ret->push_all(std::move(list.value()));
+                return ret;
+            } else {
+                return nullptr;
+            }
+        }
+
+        template<grammar_type_t>
+        pGrammarNode parse_impl();
+
+    public:
+        explicit SysYParser(lexer::Lexer lexer) {
+            for (auto token: lexer) {
+                tokens.push_back(token);
+            }
+            current = tokens.begin();
+        }
+
+        [[nodiscard]] const GrammarNode &comp_unit() { return *_comp_unit; }
+
+        void parse();
     };
 }
 

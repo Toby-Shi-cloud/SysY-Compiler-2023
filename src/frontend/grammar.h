@@ -49,6 +49,9 @@ namespace frontend::grammar {
         std::vector<pGrammarNode> children;
 
         explicit GrammarNode(grammar_type_t type) : type(type) {}
+
+        template<typename T>
+        inline void push_all(T c) { for (auto &child : c) children.push_back(std::move(child)); }
     };
 
     struct TerminalNode : GrammarNode {
@@ -56,6 +59,8 @@ namespace frontend::grammar {
 
         explicit TerminalNode(const lexer::Token &token) : GrammarNode(grammar_type::Terminal), token(token) {}
     };
+
+    using pTerminalNode = std::unique_ptr<TerminalNode>;
 }
 
 inline std::ostream &operator<<(std::ostream &os, frontend::grammar::grammar_type_t type) {

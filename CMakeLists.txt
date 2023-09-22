@@ -14,4 +14,6 @@ add_executable(Compiler
         src/frontend/grammar.h
         src/frontend/parser.h
         src/frontend/visitor.h
+        src/frontend/parser.cpp
+        src/frontend/visitor.cpp
 )
