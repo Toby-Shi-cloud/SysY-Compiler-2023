@@ -17,6 +17,7 @@
 #endif // _DEBUG_
 
 #ifndef DBG_ENABLE
+#include <algorithm>
 namespace dbg {
 template <typename T>
 T&& identity(T&& t) {

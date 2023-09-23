@@ -238,8 +238,7 @@ namespace frontend::parser {
     template<>
     pGrammarNode SysYParser::parse_impl<UnaryExp>() {
         auto gen = generator<IDENFR>() + generator<LPARENT>() + generator<FuncRParams>() * OPTION +
-                   generator<RPARENT>() | generator<PrimaryExp>() |
-                   generator<UnaryOp>() + generator<UnaryExp>();
+                   generator<RPARENT>() | generator<PrimaryExp>() | generator<UnaryOp>() + generator<UnaryExp>();
         return grammarNode(UnaryExp, gen);
     }
 
@@ -320,7 +319,7 @@ namespace frontend::parser {
 // generator_t operator
 namespace frontend::parser {
     generator_t operator+(const generator_t &one, const generator_t &other) {
-        return [&one, &other](SysYParser *self) -> optGrammarNodeList {
+        return [one, other](SysYParser *self) -> optGrammarNodeList {
             auto backup = self->current;
             auto result = one(self);
             if (!result) return std::nullopt;
@@ -334,7 +333,7 @@ namespace frontend::parser {
     }
 
     generator_t operator|(const generator_t &one, const generator_t &other) {
-        return [&one, &other](SysYParser *self) -> optGrammarNodeList {
+        return [one, other](SysYParser *self) -> optGrammarNodeList {
             if (auto result = one(self)) return result;
             if (auto result = other(self)) return result;
             return std::nullopt;
@@ -342,7 +341,7 @@ namespace frontend::parser {
     }
 
     generator_t operator*(const generator_t &gen, _option) {
-        return [&gen](SysYParser *self) -> optGrammarNodeList {
+        return [gen](SysYParser *self) -> optGrammarNodeList {
             if (auto result = gen(self)) {
                 return result;
             } else {
@@ -352,7 +351,7 @@ namespace frontend::parser {
     }
 
     generator_t operator*(const generator_t &gen, _many) {
-        return [&gen](SysYParser *self) -> optGrammarNodeList {
+        return [gen](SysYParser *self) -> optGrammarNodeList {
             pGrammarNodeList result{};
             while (auto child = gen(self)) {
                 result.splice(result.end(), child.value());
