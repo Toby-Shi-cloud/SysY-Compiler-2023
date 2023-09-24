@@ -7,7 +7,7 @@
 
 namespace frontend::visitor {
     void SysYVisitor::visitChildren(const GrammarNode &node) {
-        for (const auto &ptr : node.children) {
+        for (const auto &ptr: node.children) {
             visit(*ptr);
         }
     }
@@ -18,7 +18,10 @@ namespace frontend::visitor {
             // static_cast should be safe here
             out << static_cast<const TerminalNode &>(node).token << std::endl; // NOLINT
         } else {
-            out << "<" << node.type << ">" << std::endl;
+            if (node.type != grammar_type::BlockItem && node.type != grammar_type::Decl &&
+                node.type != grammar_type::BType &&
+                !(node.type >= grammar_type::AssignStmt && node.type <= grammar_type::PrintfStmt))
+                out << "<" << node.type << ">" << std::endl;
         }
     }
 }

@@ -5,7 +5,7 @@
 
 int main() {
     std::ifstream fin("testfile.txt");
-    std::ofstream fout("testfile.out");
+    std::ofstream fout("output.txt");
     std::string src, s;
     while (std::getline(fin, s)) {
         src += s + '\n';
