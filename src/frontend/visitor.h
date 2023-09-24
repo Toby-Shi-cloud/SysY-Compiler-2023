@@ -19,6 +19,8 @@ namespace frontend::visitor {
         void visitChildren(const GrammarNode &node);
 
         void visit(const GrammarNode &node);
+
+        void visitExp(const GrammarNode &node);
     };
 }
 
