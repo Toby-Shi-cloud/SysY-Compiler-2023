@@ -3,9 +3,9 @@
 #include "frontend/parser.h"
 #include "frontend/visitor.h"
 
-int main() {
-    std::ifstream fin("testfile.txt");
-    std::ofstream fout("output.txt");
+int main(int argc, char **argv) {
+    std::ifstream fin(argc >= 2 ? argv[1] : "testfile.txt");
+    std::ofstream fout(argc >= 3 ? argv[2] : "output.txt");
     std::string src, s;
     while (std::getline(fin, s)) {
         src += s + '\n';
