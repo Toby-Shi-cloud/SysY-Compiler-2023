@@ -6,7 +6,7 @@
 #include "lexer.h"
 
 namespace frontend::lexer {
-    Token_opt Lexer::next_token_impl() {
+    token_opt Lexer::next_token_impl() {
         while (next_token_skip_comment());
         next_token_skip_whitespaces();
         if (current.empty()) return std::nullopt;
@@ -49,7 +49,7 @@ namespace frontend::lexer {
         return true;
     }
 
-    Token_opt Lexer::next_token_try_word() {
+    token_opt Lexer::next_token_try_word() {
         for (auto &p: token_type::words) {
             if (current.length() >= p.first.size() && current.substr(0, p.first.size()) == p.first) {
                 auto temp = current.substr(p.first.size());
@@ -62,7 +62,7 @@ namespace frontend::lexer {
         return std::nullopt;
     }
 
-    Token_opt Lexer::next_token_try_number() {
+    token_opt Lexer::next_token_try_number() {
         if (!std::isdigit(current[0])) return std::nullopt;
         auto start = current;
         auto _column = column();
@@ -70,7 +70,7 @@ namespace frontend::lexer {
         return Token{token_type::INTCON, start.substr(0, current.begin() - start.begin()), _line, _column};
     }
 
-    Token_opt Lexer::next_token_try_string() {
+    token_opt Lexer::next_token_try_string() {
         if (current[0] != '"') return std::nullopt;
         auto end = current.substr(1).find('"');
         if (end == std::string_view::npos) return std::nullopt;
@@ -80,7 +80,7 @@ namespace frontend::lexer {
         return Token{token_type::STRCON, _raw, _line, _column};
     }
 
-    Token_opt Lexer::next_token_try_identifier() {
+    token_opt Lexer::next_token_try_identifier() {
         if (current[0] != '_' && !std::isalpha(current[0])) return std::nullopt;
         auto start = current;
         auto _column = column();

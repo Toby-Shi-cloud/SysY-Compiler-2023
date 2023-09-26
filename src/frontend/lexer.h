@@ -76,7 +76,7 @@ namespace frontend::lexer::token_type {
 namespace frontend::lexer {
     struct Token;
     using token_type_t = token_type::_token_type;
-    using Token_opt = std::optional<Token>;
+    using token_opt = std::optional<Token>;
 
     struct Token {
         token_type_t type;
@@ -94,9 +94,9 @@ namespace frontend::lexer {
 
         class Iterator {
             Lexer *self;
-            Token_opt current;
+            token_opt current;
         public:
-            inline explicit Iterator(Lexer *self, Token_opt token) : self(self), current(token) {}
+            inline explicit Iterator(Lexer *self, token_opt token) : self(self), current(token) {}
 
             inline Token operator*() const { return current.value(); }
 
@@ -124,22 +124,22 @@ namespace frontend::lexer {
 
         [[nodiscard]] Iterator end() { return Iterator(this, std::nullopt); }
 
-        inline Token_opt next_token() { return next_token_impl(); }
+        inline token_opt next_token() { return next_token_impl(); }
 
     private:
-        Token_opt next_token_impl();
+        token_opt next_token_impl();
 
         inline void next_token_skip_whitespaces();
 
         inline bool next_token_skip_comment();
 
-        inline Token_opt next_token_try_word();
+        inline token_opt next_token_try_word();
 
-        inline Token_opt next_token_try_number();
+        inline token_opt next_token_try_number();
 
-        inline Token_opt next_token_try_string();
+        inline token_opt next_token_try_string();
 
-        inline Token_opt next_token_try_identifier();
+        inline token_opt next_token_try_identifier();
 
         inline Token next_token_error_token();
     };
