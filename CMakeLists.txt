@@ -16,4 +16,6 @@ add_executable(Compiler
         src/frontend/visitor.h
         src/frontend/parser.cpp
         src/frontend/visitor.cpp
+        src/mir/type.cpp
+        src/mir/type.h
 )
