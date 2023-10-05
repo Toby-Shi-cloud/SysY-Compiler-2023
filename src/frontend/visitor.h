@@ -12,6 +12,7 @@ namespace frontend::visitor {
 }
 
 #include "../mir/value.h"
+#include <deque>
 
 namespace frontend::visitor {
     class SymbolTable {

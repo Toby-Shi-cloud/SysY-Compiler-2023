@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
         src += s + '\n';
     }
     frontend::lexer::Lexer lexer(src);
-    frontend::parser::SysYParser parser(lexer);
+    frontend::parser::SysYParser parser(lexer, message_queue);
     parser.parse();
     frontend::visitor::SysYVisitor visitor(message_queue);
     visitor.visit(parser.comp_unit());

@@ -36,9 +36,11 @@ namespace mir {
 
         /**
          * Not every Value has a name. <br>
-         * Value must own the name.
+         * To mark the value as anonymous, set name to empty string.
          */
-        const char *name = nullptr;
+        std::string name;
+
+        inline static const std::string anonymous = "<anonymous>";
 
     protected:
         /**
@@ -53,15 +55,13 @@ namespace mir {
     public:
         explicit Value(pType type) : use(new Use{this}), type(type) {}
 
-        virtual ~Value() { delete use, delete name; }
+        virtual ~Value() { delete use; }
 
-        void setName(const char *str) { delete name, name = str ? strdup(str) : nullptr; }
+        void setName(std::string str) { name = std::move(str); }
 
-        void setName(const std::string &str) { setName(str.c_str()); }
+        [[nodiscard]] inline bool hasName() const { return !name.empty(); }
 
-        [[nodiscard]] inline bool hasName() const { return name; }
-
-        [[nodiscard]] inline const char *getName() const { return hasName() ? name : "<anonymous>"; }
+        [[nodiscard]] inline const std::string &getName() const { return hasName() ? name : anonymous; }
 
         [[nodiscard]] inline pType getType() const { return type; }
 

@@ -11,7 +11,7 @@ namespace frontend::parser {
 
     template<>
     pGrammarNode SysYParser::parse_impl<CompUnit>() {
-        auto gen = generator<Decl>() * MANY + generator<FuncDef>() * MANY + generator<MainFuncDef>();
+        auto gen = (generator<FuncDef>() | generator<Decl>()) * MANY + generator<MainFuncDef>();
         if (auto result = grammarNode(CompUnit, gen)) {
             return result;
         }
@@ -28,7 +28,7 @@ namespace frontend::parser {
     pGrammarNode SysYParser::parse_impl<ConstDecl>() {
         auto gen = generator<CONSTTK>() + generator<BType>() + generator<ConstDef>() +
                    (generator<COMMA>() + generator<ConstDef>()) * MANY +
-                   generator<SEMICN>();
+                   generator<SEMICN>('i');
         return grammarNode(ConstDecl, gen);
     }
 
@@ -40,7 +40,7 @@ namespace frontend::parser {
 
     template<>
     pGrammarNode SysYParser::parse_impl<ConstDef>() {
-        auto gen = generator<IDENFR>() + (generator<LBRACK>() + generator<ConstExp>() + generator<RBRACK>()) * MANY +
+        auto gen = generator<IDENFR>() + (generator<LBRACK>() + generator<ConstExp>() + generator<RBRACK>('k')) * MANY +
                    generator<ASSIGN>() + generator<ConstInitVal>();
         return grammarNode(ConstDef, gen);
     }
@@ -58,13 +58,13 @@ namespace frontend::parser {
     pGrammarNode SysYParser::parse_impl<VarDecl>() {
         auto gen = generator<BType>() + generator<VarDef>() +
                    (generator<COMMA>() + generator<VarDef>()) * MANY +
-                   generator<SEMICN>();
+                   generator<SEMICN>('i');
         return grammarNode(VarDecl, gen);
     }
 
     template<>
     pGrammarNode SysYParser::parse_impl<VarDef>() {
-        auto gen = generator<IDENFR>() + (generator<LBRACK>() + generator<ConstExp>() + generator<RBRACK>()) * MANY +
+        auto gen = generator<IDENFR>() + (generator<LBRACK>() + generator<ConstExp>() + generator<RBRACK>('k')) * MANY +
                    (generator<ASSIGN>() + generator<InitVal>()) * OPTION;
         return grammarNode(VarDef, gen);
     }
@@ -81,14 +81,14 @@ namespace frontend::parser {
     template<>
     pGrammarNode SysYParser::parse_impl<FuncDef>() {
         auto gen = generator<FuncType>() + generator<IDENFR>() + generator<LPARENT>() +
-                   generator<FuncFParams>() * OPTION + generator<RPARENT>() + generator<Block>();
+                   generator<FuncFParams>() * OPTION + generator<RPARENT>('j') + generator<Block>();
         return grammarNode(FuncDef, gen);
     }
 
     template<>
     pGrammarNode SysYParser::parse_impl<MainFuncDef>() {
         auto gen = generator<INTTK>() + generator<MAINTK>() + generator<LPARENT>() +
-                   generator<RPARENT>() + generator<Block>();
+                   generator<RPARENT>('j') + generator<Block>();
         return grammarNode(MainFuncDef, gen);
     }
 
@@ -107,8 +107,8 @@ namespace frontend::parser {
     template<>
     pGrammarNode SysYParser::parse_impl<FuncFParam>() {
         auto gen = generator<BType>() + generator<IDENFR>() +
-                   (generator<LBRACK>() + generator<RBRACK>() +
-                    (generator<LBRACK>() + generator<ConstExp>() + generator<RBRACK>()) * MANY) * OPTION;
+                   (generator<LBRACK>() + generator<RBRACK>('k') +
+                    (generator<LBRACK>() + generator<ConstExp>() + generator<RBRACK>('k')) * MANY) * OPTION;
         return grammarNode(FuncFParam, gen);
     }
 
@@ -135,7 +135,7 @@ namespace frontend::parser {
 
     template<>
     pGrammarNode SysYParser::parse_impl<AssignStmt>() {
-        auto gen = generator<LVal>() + generator<ASSIGN>() + generator<Exp>() + generator<SEMICN>();
+        auto gen = generator<LVal>() + generator<ASSIGN>() + generator<Exp>() + generator<SEMICN>('i');
         return grammarNode(AssignStmt, gen);
     }
 
@@ -153,7 +153,7 @@ namespace frontend::parser {
 
     template<>
     pGrammarNode SysYParser::parse_impl<IfStmt>() {
-        auto gen = generator<IFTK>() + generator<LPARENT>() + generator<Cond>() + generator<RPARENT>() +
+        auto gen = generator<IFTK>() + generator<LPARENT>() + generator<Cond>() + generator<RPARENT>('j') +
                    generator<Stmt>() + (generator<ELSETK>() + generator<Stmt>()) * OPTION;
         return grammarNode(IfStmt, gen);
     }
@@ -162,39 +162,39 @@ namespace frontend::parser {
     pGrammarNode SysYParser::parse_impl<ForLoopStmt>() {
         auto gen = generator<FORTK>() + generator<LPARENT>() + generator<ForStmt>() * OPTION + generator<SEMICN>() +
                    generator<Cond>() * OPTION + generator<SEMICN>() + generator<ForStmt>() * OPTION +
-                   generator<RPARENT>() + generator<Stmt>();
+                   generator<RPARENT>('j') + generator<Stmt>();
         return grammarNode(ForLoopStmt, gen);
     }
 
     template<>
     pGrammarNode SysYParser::parse_impl<BreakStmt>() {
-        auto gen = generator<BREAKTK>() + generator<SEMICN>();
+        auto gen = generator<BREAKTK>() + generator<SEMICN>('i');
         return grammarNode(BreakStmt, gen);
     }
 
     template<>
     pGrammarNode SysYParser::parse_impl<ContinueStmt>() {
-        auto gen = generator<CONTINUETK>() + generator<SEMICN>();
+        auto gen = generator<CONTINUETK>() + generator<SEMICN>('i');
         return grammarNode(ContinueStmt, gen);
     }
 
     template<>
     pGrammarNode SysYParser::parse_impl<ReturnStmt>() {
-        auto gen = generator<RETURNTK>() + generator<Exp>() * OPTION + generator<SEMICN>();
+        auto gen = generator<RETURNTK>() + generator<Exp>() * OPTION + generator<SEMICN>('i');
         return grammarNode(ReturnStmt, gen);
     }
 
     template<>
     pGrammarNode SysYParser::parse_impl<GetintStmt>() {
         auto gen = generator<LVal>() + generator<ASSIGN>() + generator<GETINTTK>() +
-                   generator<LPARENT>() + generator<RPARENT>() + generator<SEMICN>();
+                   generator<LPARENT>() + generator<RPARENT>('j') + generator<SEMICN>('i');
         return grammarNode(GetintStmt, gen);
     }
 
     template<>
     pGrammarNode SysYParser::parse_impl<PrintfStmt>() {
         auto gen = generator<PRINTFTK>() + generator<LPARENT>() + generator<STRCON>() +
-                   (generator<COMMA>() + generator<Exp>()) * MANY + generator<RPARENT>() + generator<SEMICN>();
+                   (generator<COMMA>() + generator<Exp>()) * MANY + generator<RPARENT>('j') + generator<SEMICN>('i');
         return grammarNode(PrintfStmt, gen);
     }
 
@@ -218,13 +218,13 @@ namespace frontend::parser {
 
     template<>
     pGrammarNode SysYParser::parse_impl<LVal>() {
-        auto gen = generator<IDENFR>() + (generator<LBRACK>() + generator<Exp>() + generator<RBRACK>()) * MANY;
+        auto gen = generator<IDENFR>() + (generator<LBRACK>() + generator<Exp>() + generator<RBRACK>('k')) * MANY;
         return grammarNode(LVal, gen);
     }
 
     template<>
     pGrammarNode SysYParser::parse_impl<PrimaryExp>() {
-        auto gen = generator<LPARENT>() + generator<Exp>() + generator<RPARENT>() |
+        auto gen = generator<LPARENT>() + generator<Exp>() + generator<RPARENT>('j') |
                    generator<LVal>() | generator<Number>();
         return grammarNode(PrimaryExp, gen);
     }
@@ -238,7 +238,7 @@ namespace frontend::parser {
     template<>
     pGrammarNode SysYParser::parse_impl<UnaryExp>() {
         auto gen = generator<IDENFR>() + generator<LPARENT>() + generator<FuncRParams>() * OPTION +
-                   generator<RPARENT>() | generator<PrimaryExp>() | generator<UnaryOp>() + generator<UnaryExp>();
+                   generator<RPARENT>('j') | generator<PrimaryExp>() | generator<UnaryOp>() + generator<UnaryExp>();
         return grammarNode(UnaryExp, gen);
     }
 
@@ -304,9 +304,21 @@ namespace frontend::parser {
 
 // SysYParser other methods
 namespace frontend::parser {
-    pTerminalNode SysYParser::need_terminal(lexer::token_type_t type) {
+    pTerminalNode SysYParser::need_terminal(lexer::token_type_t type, int error_code) {
         if (current->type == type)
             return std::make_unique<TerminalNode>(*current++);
+        if (error_code) {
+            using namespace std::string_literals;
+            auto last_token = current - 1;
+            auto line = last_token->line;
+            auto column = last_token->column + last_token->raw.size();
+            message_queue.push_back(
+                    {message::type_t::error, error_code,
+                     static_cast<int>(line), static_cast<int>(column),
+                     "missing token '"s + lexer::token_type::raw[type] + "'"
+                    });
+            return std::make_unique<TerminalNode>(lexer::Token{type, ""sv, line, column});
+        }
         return nullptr;
     }
 

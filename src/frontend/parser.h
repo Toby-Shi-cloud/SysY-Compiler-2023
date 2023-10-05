@@ -9,6 +9,7 @@
 #include <functional>
 #include <utility>
 #include "grammar.h"
+#include "message.h"
 
 namespace frontend::parser {
     class SysYParser;
@@ -42,13 +43,14 @@ namespace frontend::parser {
         token_buffer tokens;
         token_iterator current;
         pGrammarNode _comp_unit;
+        message_queue_t &message_queue;
 
         friend generator_t operator+(const generator_t &, const generator_t &);
 
         template<lexer::token_type_t type>
-        inline static auto generator() -> generator_t {
-            return [](SysYParser *self) -> optGrammarNodeList {
-                if (auto node = self->need_terminal(type)) {
+        inline static auto generator(int error_code = 0) -> generator_t {
+            return [error_code](SysYParser *self) -> optGrammarNodeList {
+                if (auto node = self->need_terminal(type, error_code)) {
                     pGrammarNodeList result{};
                     result.push_back(std::move(node));
                     return result;
@@ -71,7 +73,7 @@ namespace frontend::parser {
             };
         }
 
-        pTerminalNode need_terminal(lexer::token_type_t type);
+        pTerminalNode need_terminal(lexer::token_type_t type, int error_code);
 
         inline pGrammarNode grammarNode(grammar_type_t type, const generator_t &gen) {
             if (auto list = gen(this)) {
@@ -87,7 +89,7 @@ namespace frontend::parser {
         pGrammarNode parse_impl();
 
     public:
-        explicit SysYParser(lexer::Lexer lexer) {
+        SysYParser(lexer::Lexer lexer, message_queue_t &message_queue) : message_queue(message_queue) {
             for (auto token: lexer) {
                 tokens.push_back(token);
             }

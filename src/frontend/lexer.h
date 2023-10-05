@@ -23,15 +23,26 @@ namespace frontend::lexer::token_type {
         IDENFR
     };
 
-    constexpr std::string_view name[] = {
-            "ERRORTOKEN"sv,
-            "INTCON"sv, "STRCON"sv,
-            "MAINTK"sv, "CONSTTK"sv, "INTTK"sv, "VOIDTK"sv, "BREAKTK"sv, "CONTINUETK"sv,
-            "IFTK"sv, "ELSETK"sv, "FORTK"sv, "GETINTTK"sv, "PRINTFTK"sv, "RETURNTK"sv,
-            "NOT"sv, "AND"sv, "OR"sv, "PLUS"sv, "MINU"sv, "MULT"sv, "DIV"sv, "MOD"sv,
-            "LSS"sv, "LEQ"sv, "GRE"sv, "GEQ"sv, "EQL"sv, "NEQ"sv, "ASSIGN"sv, "SEMICN"sv, "COMMA"sv,
-            "LPARENT"sv, "RPARENT"sv, "LBRACK"sv, "RBRACK"sv, "LBRACE"sv, "RBRACE"sv,
-            "IDENFR"sv
+    constexpr const char *name[] = {
+            "ERRORTOKEN",
+            "INTCON", "STRCON",
+            "MAINTK", "CONSTTK", "INTTK", "VOIDTK", "BREAKTK", "CONTINUETK",
+            "IFTK", "ELSETK", "FORTK", "GETINTTK", "PRINTFTK", "RETURNTK",
+            "NOT", "AND", "OR", "PLUS", "MINU", "MULT", "DIV", "MOD",
+            "LSS", "LEQ", "GRE", "GEQ", "EQL", "NEQ", "ASSIGN", "SEMICN", "COMMA",
+            "LPARENT", "RPARENT", "LBRACK", "RBRACK", "LBRACE", "RBRACE",
+            "IDENFR"
+    };
+
+    constexpr const char *raw[] = {
+            "<ERROR>",
+            "<int>", "<const char *>",
+            "main", "const", "int", "void", "break", "continue",
+            "if", "else", "for", "getint", "printf", "return",
+            "!", "&&", "||", "+", "-", "*", "/", "%",
+            "<", "<=", ">", ">=", "==", "!=", "=", ";", ",",
+            "(", ")", "[", "]", "{", "}",
+            "<identifier>"
     };
 
     constexpr std::pair<std::string_view, _token_type> words[] = {

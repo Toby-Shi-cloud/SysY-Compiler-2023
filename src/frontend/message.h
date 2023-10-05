@@ -16,7 +16,7 @@ namespace frontend {
         int code;
         int line;
         int column;
-        const char *msg;
+        std::string msg;
     };
 
     using message_queue_t = std::vector<message>;
@@ -40,7 +40,7 @@ inline std::ostream &operator<<(std::ostream &_o, frontend::message::type_t type
 }
 
 inline std::ostream &operator<<(std::ostream &_o, const frontend::message &msg) {
-    return _o << msg.type << ": " << msg.msg << " at line " << msg.line << ", column " << msg.column << std::endl;
+    return _o << msg.type << ": " << msg.msg << " at line " << msg.line << ", column " << msg.column;
 }
 
 #endif //COMPILER_MESSAGE_H
