@@ -33,6 +33,16 @@ namespace mir {
             VOID, LABEL, INTEGER, POINTER, ARRAY, FUNCTION
         } type;
 
+        Type() = delete;
+
+        Type(const Type &) = delete;
+
+        Type(Type &&) = delete;
+
+        Type &operator=(const Type &) = delete;
+
+        Type &operator=(Type &&) = delete;
+
         static pType getVoidType();
 
         static pType getLabelType();

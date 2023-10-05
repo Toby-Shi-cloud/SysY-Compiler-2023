@@ -78,19 +78,26 @@ namespace mir {
 
 #include <unordered_map>
 
-template<typename First, typename Second>
-struct [[maybe_unused]] std::hash<std::pair<First, Second>> {
-    size_t operator()(const std::pair<First, Second> &p) const {
-        return std::hash<First>()(p.first) ^ std::hash<Second>()(p.second);
+template<typename First>
+struct [[maybe_unused]] std::hash<std::pair<First, mir::pType>> {
+    size_t operator()(const std::pair<First, mir::pType> &p) const {
+        return std::hash<First>()(p.first) * 10007 + std::hash<mir::pType>()(p.second);
     }
 };
 
-template<typename T>
-struct [[maybe_unused]] std::hash<std::vector<T>> {
-    size_t operator()(const std::vector<T> &v) const {
+template<typename Second>
+struct [[maybe_unused]] std::hash<std::pair<mir::pType, Second>> {
+    size_t operator()(const std::pair<mir::pType, Second> &p) const {
+        return std::hash<mir::pType>()(p.first) * 10007 + std::hash<Second>()(p.second);
+    }
+};
+
+template<>
+struct [[maybe_unused]] std::hash<std::vector<mir::pType>> {
+    size_t operator()(const std::vector<mir::pType> &v) const {
         size_t ret = 0;
-        for (const auto &i: v) {
-            ret ^= std::hash<T>()(i);
+        for (const auto &e: v) {
+            ret = ret * 10007 + std::hash<mir::pType>()(e);
         }
         return ret;
     }
