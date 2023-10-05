@@ -6,6 +6,23 @@
 #include "visitor.h"
 
 namespace frontend::visitor {
+    SymbolTable::store_type_t SymbolTable::insert(std::string_view name, mir::pType type) {
+        //TODO: to create some real instructions later.
+        if (stack.back().count(name)) return nullptr;
+        auto value = new mir::Value(type);
+        stack.back()[name] = value;
+        return value;
+    }
+
+    SymbolTable::store_type_t SymbolTable::lookup(std::string_view name) {
+        for (auto it = stack.rbegin(); it != stack.rend(); ++it) {
+            if (it->count(name)) return it->at(name);
+        }
+        return nullptr;
+    }
+}
+
+namespace frontend::visitor {
     void SysYVisitor::visitChildren(const GrammarNode &node) {
         for (const auto &ptr: node.children) {
             visit(*ptr);
@@ -14,14 +31,5 @@ namespace frontend::visitor {
 
     void SysYVisitor::visit(const GrammarNode &node) {
         visitChildren(node);
-        if (node.type == grammar_type::Terminal) {
-            // static_cast should be safe here
-            out << static_cast<const TerminalNode &>(node).token << std::endl; // NOLINT
-        } else {
-            if (node.type != grammar_type::BlockItem && node.type != grammar_type::Decl &&
-                node.type != grammar_type::BType &&
-                !(node.type >= grammar_type::AssignStmt && node.type <= grammar_type::PrintfStmt))
-                out << "<" << node.type << ">" << std::endl;
-        }
     }
 }
