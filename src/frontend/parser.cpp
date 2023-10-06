@@ -313,8 +313,7 @@ namespace frontend::parser {
             auto line = last_token->line;
             auto column = last_token->column + last_token->raw.size();
             message_queue.push_back(
-                    {message::type_t::error, error_code,
-                     static_cast<int>(line), static_cast<int>(column),
+                    {message::ERROR, error_code, line, column,
                      "missing token '"s + lexer::token_type::raw[type] + "'"
                     });
             return std::make_unique<TerminalNode>(lexer::Token{type, ""sv, line, column});

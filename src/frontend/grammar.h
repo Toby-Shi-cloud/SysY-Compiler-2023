@@ -24,17 +24,17 @@ namespace frontend::grammar::grammar_type {
         Terminal
     };
 
-    constexpr std::string_view name[] = {
-            "CompUnit"sv, "Decl"sv,
-            "ConstDecl"sv, "BType"sv, "ConstDef"sv, "ConstInitVal"sv,
-            "VarDecl"sv, "VarDef"sv, "InitVal"sv,
-            "FuncDef"sv, "MainFuncDef"sv, "FuncType"sv, "FuncFParams"sv, "FuncFParam"sv,
-            "Block"sv, "BlockItem"sv,
-            "Stmt"sv, "AssignStmt"sv, "ExpStmt"sv, "BlockStmt"sv, "IfStmt"sv, "ForLoopStmt"sv,
-            "BreakStmt"sv, "ContinueStmt"sv, "ReturnStmt"sv, "GetintStmt"sv, "PrintfStmt"sv,
-            "ForStmt"sv, "Exp"sv, "Cond"sv, "LVal"sv, "PrimaryExp"sv, "Number"sv, "UnaryExp"sv, "UnaryOp"sv,
-            "FuncRParams"sv, "MulExp"sv, "AddExp"sv, "RelExp"sv, "EqExp"sv, "LAndExp"sv, "LOrExp"sv, "ConstExp"sv,
-            "Terminal"sv
+    constexpr const char *name[] = {
+            "CompUnit", "Decl",
+            "ConstDecl", "BType", "ConstDef", "ConstInitVal",
+            "VarDecl", "VarDef", "InitVal",
+            "FuncDef", "MainFuncDef", "FuncType", "FuncFParams", "FuncFParam",
+            "Block", "BlockItem",
+            "Stmt", "AssignStmt", "ExpStmt", "BlockStmt", "IfStmt", "ForLoopStmt",
+            "BreakStmt", "ContinueStmt", "ReturnStmt", "GetintStmt", "PrintfStmt",
+            "ForStmt", "Exp", "Cond", "LVal", "PrimaryExp", "Number", "UnaryExp", "UnaryOp",
+            "FuncRParams", "MulExp", "AddExp", "RelExp", "EqExp", "LAndExp", "LOrExp", "ConstExp",
+            "Terminal"
     };
 }
 

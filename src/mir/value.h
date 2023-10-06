@@ -39,8 +39,13 @@ namespace mir {
          * To mark the value as anonymous, set name to empty string.
          */
         std::string name;
-
         inline static const std::string anonymous = "<anonymous>";
+
+        /**
+         * To mark the value as constant, set isConstant to true. <br>
+         * False by default.
+         */
+        bool isConstant;
 
     protected:
         /**
@@ -53,9 +58,13 @@ namespace mir {
         Use *use;
 
     public:
-        explicit Value(pType type) : use(new Use{this}), type(type) {}
+        explicit Value(pType type, bool isConstant) : use(new Use{this}), type(type), isConstant(isConstant) {}
+
+        explicit Value(pType type) : Value(type, false) {}
 
         virtual ~Value() { delete use; }
+
+        void setConst(bool constant = true) { isConstant = constant; }
 
         void setName(std::string str) { name = std::move(str); }
 
@@ -66,6 +75,8 @@ namespace mir {
         [[nodiscard]] inline pType getType() const { return type; }
 
         [[nodiscard]] inline bool isUsed() const { return !use->users.empty(); }
+
+        [[nodiscard]] inline bool isConst() const { return isConstant; }
     };
 
     /**
@@ -79,7 +90,7 @@ namespace mir {
 
     public:
         template<typename... Args>
-        explicit User(pType type, Args... args) : Value(type), operands{(args->use)...} {
+        explicit User(pType type, Args... args) : Value(type, (args->isConst() && ...)), operands{(args->use)...} {
             for (auto operand: operands) operand->users.insert(this);
         }
 

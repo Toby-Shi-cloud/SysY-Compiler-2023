@@ -10,12 +10,12 @@
 
 namespace frontend {
     struct message {
-        enum class type_t {
-            info, warning, error
+        enum type_t {
+            INFO, WARNING, ERROR
         } type;
         int code;
-        int line;
-        int column;
+        size_t line;
+        size_t column;
         std::string msg;
     };
 
@@ -30,11 +30,11 @@ namespace frontend {
 
 inline std::ostream &operator<<(std::ostream &_o, frontend::message::type_t type) {
     switch (type) {
-        case frontend::message::type_t::info:
+        case frontend::message::type_t::INFO:
             return _o << "INFO";
-        case frontend::message::type_t::warning:
+        case frontend::message::type_t::WARNING:
             return _o << "WARNING";
-        case frontend::message::type_t::error:
+        case frontend::message::type_t::ERROR:
             return _o << "ERROR";
     }
 }

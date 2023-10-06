@@ -39,7 +39,7 @@ namespace frontend::visitor {
          * @brief Insert a new symbol into the current block.
          * @return the inserted symbol or nullptr if the symbol already exists.
          */
-        store_type_t insert(std::string_view name, mir::pType type);
+        store_type_t insert(std::string_view name, mir::pType type, bool isConstant = false);
 
         /**
          * @brief Lookup a symbol in the current block.
@@ -53,14 +53,36 @@ namespace frontend::visitor {
 
 namespace frontend::visitor {
     class SysYVisitor {
+        using return_type_t = void;
+
         message_queue_t &message_queue;
+
+        /**
+         * Visit all children of the node. <br>
+         * Use this method only if you have nothing to do with the node itself.
+         */
+        return_type_t visitChildren(const GrammarNode &node);
+
+        /**
+         * The series of methods actually do the work. <br>
+         * They are called by visit (overload method which has no template parameters)
+         * according to the type of the node. <br>
+         * By default, the methods do nothing but call visitChildren. <br>
+         * To let the methods do something, specialize them.
+         */
+        template<grammar_type_t type>
+        return_type_t visit(const GrammarNode &node);
 
     public:
         explicit SysYVisitor(message_queue_t &message_queue) : message_queue(message_queue) {}
 
-        void visitChildren(const GrammarNode &node);
-
-        void visit(const GrammarNode &node);
+        /**
+         * Visit the node. <br>
+         * This method is exposed to the user. <br>
+         * This method will no nothing but call the corresponding method according
+         * to the type of the node.
+         */
+        return_type_t visit(const GrammarNode &node);
     };
 }
 
