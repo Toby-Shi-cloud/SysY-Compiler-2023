@@ -29,6 +29,76 @@ namespace frontend::visitor {
     }
 }
 
+// visitor: helper functions
+namespace frontend::visitor {
+    template<grammar_type_t type>
+    bool is_specific_type(const pcGrammarNode &node) {
+        return node->type == type;
+    }
+
+    inline std::optional<message> check_valid(const lexer::Token &str_token) {
+        assert(str_token.type == lexer::token_type::STRCON);
+        using namespace std::string_literals;
+        bool rslash = false;
+        bool percent = false;
+        for (const char &ch: str_token.raw.substr(1, str_token.raw.size() - 2)) {
+            auto line = str_token.line;
+            auto column = str_token.column + (&ch - str_token.raw.data());
+            if (rslash) {
+                if (ch != 'n')
+                    return message{message::ERROR, 'a', line, column - 1, "invalid escape sequence '\\"s + ch + "'"};
+                rslash = false;
+            } else if (percent) {
+                if (ch != 'd')
+                    return message{message::ERROR, 'a', line, column - 1, "invalid format specifier '%"s + ch + "'"};
+                percent = false;
+            } else {
+                if (ch == '\\') {
+                    rslash = true;
+                } else if (ch == '%') {
+                    percent = true;
+                } else if (ch != 32 && ch != 33 && ch < 40 && ch > 126) {
+                    return message{message::ERROR, 'a', line, column, "invalid character '"s + ch + "'"};
+                }
+            }
+        }
+        if (rslash)
+            return message{message::ERROR, 'a', str_token.line, str_token.column + str_token.raw.size() - 2, "invalid escape sequence '\\'"};
+        if (percent)
+            return message{message::ERROR, 'a', str_token.line, str_token.column + str_token.raw.size() - 2, "invalid format specifier '%'"};
+        return std::nullopt;
+    }
+}
+
+// visitor: specific methods
+namespace frontend::visitor {
+    using namespace grammar_type;
+
+    template<>
+    SysYVisitor::return_type_t SysYVisitor::visit<PrintfStmt>(const GrammarNode &node) {
+        // PRINTFTK LPARENT STRCON (COMMA exp)* RPARENT SEMICN
+        assert(node.children[2]->type == Terminal);
+        auto &strcon = static_cast<const TerminalNode &>(*node.children[2]).token; // NOLINT
+        if (auto msg = check_valid(strcon)) {
+            message_queue.push_back(*msg);
+        }
+        auto count_params = std::count_if(node.children.begin(), node.children.end(), &is_specific_type<Exp>);
+        auto count_format = std::count(strcon.raw.begin(), strcon.raw.end(), '%');
+        if (count_format != count_params) {
+            using namespace std::string_literals;
+            std::string msg =
+                    "too "s + (count_params < count_format ? "few" : "many") +
+                    " arguments for format " + std::string(strcon.raw) +
+                    ", expected " + std::to_string(count_format) +
+                    " but " + std::to_string(count_params) + " given";
+            auto &printftk = static_cast<const TerminalNode &>(*node.children[0]).token; // NOLINT
+            message_queue.push_back(message{message::ERROR, 'l', printftk.line, printftk.column, msg});
+        }
+        visitChildren(node);
+    }
+}
+
+// visitor: default methods
 namespace frontend::visitor {
     SysYVisitor::return_type_t SysYVisitor::visit(const GrammarNode &node) {
         using namespace grammar_type;

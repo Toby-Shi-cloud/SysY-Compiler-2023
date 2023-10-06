@@ -40,7 +40,7 @@ inline std::ostream &operator<<(std::ostream &_o, frontend::message::type_t type
 }
 
 inline std::ostream &operator<<(std::ostream &_o, const frontend::message &msg) {
-    return _o << msg.type << ": " << msg.msg << " at line " << msg.line << ", column " << msg.column;
+    return _o << msg.type << "[" << msg.line << ":" << msg.column << "]: " << msg.msg;
 }
 
 #endif //COMPILER_MESSAGE_H

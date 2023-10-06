@@ -42,11 +42,12 @@ namespace frontend::grammar::grammar_type {
 namespace frontend::grammar {
     struct GrammarNode;
     using pGrammarNode = std::unique_ptr<GrammarNode>;
+    using pcGrammarNode = std::unique_ptr<const GrammarNode>;
     using grammar_type_t = grammar_type::_grammar_type;
 
     struct GrammarNode {
         const grammar_type_t type;
-        std::vector<pGrammarNode> children;
+        std::vector<pcGrammarNode> children;
 
         explicit GrammarNode(grammar_type_t type) : type(type) {}
 
@@ -71,23 +72,27 @@ inline std::ostream &operator<<(std::ostream &os, frontend::grammar::grammar_typ
 namespace dbg {
     template<>
     [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, const frontend::grammar::TerminalNode &value) {
+        stream << value.type << " ";
+        pretty_print(stream, value.token);
+        return true;
+    }
+
+    template<>
+    [[maybe_unused]]
     inline bool pretty_print(std::ostream &stream, const frontend::grammar::GrammarNode &value) {
-        stream << value.type << " {";
+        if (value.type == frontend::grammar::grammar_type::Terminal) {
+            // NOLINTNEXTLINE
+            return pretty_print(stream, static_cast<const frontend::grammar::TerminalNode &>(value));
+        }
+        stream << value.type << " { ";
         bool first = true;
         for (const auto &child : value.children) {
             if (first) first = false;
             else stream << ", ";
             stream << child->type;
         }
-        stream << "}";
-        return true;
-    }
-
-    template<>
-    [[maybe_unused]]
-    inline bool pretty_print(std::ostream &stream, const frontend::grammar::TerminalNode &value) {
-        stream << value.type << " ";
-        pretty_print(stream, value.token);
+        stream << " }";
         return true;
     }
 }
