@@ -53,7 +53,7 @@ namespace frontend::visitor {
 
 namespace frontend::visitor {
     class SysYVisitor {
-        using return_type_t = void;
+        using return_type = void;
 
         message_queue_t &message_queue;
 
@@ -61,7 +61,7 @@ namespace frontend::visitor {
          * Visit all children of the node. <br>
          * Use this method only if you have nothing to do with the node itself.
          */
-        return_type_t visitChildren(const GrammarNode &node);
+        return_type visitChildren(const GrammarNode &node);
 
         /**
          * The series of methods actually do the work. <br>
@@ -71,7 +71,7 @@ namespace frontend::visitor {
          * To let the methods do something, specialize them.
          */
         template<grammar_type_t type>
-        return_type_t visit(const GrammarNode &node);
+        return_type visit(const GrammarNode &node);
 
     public:
         explicit SysYVisitor(message_queue_t &message_queue) : message_queue(message_queue) {}
@@ -82,7 +82,7 @@ namespace frontend::visitor {
          * This method will no nothing but call the corresponding method according
          * to the type of the node.
          */
-        return_type_t visit(const GrammarNode &node);
+        return_type visit(const GrammarNode &node);
     };
 }
 

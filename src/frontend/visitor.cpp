@@ -32,7 +32,7 @@ namespace frontend::visitor {
 // visitor: helper functions
 namespace frontend::visitor {
     template<grammar_type_t type>
-    bool is_specific_type(const pcGrammarNode &node) {
+    inline bool is_specific_type(const pcGrammarNode &node) {
         return node->type == type;
     }
 
@@ -75,7 +75,7 @@ namespace frontend::visitor {
     using namespace grammar_type;
 
     template<>
-    SysYVisitor::return_type_t SysYVisitor::visit<PrintfStmt>(const GrammarNode &node) {
+    SysYVisitor::return_type SysYVisitor::visit<PrintfStmt>(const GrammarNode &node) {
         // PRINTFTK LPARENT STRCON (COMMA exp)* RPARENT SEMICN
         assert(node.children[2]->type == Terminal);
         auto &strcon = static_cast<const TerminalNode &>(*node.children[2]).token; // NOLINT
@@ -100,7 +100,7 @@ namespace frontend::visitor {
 
 // visitor: default methods
 namespace frontend::visitor {
-    SysYVisitor::return_type_t SysYVisitor::visit(const GrammarNode &node) {
+    SysYVisitor::return_type SysYVisitor::visit(const GrammarNode &node) {
         using namespace grammar_type;
         static decltype(&SysYVisitor::visit<CompUnit>) methods[] =
                 {&SysYVisitor::visit<CompUnit>, &SysYVisitor::visit<Decl>, &SysYVisitor::visit<ConstDecl>,
@@ -121,7 +121,7 @@ namespace frontend::visitor {
         return (this->*methods[node.type])(node);
     }
 
-    SysYVisitor::return_type_t SysYVisitor::visitChildren(const GrammarNode &node) {
+    SysYVisitor::return_type SysYVisitor::visitChildren(const GrammarNode &node) {
         for (const auto &ptr: node.children) {
             visit(*ptr);
         }
@@ -129,7 +129,7 @@ namespace frontend::visitor {
 
     // default: do nothing
     template<grammar_type_t type>
-    SysYVisitor::return_type_t SysYVisitor::visit(const GrammarNode &node) {
+    SysYVisitor::return_type SysYVisitor::visit(const GrammarNode &node) {
         visitChildren(node);
     }
 }
