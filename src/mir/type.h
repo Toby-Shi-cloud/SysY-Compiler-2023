@@ -6,6 +6,7 @@
 #define COMPILER_TYPE_H
 
 #include <vector>
+#include <ostream>
 
 namespace mir {
     struct Type;
@@ -53,6 +54,10 @@ namespace mir {
 
         static pIntegerType getI32Type();
 
+        bool operator==(const Type &other) const { return this == &other; }
+
+        bool operator!=(const Type &other) const { return this != &other; }
+
         [[nodiscard]] bool isVoidTy() const { return type == VOID; }
 
         [[nodiscard]] bool isLabelTy() const { return type == LABEL; }
@@ -81,7 +86,17 @@ namespace mir {
 
         [[nodiscard]] int getFunctionParamCount() const;
 
-        bool convertableTo(pType other) const;
+        [[nodiscard]] bool convertableTo(pType other) const;
+
+        [[nodiscard]] size_t size() const;
+
+        [[nodiscard]] ssize_t ssize() const;
+
+        [[nodiscard]] explicit operator std::string() const;
+
+        friend std::ostream &operator<<(std::ostream &o, const Type &t) { return o << std::string(t); }
+
+        friend std::ostream &operator<<(std::ostream &o, pType t) { return o << std::string(*t); }
 
     protected:
         explicit Type(TypeID type) : type(type) {}

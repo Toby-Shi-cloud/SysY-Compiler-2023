@@ -74,6 +74,46 @@ namespace mir {
         if (isArrayTy() && other->isPointerTy()) return getArrayBase() == other->getPointerBase();
         return false;
     }
+
+    size_t Type::size() const {
+        return static_cast<size_t>(ssize());
+    }
+
+    ssize_t Type::ssize() const {
+        if (isIntegerTy()) {
+            return (getIntegerBits() + 7) / 8;
+        } else if (isPointerTy() || isFunctionTy()) {
+            return 4;
+        } else if (isArrayTy()) {
+            return getArraySize() * getArrayBase()->ssize();
+        }
+        return 0;
+    }
+
+    Type::operator std::string() const {
+        using namespace std::string_literals;
+        if (isLabelTy()) {
+            return "<label>"s;
+        } else if (isVoidTy()) {
+            return "void"s;
+        } else if (isIntegerTy()) {
+            return "i" + std::to_string(getIntegerBits());
+        } else if (isPointerTy()) {
+            return std::string(*getPointerBase()) + "*";
+        } else if (isArrayTy()) {
+            return "[" + std::to_string(getArraySize()) + " x " + std::string(*getArrayBase()) + "]";
+        } else if (isFunctionTy()) {
+            std::string ret = std::string(*getFunctionRet());
+            std::string params;
+            for (auto param: getFunctionParams()) {
+                params += std::string(*param) + ", ";
+            }
+            if (!params.empty()) params.pop_back(), params.pop_back();
+            return ret + " (" + params + ")";
+        } else {
+            return "<unknown>"s;
+        }
+    }
 }
 
 #include <unordered_map>
