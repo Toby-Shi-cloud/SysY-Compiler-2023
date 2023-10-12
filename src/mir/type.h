@@ -5,6 +5,7 @@
 #ifndef COMPILER_TYPE_H
 #define COMPILER_TYPE_H
 
+#include "../dbg.h"
 #include <vector>
 #include <ostream>
 
@@ -69,6 +70,8 @@ namespace mir {
         [[nodiscard]] bool isArrayTy() const { return type == ARRAY; }
 
         [[nodiscard]] bool isFunctionTy() const { return type == FUNCTION; }
+
+        [[nodiscard]] bool isStringTy() const { return type == ARRAY && getArrayBase() == (Type *)getI8Type(); }
 
         [[nodiscard]] int getIntegerBits() const;
 

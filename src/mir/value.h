@@ -7,6 +7,7 @@
 
 #include "type.h"
 #include <string>
+#include <ostream>
 #include <unordered_set>
 
 // Use List
@@ -102,6 +103,16 @@ namespace mir {
 
         [[nodiscard]] auto getNumOperands() const { return operands.size(); }
     };
+
+    inline std::ostream &operator<<(std::ostream &os, const Value &value) {
+        return os << value.getType() << " " << value.getName();
+    }
+
+    template<typename T>
+    inline std::enable_if_t<std::is_base_of_v<Value, T>, std::ostream> &
+    operator<<(std::ostream &os, const T *value) {
+        return os << *value;
+    }
 }
 
 #endif //COMPILER_VALUE_H

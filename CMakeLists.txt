@@ -20,4 +20,6 @@ add_executable(Compiler
         src/mir/type.cpp
         src/mir/type.h
         src/mir/value.h
+        src/mir/derived_value.cpp
+        src/mir/derived_value.h
 )

@@ -3,7 +3,6 @@
 //
 
 #include "type.h"
-#include <cassert>
 
 // Type
 namespace mir {
