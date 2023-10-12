@@ -30,6 +30,8 @@ namespace mir {
      * Value is the base class for all mir values.
      */
     class Value {
+        friend class User;
+
         /**
          * Every Value has a type. <br>
          */
@@ -48,7 +50,6 @@ namespace mir {
          */
         bool isConstant;
 
-    protected:
         /**
          * Value owns Use. <br>
          * Value must transfer use to another Value
@@ -91,7 +92,12 @@ namespace mir {
 
     public:
         template<typename... Args>
-        explicit User(pType type, Args... args) : Value(type, (args->isConst() && ...)), operands{(args->use)...} {
+        explicit User(pType type, Args... args) : Value(type), operands{(args->use)...} {
+            for (auto operand: operands) operand->users.insert(this);
+        }
+
+        explicit User(pType type, const std::vector<Value *> &args) : Value(type) {
+            for (auto arg: args) operands.push_back(arg->use);
             for (auto operand: operands) operand->users.insert(this);
         }
 
@@ -99,7 +105,8 @@ namespace mir {
             for (auto operand: operands) operand->users.erase(this);
         }
 
-        [[nodiscard]] const Value *getOperand(int i) const { return operands[i]->value; }
+        template<typename R = Value>
+        [[nodiscard]] R *getOperand(int i) const { return static_cast<R *>(operands[i]->value); }
 
         [[nodiscard]] auto getNumOperands() const { return operands.size(); }
     };

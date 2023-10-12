@@ -90,7 +90,7 @@ namespace mir {
      * Instructions. <br>
      */
     struct Instruction : User {
-        enum Type {
+        enum InstrTy {
             // Terminator Instructions
             RET, BR,
             // Binary Operations
@@ -107,30 +107,39 @@ namespace mir {
 
         [[nodiscard]] virtual std::string to_string() const = 0;
 
-        explicit Instruction(pType type, Type instrTy) : User(type), instrTy(instrTy) {}
+        template<typename... Args>
+        explicit Instruction(pType type, InstrTy instrTy, Args ...args) : User(type, args...), instrTy(instrTy) {}
 
+        explicit Instruction(pType type, InstrTy instrTy, const std::vector<Value *> &args) :
+                User(type, args), instrTy(instrTy) {}
+
+    private:
+        template<InstrTy ty> struct _binary_instruction;
+        template<InstrTy ty> struct _conversion_instruction;
+
+    public:
         struct ret;
         struct br;
-        struct add;
-        struct sub;
-        struct mul;
-        struct udiv;
-        struct sdiv;
-        struct urem;
-        struct srem;
-        struct shl;
-        struct lshr;
-        struct ashr;
-        struct and_;
-        struct or_;
-        struct xor_;
-        struct alloca;
+        using add = _binary_instruction<ADD>;
+        using sub = _binary_instruction<SUB>;
+        using mul = _binary_instruction<MUL>;
+        using udiv = _binary_instruction<UDIV>;
+        using sdiv = _binary_instruction<SDIV>;
+        using urem = _binary_instruction<UREM>;
+        using srem = _binary_instruction<SREM>;
+        using shl = _binary_instruction<SHL>;
+        using lshr = _binary_instruction<LSHR>;
+        using ashr = _binary_instruction<ASHR>;
+        using and_ = _binary_instruction<AND>;
+        using or_ = _binary_instruction<OR>;
+        using xor_ = _binary_instruction<XOR>;
+        struct alloca_;
         struct load;
         struct store;
         struct getelementptr;
-        struct trunc;
-        struct zext;
-        struct sext;
+        using trunc = _conversion_instruction<TRUNC>;
+        using zext = _conversion_instruction<ZEXT>;
+        using sext = _conversion_instruction<SEXT>;
         struct icmp;
         struct phi;
         struct call;
@@ -181,6 +190,8 @@ namespace mir {
     std::ostream &operator<<(std::ostream &os, const GlobalVar &var);
 
     std::ostream &operator<<(std::ostream &os, const Instruction &instr);
+
+    std::ostream &operator<<(std::ostream &os, Instruction::InstrTy ty);
 }
 
 #endif //COMPILER_DERIVED_VALUE_H

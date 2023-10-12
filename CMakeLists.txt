@@ -22,4 +22,6 @@ add_executable(Compiler
         src/mir/value.h
         src/mir/derived_value.cpp
         src/mir/derived_value.h
+        src/mir/instruction.cpp
+        src/mir/instruction.h
 )

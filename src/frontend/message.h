@@ -7,6 +7,7 @@
 
 #include <vector>
 #include <ostream>
+#include <algorithm>
 
 namespace frontend {
     struct message {
@@ -36,6 +37,8 @@ inline std::ostream &operator<<(std::ostream &_o, frontend::message::type_t type
             return _o << "WARNING";
         case frontend::message::type_t::ERROR:
             return _o << "ERROR";
+        default:
+            return _o << "UNKNOWN";
     }
 }
 

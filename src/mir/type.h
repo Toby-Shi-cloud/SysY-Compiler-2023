@@ -95,11 +95,11 @@ namespace mir {
 
         [[nodiscard]] ssize_t ssize() const;
 
-        [[nodiscard]] explicit operator std::string() const;
+        [[nodiscard]] std::string to_string() const;
 
-        friend std::ostream &operator<<(std::ostream &o, const Type &t) { return o << std::string(t); }
+        friend std::ostream &operator<<(std::ostream &o, const Type &t) { return o << t.to_string(); }
 
-        friend std::ostream &operator<<(std::ostream &o, pType t) { return o << std::string(*t); }
+        friend std::ostream &operator<<(std::ostream &o, pType t) { return o << t->to_string(); }
 
     protected:
         explicit Type(TypeID type) : type(type) {}

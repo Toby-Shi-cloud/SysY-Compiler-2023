@@ -103,4 +103,22 @@ namespace mir {
     std::ostream &operator<<(std::ostream &os, const Instruction &instr) {
         return os << instr.to_string();
     }
+
+    std::ostream &operator<<(std::ostream &os, Instruction::InstrTy ty) {
+        static constexpr const char *names[] = {
+                // Terminator Instructions
+                "ret", "br",
+                // Binary Operations
+                "add", "sub", "mul", "udiv", "sdiv", "urem", "srem",
+                // Bitwise Binary Operations
+                "shl", "lshr", "ashr", "and", "or", "xor",
+                // Memory Access and Addressing Operations
+                "alloca", "load", "store", "getelementptr",
+                // Conversion Operations
+                "trunc", "zext", "sext",
+                // Other Operations
+                "icmp", "phi", "call"
+        };
+        return os << names[ty];
+    }
 }

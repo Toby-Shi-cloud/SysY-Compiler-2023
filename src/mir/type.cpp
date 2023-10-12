@@ -90,7 +90,7 @@ namespace mir {
         return 0;
     }
 
-    Type::operator std::string() const {
+    std::string Type::to_string() const {
         using namespace std::string_literals;
         if (isLabelTy()) {
             return "<label>"s;
@@ -99,14 +99,14 @@ namespace mir {
         } else if (isIntegerTy()) {
             return "i" + std::to_string(getIntegerBits());
         } else if (isPointerTy()) {
-            return std::string(*getPointerBase()) + "*";
+            return getPointerBase()->to_string() + "*";
         } else if (isArrayTy()) {
-            return "[" + std::to_string(getArraySize()) + " x " + std::string(*getArrayBase()) + "]";
+            return "[" + std::to_string(getArraySize()) + " x " + getArrayBase()->to_string() + "]";
         } else if (isFunctionTy()) {
-            std::string ret = std::string(*getFunctionRet());
+            std::string ret = getFunctionRet()->to_string();
             std::string params;
             for (auto param: getFunctionParams()) {
-                params += std::string(*param) + ", ";
+                params += param->to_string() + ", ";
             }
             if (!params.empty()) params.pop_back(), params.pop_back();
             return ret + " (" + params + ")";

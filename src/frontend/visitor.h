@@ -6,6 +6,7 @@
 #define COMPILER_VISITOR_H
 
 #include "grammar.h"
+#include <unordered_map>
 
 namespace frontend::visitor {
     using namespace frontend::grammar;
