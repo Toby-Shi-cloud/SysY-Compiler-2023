@@ -3,6 +3,7 @@
 //
 
 #include "type.h"
+#include <cassert>
 
 // Type
 namespace mir {
@@ -164,7 +165,7 @@ namespace mir {
         return cache[base];
     }
 
-    pArrayType ArrayType::getArrayTypeType(int size, pType base) {
+    pArrayType ArrayType::getArrayType(int size, pType base) {
         static map<std::pair<int, pType>, pArrayType> cache;
         std::pair<int, pType> key{size, base};
         if (cache.find(key) == cache.end()) {

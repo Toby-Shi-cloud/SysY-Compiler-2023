@@ -124,7 +124,7 @@ namespace mir {
         int size;
         pType base;
 
-        static pArrayType getArrayTypeType(int size, pType base);
+        static pArrayType getArrayType(int size, pType base);
 
     private:
         explicit ArrayType(int size, pType base) : Type(ARRAY), size(size), base(base) {}

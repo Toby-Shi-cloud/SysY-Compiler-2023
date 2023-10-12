@@ -5,6 +5,8 @@
 #ifndef COMPILER_DBG_H
 #define COMPILER_DBG_H
 
+#include <cassert>
+
 #ifdef _DEBUG_
 #define DBG_ENABLE
 #if __has_include(<dbg.h>) // has_include(...)
