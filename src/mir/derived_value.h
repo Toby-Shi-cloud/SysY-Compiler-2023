@@ -54,6 +54,10 @@ namespace mir {
         pType retType;
         std::vector<Argument *> args; // owns
         std::vector<BasicBlock *> bbs; // owns
+        static Function *getint;
+        static Function *putint;
+        static Function *putch;
+        static Function *putstr;
 
         explicit Function(pType type, std::string name) : Value(type), retType(type->getFunctionRet()) {
             setName(std::move(name));
@@ -188,6 +192,8 @@ namespace mir {
     std::ostream &operator<<(std::ostream &os, const GlobalVar &var);
 
     std::ostream &operator<<(std::ostream &os, const Instruction &instr);
+
+    std::ostream &operator<<(std::ostream &os, const Literal &literal);
 
     std::ostream &operator<<(std::ostream &os, Instruction::InstrTy ty);
 }

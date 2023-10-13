@@ -141,11 +141,11 @@ namespace frontend::visitor {
             }
             else {
                 if (ret_val->getType() != mir::Type::getI32Type()) {
-                    ret_val = new mir::Instruction::sext{mir::Type::getI32Type(), ret_val};
+                    ret_val = new mir::Instruction::zext{mir::Type::getI32Type(), ret_val};
                     ret_list.push_back(ret_val);
                 }
                 if (value->getType() != mir::Type::getI32Type()) {
-                    value = new mir::Instruction::sext{mir::Type::getI32Type(), value};
+                    value = new mir::Instruction::zext{mir::Type::getI32Type(), value};
                     ret_list.push_back(value);
                 }
                 ret_val = g(ret_val, value);
@@ -174,10 +174,90 @@ namespace frontend::visitor {
 
 // visitor: specific methods
 namespace frontend::visitor {
+    //TODO: IfStmt, ForLoopStmt, LAndExp, LOrExp, ConstDef, VarDef, FuncDef
+
     template<>
-    SysYVisitor::return_type SysYVisitor::visit<ConstDef>(const GrammarNode &node) {
-        // IDENFR (LBRACK constExp RBRACK)* ASSIGN constInitVal
-        auto type = getVarType(node.children.begin() + 1, node.children.end() - 2);
+    SysYVisitor::return_type SysYVisitor::visit<Block>(const GrammarNode &node) {
+        // LBRACE blockItem* RBRACE
+        symbol_table.enter_block();
+        auto result = visitChildren(node);
+        symbol_table.exit_block();
+        return result;
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<AssignStmt>(const GrammarNode &node) {
+        // lVal ASSIGN exp SEMICN
+        auto [variable, list] = visit(*node.children[0]);
+        auto [value, l] = visit(*node.children[2]);
+        list.merge(l);
+        if (variable->isConst()) {
+            auto &ident = node.children[0]->children[0]->getToken();
+            message_queue.push_back(message{
+                    message::ERROR, 'h', ident.line, ident.column,
+                    "cannot assign to const variable"
+            });
+            return {nullptr, list};
+        }
+        auto store = new Instruction::store(value, variable);
+        list.push_back(store);
+        return {store, list};
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<BreakStmt>(const GrammarNode &node) {
+        // BREAKTK SEMICN
+        auto &breaktk = node.children[0]->getToken();
+        if (loop_stack.empty()) {
+            message_queue.push_back(message{
+                    message::ERROR, 'm', breaktk.line, breaktk.column,
+                    "break statement not within a loop"
+            });
+            return {nullptr, {}};
+        }
+        return {nullptr, {new Instruction::br(loop_stack.top().break_block)}};
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<ContinueStmt>(const GrammarNode &node) {
+        // CONTINUETK SEMICN
+        auto &continuetk = node.children[0]->getToken();
+        if (loop_stack.empty()) {
+            message_queue.push_back(message{
+                    message::ERROR, 'm', continuetk.line, continuetk.column,
+                    "continue statement not within a loop"
+            });
+            return {nullptr, {}};
+        }
+        return {nullptr, {new Instruction::br(loop_stack.top().continue_block)}};
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<ReturnStmt>(const GrammarNode &node) {
+        // RETURNTK exp? SEMICN
+        if (node.children.size() == 2) return {nullptr, {new Instruction::ret()}};
+        auto [value, list] = visit(*node.children[1]);
+        list.push_back(new Instruction::ret(value));
+        return {nullptr, list};
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<GetintStmt>(const GrammarNode &node) {
+        // lVal ASSIGN GETINTTK LPARENT RPARENT SEMICN
+        auto [variable, list] = visit(*node.children[0]);
+        auto call = new Instruction::call(mir::Function::getint, {});
+        list.push_back(call);
+        if (variable->isConst()) {
+            auto &ident = node.children[0]->children[0]->getToken();
+            message_queue.push_back(message{
+                    message::ERROR, 'h', ident.line, ident.column,
+                    "cannot assign to const variable"
+            });
+            return {nullptr, list};
+        }
+        auto store = new Instruction::store(call, variable);
+        list.push_back(store);
+        return {store, list};
     }
 
     template<>
@@ -199,8 +279,31 @@ namespace frontend::visitor {
             auto &printftk = node.children[0]->getToken();
             message_queue.push_back(message{message::ERROR, 'l', printftk.line, printftk.column, msg});
         }
-        //TODO: generator code
-        return visitChildren(node);
+        auto [exps, list] = visitExps(node.children.begin() + 3, node.children.end() - 2);
+        auto exps_it = exps.begin();
+        auto str = std::string(strcon.raw.substr(1, strcon.raw.size() - 2));
+        size_t pos;
+        while ((pos = str.find("\\n")) != std::string::npos) {
+            str.replace(pos, 2, "\n");
+        }
+        auto sv = std::string_view(str);
+        while (!sv.empty()) {
+            pos = sv.find("%d");
+            if (pos != 0) {
+                auto literal = new mir::Literal(mir::make_literal(std::string(sv.substr(0, pos))));
+                manager.literalPool.insert(literal);
+                list.push_back(new Instruction::call(mir::Function::putstr, {literal}));
+            }
+            if (pos == std::string_view::npos) break;
+            list.push_back(new Instruction::call(mir::Function::putint, {*exps_it++}));
+            sv = sv.substr(pos + 2);
+        }
+        return {nullptr, list};
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<ForStmt>(const GrammarNode &node) {
+        return visit<AssignStmt>(node);
     }
 
     template<>
@@ -219,9 +322,21 @@ namespace frontend::visitor {
         if (node.children.size() > 1) {
             auto [indices, l] = visitExps(node.children.begin() + 1, node.children.end(), {zero_value});
             list.merge(l);
+            bool isConst = variable->isConst();
             variable = new Instruction::getelementptr(variable->getType(), variable, indices);
+            variable->setConst(isConst);
         }
-        auto value = new Instruction::load(mir::Type::getI32Type(), variable);
+        return {variable, list};
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<PrimaryExp>(const frontend::grammar::GrammarNode &node) {
+        // LPARENT exp RPARENT | lVal | number
+        auto [value, list] = visitChildren(node);
+        if (node.children[0]->type == LVal) {
+            value = new Instruction::load(mir::Type::getI32Type(), value);
+            list.push_back(value);
+        }
         return {value, list};
     }
 

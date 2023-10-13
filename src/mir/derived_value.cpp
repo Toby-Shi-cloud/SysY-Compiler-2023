@@ -5,6 +5,17 @@
 #include "derived_value.h"
 
 namespace mir {
+    Function *Function::getint = new Function(FunctionType::getFunctionType(Type::getI32Type(), {}), "getint");
+    Function *Function::putint = new Function(
+            FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type()}), "putint");
+    Function *Function::putch = new Function(
+            FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type()}), "putch");
+    Function *Function::putstr = new Function(
+            FunctionType::getFunctionType(Type::getVoidType(), {PointerType::getPointerType(Type::getI8Type())}),
+            "putstr");
+}
+
+namespace mir {
     BasicBlock::~BasicBlock() {
         for (auto instruction: instructions)
             delete instruction;
@@ -95,13 +106,37 @@ namespace mir {
         os << var.getName() << " = ";
         os << (var.unnamed ? "private unnamed_addr " : "dso_local ");
         os << (var.isConst() ? "constant " : "global ");
-        (var.init ? os << var.init : os << "zeroinitializer") << ", align ";
+        (var.init ? os << var.init : os << var.getType() << " zeroinitializer") << ", align ";
         os << (var.getType()->isStringTy() ? 1 : 4);
         return os;
     }
 
     std::ostream &operator<<(std::ostream &os, const Instruction &instr) {
         return os << instr.to_string();
+    }
+
+    std::ostream &operator<<(std::ostream &os, const Literal &literal) {
+        os << literal.getType() << " ";
+        if (literal.getType() == Type::getI1Type()) {
+            os << std::boolalpha << literal.getBool();
+        } else if (literal.getType() == Type::getI32Type()) {
+            os << literal.getInt();
+        } else if (literal.getType()->isArrayTy()) {
+            auto base = literal.getType()->getArrayBase();
+            if (base == Type::getI8Type()) {
+                os << '"' << literal.getString() << '"';
+            } else {
+                os << '[';
+                for (size_t i = 0; i < literal.getArray().size(); i++) {
+                    if (i) os << ", ";
+                    os << literal.getArray()[i];
+                }
+                os << ']';
+            }
+        } else {
+            assert(false);
+        }
+        return os;
     }
 
     std::ostream &operator<<(std::ostream &os, Instruction::InstrTy ty) {

@@ -9,7 +9,7 @@
 #include "grammar.h"
 #include "../mir/manager.h"
 #include <list>
-#include <deque>
+#include <stack>
 #include <unordered_map>
 
 namespace frontend::visitor {
@@ -65,10 +65,17 @@ namespace frontend::visitor {
         using value_vector = std::vector<value_type>;
         using return_type = std::tuple<value_type, value_list>;
 
+        struct loop_info {
+            mir::BasicBlock *continue_block;
+            mir::BasicBlock *break_block;
+        };
+
         mir::Manager &manager;
         message_queue_t &message_queue;
         SymbolTable symbol_table;
         mir::Literal *zero_value;
+        std::stack<loop_info> loop_stack;
+        mir::Function *current_function;
 
         /**
          * Visit all children of the node. <br>
@@ -88,8 +95,8 @@ namespace frontend::visitor {
 
     public:
         explicit SysYVisitor(mir::Manager &manager, message_queue_t &message_queue)
-                : manager(manager), message_queue(message_queue), symbol_table() {
-            zero_value = new mir::Literal(mir::make_literal(0));
+                : manager(manager), message_queue(message_queue),
+                  zero_value(new mir::Literal(mir::make_literal(0))) {
             manager.literalPool.insert(zero_value);
         }
 
