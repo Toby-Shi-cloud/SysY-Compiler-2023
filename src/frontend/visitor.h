@@ -62,11 +62,13 @@ namespace frontend::visitor {
     class SysYVisitor {
         using value_type = mir::Value *;
         using value_list = std::list<value_type>;
+        using value_vector = std::vector<value_type>;
         using return_type = std::tuple<value_type, value_list>;
 
         mir::Manager &manager;
         message_queue_t &message_queue;
         SymbolTable symbol_table;
+        mir::Literal *zero_value;
 
         /**
          * Visit all children of the node. <br>
@@ -86,7 +88,10 @@ namespace frontend::visitor {
 
     public:
         explicit SysYVisitor(mir::Manager &manager, message_queue_t &message_queue)
-                : manager(manager), message_queue(message_queue), symbol_table() {}
+                : manager(manager), message_queue(message_queue), symbol_table() {
+            zero_value = new mir::Literal(mir::make_literal(0));
+            manager.literalPool.insert(zero_value);
+        }
 
         /**
          * Visit the node. <br>
@@ -111,6 +116,13 @@ namespace frontend::visitor {
          * because they need short-circuit evaluation.
          */
         return_type visitBinaryExp(const GrammarNode &node);
+
+        /**
+         * A visitor helper for many exps, which are split by any terminal symbol. <br>
+         * Return a pair of value_vector and value_list. <br>
+         */
+        std::pair<value_vector, value_list>
+        visitExps(GrammarIterator begin, GrammarIterator end, value_vector init_value = {});
     };
 }
 

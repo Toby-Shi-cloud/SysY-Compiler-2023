@@ -79,6 +79,7 @@ namespace frontend::visitor {
     using namespace grammar_type;
     using namespace lexer::token_type;
     using lexer::token_type_t;
+    using mir::Instruction;
 
     mir::pType SysYVisitor::getVarType(GrammarIterator begin, GrammarIterator end) {
         mir::pType result = mir::Type::getI32Type();
@@ -105,7 +106,6 @@ namespace frontend::visitor {
     }
 
     SysYVisitor::return_type SysYVisitor::visitBinaryExp(const GrammarNode &node) {
-        using mir::Instruction;
         using literal_operator = decltype(&mir::literal_operators::operator+);
         using normal_operator = decltype(&get_binary_instruction<Instruction::add>);
         using namespace mir::literal_operators;
@@ -154,10 +154,32 @@ namespace frontend::visitor {
         }
         return {ret_val, ret_list};
     }
+
+    std::pair<SysYVisitor::value_vector, SysYVisitor::value_list>
+    SysYVisitor::visitExps(GrammarIterator begin, GrammarIterator end, value_vector init_value) {
+        value_vector &indices = init_value;
+        value_list list = {};
+        std::transform(begin, end, std::back_inserter(indices),
+                       [this, &list](const pcGrammarNode &ptr) -> value_type {
+                           if (ptr->type == grammar_type::Terminal) return nullptr;
+                           auto [value, l] = visit(*ptr);
+                           list.merge(l);
+                           return value;
+                       });
+        indices.erase(std::remove_if(indices.begin(), indices.end(), [](value_type ptr) { return ptr == nullptr; }),
+                      indices.end());
+        return {indices, list};
+    }
 }
 
 // visitor: specific methods
 namespace frontend::visitor {
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<ConstDef>(const GrammarNode &node) {
+        // IDENFR (LBRACK constExp RBRACK)* ASSIGN constInitVal
+        auto type = getVarType(node.children.begin() + 1, node.children.end() - 2);
+    }
+
     template<>
     SysYVisitor::return_type SysYVisitor::visit<PrintfStmt>(const GrammarNode &node) {
         // PRINTFTK LPARENT STRCON (COMMA exp)* RPARENT SEMICN
@@ -179,6 +201,94 @@ namespace frontend::visitor {
         }
         //TODO: generator code
         return visitChildren(node);
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<LVal>(const frontend::grammar::GrammarNode &node) {
+        // IDENFR (LBRACK exp RBRACK)*
+        auto &identifier = node.children[0]->getToken();
+        auto variable = symbol_table.lookup(identifier.raw);
+        if (variable == nullptr) {
+            message_queue.push_back(message{
+                    message::ERROR, 'c', identifier.line, identifier.column,
+                    "undefined symbol '" + std::string(identifier.raw) + "'"
+            });
+            return {zero_value, {}};
+        }
+        value_list list = {};
+        if (node.children.size() > 1) {
+            auto [indices, l] = visitExps(node.children.begin() + 1, node.children.end(), {zero_value});
+            list.merge(l);
+            variable = new Instruction::getelementptr(variable->getType(), variable, indices);
+        }
+        auto value = new Instruction::load(mir::Type::getI32Type(), variable);
+        return {value, list};
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<Number>(const frontend::grammar::GrammarNode &node) {
+        // INTCON
+        auto &token = node.children[0]->getToken();
+        auto value = std::stoi(token.raw.data());
+        auto literal = new mir::Literal(mir::make_literal(value));
+        manager.literalPool.insert(literal);
+        return {literal, {}};
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<UnaryExp>(const frontend::grammar::GrammarNode &node) {
+        // primaryExp | IDENFR LPARENT funcRParams? RPARENT | unaryOp unaryExp
+        if (node.children[0]->type == PrimaryExp) return visit(*node.children[0]);
+        if (node.children[0]->type == Terminal) {
+            auto &identifier = node.children[0]->getToken();
+            auto variable = symbol_table.lookup(identifier.raw);
+            if (variable == nullptr) {
+                message_queue.push_back(message{
+                        message::ERROR, 'c', identifier.line, identifier.column,
+                        "undefined symbol '" + std::string(identifier.raw) + "'"
+                });
+                return {zero_value, {}};
+            }
+            auto function = dynamic_cast<mir::Function *>(variable);
+            if (function == nullptr) {
+                message_queue.push_back(message{
+                        message::ERROR, 'c', identifier.line, identifier.column,
+                        "symbol '" + std::string(identifier.raw) + "' is not a function"
+                });
+                return {zero_value, {}};
+            }
+            value_list list = {};
+            if (node.children.size() == 3) {
+                auto call = new Instruction::call(function, {});
+                list.push_back(call);
+                return {call, list};
+            }
+            // visit funcRParams
+            auto [value, l] = visitExps(node.children[2]->children.begin(), node.children[2]->children.end());
+            list.merge(l);
+            auto call = new Instruction::call(function, value);
+            list.push_back(call);
+            return {call, list};
+        }
+        auto [value, list] = visit(*node.children[1]);
+        auto &unary_op = node.children[0]->children[0]->getToken();
+        switch (unary_op.type) {
+        case PLUS:
+            break;
+        case MINU:
+            value = new Instruction::sub(zero_value, value);
+            list.push_back(value);
+            break;
+        case NOT:
+            value = new Instruction::icmp(Instruction::icmp::EQ, value, zero_value);
+            list.push_back(value);
+            value = new Instruction::zext(mir::Type::getI32Type(), value);
+            list.push_back(value);
+            break;
+        default:
+            assert(false);
+        }
+        return {value, list};
     }
 
     template<>
@@ -234,7 +344,7 @@ namespace frontend::visitor {
         value_list list{};
         for (const auto &ptr: node.children) {
             auto [r1, r2] = visit(*ptr);
-            value = r1;
+            value = r1 ? r1 : value;
             list.merge(r2);
         }
         return {value, list};
