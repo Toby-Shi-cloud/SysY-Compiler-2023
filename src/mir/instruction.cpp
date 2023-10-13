@@ -3,17 +3,8 @@
 //
 
 #include "instruction.h"
-#include <sstream>
 
 namespace mir {
-    template<typename T>
-    static inline decltype(std::stringstream{} << std::declval<T>(), std::string{})
-    string_of(const T &value) {
-        std::stringstream ss;
-        ss << value;
-        return ss.str();
-    }
-
     static inline std::vector<Value *> merge(Value *ptr, const std::vector<Value *> &other) {
         std::vector<Value *> args = {ptr};
         args.insert(args.end(), other.begin(), other.end());
@@ -35,11 +26,6 @@ namespace mir {
         } else {
             return "br " + string_of(getTarget());
         }
-    }
-
-    template<Instruction::InstrTy ty>
-    std::string Instruction::_binary_instruction<ty>::to_string() const {
-        return getName() + " = " + string_of(ty) + string_of(getLhs()) + ", " + string_of(getRhs());
     }
 
     std::string Instruction::alloca_::to_string() const {
@@ -65,11 +51,6 @@ namespace mir {
             ss << ", " << getIndexOperand(i);
         }
         return ss.str();
-    }
-
-    template<Instruction::InstrTy ty>
-    std::string Instruction::_conversion_instruction<ty>::to_string() const {
-        return getName() + " = " + string_of(ty) + " " + string_of(getValueOperand()) + " to " + string_of(getType());
     }
 
     std::string Instruction::icmp::to_string() const {

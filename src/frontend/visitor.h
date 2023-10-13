@@ -5,19 +5,20 @@
 #ifndef COMPILER_VISITOR_H
 #define COMPILER_VISITOR_H
 
+#include "message.h"
 #include "grammar.h"
+#include "../mir/manager.h"
+#include <list>
+#include <deque>
 #include <unordered_map>
 
 namespace frontend::visitor {
     using namespace frontend::grammar;
 }
 
-#include "../mir/value.h"
-#include <deque>
-
 namespace frontend::visitor {
     class SymbolTable {
-        using store_type_t = const mir::Value *;
+        using store_type_t = mir::Value *;
         using table_t = std::unordered_map<std::string_view, store_type_t>;
 
         /**
@@ -38,9 +39,12 @@ namespace frontend::visitor {
 
         /**
          * @brief Insert a new symbol into the current block.
-         * @return the inserted symbol or nullptr if the symbol already exists.
+         * @param name the name of the symbol.
+         * @param value the value of the symbol.
+         * @param token the token where the symbol is defined.
+         * @return a message if the symbol already exists, or nullopt if the symbol is inserted successfully.
          */
-        store_type_t insert(std::string_view name, mir::pType type, bool isConstant = false);
+        std::optional<message> insert(std::string_view name, store_type_t value, const lexer::Token &token);
 
         /**
          * @brief Lookup a symbol in the current block.
@@ -53,10 +57,16 @@ namespace frontend::visitor {
 #include "message.h"
 
 namespace frontend::visitor {
-    class SysYVisitor {
-        using return_type = void;
+    using GrammarIterator = std::vector<pcGrammarNode>::const_iterator;
 
+    class SysYVisitor {
+        using value_type = mir::Value *;
+        using value_list = std::list<value_type>;
+        using return_type = std::tuple<value_type, value_list>;
+
+        mir::Manager &manager;
         message_queue_t &message_queue;
+        SymbolTable symbol_table;
 
         /**
          * Visit all children of the node. <br>
@@ -75,7 +85,8 @@ namespace frontend::visitor {
         return_type visit(const GrammarNode &node);
 
     public:
-        explicit SysYVisitor(message_queue_t &message_queue) : message_queue(message_queue) {}
+        explicit SysYVisitor(mir::Manager &manager, message_queue_t &message_queue)
+                : manager(manager), message_queue(message_queue), symbol_table() {}
 
         /**
          * Visit the node. <br>
@@ -84,6 +95,22 @@ namespace frontend::visitor {
          * to the type of the node.
          */
         return_type visit(const GrammarNode &node);
+
+        /* Helper methods */
+    private:
+        /**
+         * To get the type of a variable. <br>
+         * The parameter should be like this: <br>
+         *     LBRACK constExp? RBRACK (LBRACK constExp RBRACK)*
+         */
+        mir::pType getVarType(GrammarIterator begin, GrammarIterator end);
+
+        /**
+         * A visitor helper for binary expressions. <br>
+         * Note: LogicalAnd and LogicalOr are not included,
+         * because they need short-circuit evaluation.
+         */
+        return_type visitBinaryExp(const GrammarNode &node);
     };
 }
 

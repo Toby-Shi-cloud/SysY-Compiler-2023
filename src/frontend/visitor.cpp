@@ -4,21 +4,15 @@
 
 #include <iostream>
 #include "visitor.h"
+#include "../mir/instruction.h"
 
 namespace frontend::visitor {
-    SymbolTable::store_type_t SymbolTable::insert(std::string_view name, mir::pType type, bool isConstant) {
-        /** TODO:
-         * <li> To create some real instructions later. </li>
-         * <li> Values are owned by BasicBlocks, but now we still not have any,
-         * which means there is a memory leak here (Values are never freed and
-         * when the block is popped no one can find them). We can fix it by using
-         * unique_ptr or deleting them manually, but after all this is a temporary
-         * code.</li>
-         */
-        if (stack.back().count(name)) return nullptr;
-        auto value = new mir::Value(type, isConstant);
+    std::optional<message> SymbolTable::insert(std::string_view name, store_type_t value, const lexer::Token &token) {
+        if (stack.back().count(name)) return message{
+            message::ERROR, 'b', token.line, token.column, "redefinition of '" + std::string(name) + "'"
+        };
         stack.back()[name] = value;
-        return value;
+        return std::nullopt;
     }
 
     SymbolTable::store_type_t SymbolTable::lookup(std::string_view name) {
@@ -36,25 +30,35 @@ namespace frontend::visitor {
         return node->type == type;
     }
 
+    template<typename T>
+    inline mir::Instruction *get_binary_instruction(mir::Value *lhs, mir::Value *rhs) {
+        return new T{lhs, rhs};
+    }
+
+    template<mir::Instruction::icmp::Cond cond>
+    inline mir::Instruction *get_icmp_instruction(mir::Value *lhs, mir::Value *rhs) {
+        return new mir::Instruction::icmp{cond, lhs, rhs};
+    }
+
     inline std::optional<message> check_valid(const lexer::Token &str_token) {
         assert(str_token.type == lexer::token_type::STRCON);
         using namespace std::string_literals;
-        bool rslash = false;
+        bool backslash = false;
         bool percent = false;
         for (const char &ch: str_token.raw.substr(1, str_token.raw.size() - 2)) {
             auto line = str_token.line;
             auto column = str_token.column + (&ch - str_token.raw.data());
-            if (rslash) {
+            if (backslash) {
                 if (ch != 'n')
                     return message{message::ERROR, 'a', line, column - 1, "invalid escape sequence '\\"s + ch + "'"};
-                rslash = false;
+                backslash = false;
             } else if (percent) {
                 if (ch != 'd')
                     return message{message::ERROR, 'a', line, column - 1, "invalid format specifier '%"s + ch + "'"};
                 percent = false;
             } else {
                 if (ch == '\\') {
-                    rslash = true;
+                    backslash = true;
                 } else if (ch == '%') {
                     percent = true;
                 } else if (ch != 32 && ch != 33 && ch < 40 && ch > 126) {
@@ -62,7 +66,7 @@ namespace frontend::visitor {
                 }
             }
         }
-        if (rslash)
+        if (backslash)
             return message{message::ERROR, 'a', str_token.line, str_token.column + str_token.raw.size() - 2, "invalid escape sequence '\\'"};
         if (percent)
             return message{message::ERROR, 'a', str_token.line, str_token.column + str_token.raw.size() - 2, "invalid format specifier '%'"};
@@ -70,15 +74,94 @@ namespace frontend::visitor {
     }
 }
 
-// visitor: specific methods
+// visitor: helper methods
 namespace frontend::visitor {
     using namespace grammar_type;
+    using namespace lexer::token_type;
+    using lexer::token_type_t;
 
+    mir::pType SysYVisitor::getVarType(GrammarIterator begin, GrammarIterator end) {
+        mir::pType result = mir::Type::getI32Type();
+
+        for (auto it = std::reverse_iterator(end); it != std::reverse_iterator(begin); ++it) {
+            auto &node = *it;
+            if (node->type != grammar_type::Terminal) continue;
+            auto &token = node->getToken();
+            if (token.type == RBRACK) continue;
+            assert(token.type == LBRACK);
+            auto &exp = *(it - 1);
+            if (exp->type == grammar_type::Terminal) {
+                result = mir::PointerType::getPointerType(result);
+            } else {
+                assert(exp->type == grammar_type::ConstExp);
+                auto [value, list] = visit(*exp);
+                auto literal = dynamic_cast<mir::Literal *>(value);
+                assert(literal && list.empty());
+                result = mir::ArrayType::getArrayType(literal->getInt(), result);
+            }
+        }
+
+        return result;
+    }
+
+    SysYVisitor::return_type SysYVisitor::visitBinaryExp(const GrammarNode &node) {
+        using mir::Instruction;
+        using literal_operator = decltype(&mir::literal_operators::operator+);
+        using normal_operator = decltype(&get_binary_instruction<Instruction::add>);
+        using namespace mir::literal_operators;
+        using icmp = mir::Instruction::icmp;
+        static std::unordered_map<token_type_t, std::pair<literal_operator, normal_operator>> call_table = {
+                {PLUS, {&operator+, &get_binary_instruction<Instruction::add>}},
+                {MINU, {&operator-, &get_binary_instruction<Instruction::sub>}},
+                {MULT, {&operator*, &get_binary_instruction<Instruction::mul>}},
+                {DIV, {&operator/, &get_binary_instruction<Instruction::sdiv>}},
+                {MOD, {&operator%, &get_binary_instruction<Instruction::srem>}},
+                {LSS, {nullptr, &get_icmp_instruction<icmp::SLT>}},
+                {LEQ, {nullptr, &get_icmp_instruction<icmp::SLE>}},
+                {GRE, {nullptr, &get_icmp_instruction<icmp::SGT>}},
+                {GEQ, {nullptr, &get_icmp_instruction<icmp::SGE>}},
+                {EQL, {nullptr, &get_icmp_instruction<icmp::EQ>}},
+                {NEQ, {nullptr, &get_icmp_instruction<icmp::NE>}},
+        };
+
+        auto [ret_val, ret_list] = visit(*node.children[0]);
+        for (auto it = node.children.begin() + 1; it != node.children.end(); it += 2) {
+            auto &token = (*it)->getToken();
+            auto [value, list] = visit(*it[1]);
+            ret_list.merge(list);
+
+            auto ret_literal = dynamic_cast<mir::Literal *>(ret_val);
+            auto literal = dynamic_cast<mir::Literal *>(value);
+
+            auto [f, g] = call_table[token.type];
+
+            if (f && ret_literal && literal && ret_list.empty()) {
+                ret_literal = new mir::Literal(f(*ret_literal, *literal));
+                manager.literalPool.insert(ret_literal);
+            }
+            else {
+                if (ret_val->getType() != mir::Type::getI32Type()) {
+                    ret_val = new mir::Instruction::sext{mir::Type::getI32Type(), ret_val};
+                    ret_list.push_back(ret_val);
+                }
+                if (value->getType() != mir::Type::getI32Type()) {
+                    value = new mir::Instruction::sext{mir::Type::getI32Type(), value};
+                    ret_list.push_back(value);
+                }
+                ret_val = g(ret_val, value);
+                ret_list.push_back(ret_val);
+            }
+        }
+        return {ret_val, ret_list};
+    }
+}
+
+// visitor: specific methods
+namespace frontend::visitor {
     template<>
     SysYVisitor::return_type SysYVisitor::visit<PrintfStmt>(const GrammarNode &node) {
         // PRINTFTK LPARENT STRCON (COMMA exp)* RPARENT SEMICN
-        assert(node.children[2]->type == Terminal);
-        auto &strcon = static_cast<const TerminalNode &>(*node.children[2]).token; // NOLINT
+        auto &strcon = node.children[2]->getToken();
         if (auto msg = check_valid(strcon)) {
             message_queue.push_back(*msg);
         }
@@ -91,10 +174,35 @@ namespace frontend::visitor {
                     " arguments for format " + std::string(strcon.raw) +
                     ", expected " + std::to_string(count_format) +
                     " but " + std::to_string(count_params) + " given";
-            auto &printftk = static_cast<const TerminalNode &>(*node.children[0]).token; // NOLINT
+            auto &printftk = node.children[0]->getToken();
             message_queue.push_back(message{message::ERROR, 'l', printftk.line, printftk.column, msg});
         }
-        visitChildren(node);
+        //TODO: generator code
+        return visitChildren(node);
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<MulExp>(const frontend::grammar::GrammarNode &node) {
+        // unaryExp ((MULT | DIV | MOD) unaryExp)*
+        return visitBinaryExp(node);
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<AddExp>(const frontend::grammar::GrammarNode &node) {
+        // mulExp ((PLUS | MINU) mulExp)*
+        return visitBinaryExp(node);
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<RelExp>(const frontend::grammar::GrammarNode &node) {
+        // addExp ((LSS | LEQ | GRE | GEQ) addExp)*
+        return visitBinaryExp(node);
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<EqExp>(const frontend::grammar::GrammarNode &node) {
+        // relExp ((EQL | NEQ) relExp)*
+        return visitBinaryExp(node);
     }
 }
 
@@ -122,14 +230,19 @@ namespace frontend::visitor {
     }
 
     SysYVisitor::return_type SysYVisitor::visitChildren(const GrammarNode &node) {
+        value_type value{};
+        value_list list{};
         for (const auto &ptr: node.children) {
-            visit(*ptr);
+            auto [r1, r2] = visit(*ptr);
+            value = r1;
+            list.merge(r2);
         }
+        return {value, list};
     }
 
     // default: do nothing
     template<grammar_type_t type>
     SysYVisitor::return_type SysYVisitor::visit(const GrammarNode &node) {
-        visitChildren(node);
+        return visitChildren(node);
     }
 }

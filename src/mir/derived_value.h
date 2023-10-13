@@ -113,11 +113,9 @@ namespace mir {
         explicit Instruction(pType type, InstrTy instrTy, const std::vector<Value *> &args) :
                 User(type, args), instrTy(instrTy) {}
 
-    private:
         template<InstrTy ty> struct _binary_instruction;
         template<InstrTy ty> struct _conversion_instruction;
 
-    public:
         struct ret;
         struct br;
         using add = _binary_instruction<ADD>;

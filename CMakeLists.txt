@@ -24,4 +24,5 @@ add_executable(Compiler
         src/mir/derived_value.h
         src/mir/instruction.cpp
         src/mir/instruction.h
+        src/mir/manager.h
 )

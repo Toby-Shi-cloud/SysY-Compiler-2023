@@ -6,8 +6,17 @@
 #define COMPILER_INSTRUCTION_H
 
 #include "derived_value.h"
+#include <sstream>
 
 namespace mir {
+    template<typename T>
+    static inline decltype(std::stringstream{} << std::declval<T>(), std::string{})
+    string_of(const T &value) {
+        std::stringstream ss;
+        ss << value;
+        return ss.str();
+    }
+
     struct Instruction::ret : Instruction {
         explicit ret() : Instruction(Type::getVoidType(), RET) {}
 
@@ -57,7 +66,9 @@ namespace mir {
 
         [[nodiscard]] Value *getRhs() const { return getOperand(1); }
 
-        [[nodiscard]] std::string to_string() const override;
+        [[nodiscard]] std::string to_string() const override {
+            return getName() + " = " + string_of(ty) + string_of(getLhs()) + ", " + string_of(getRhs());
+        }
     };
 
     struct Instruction::alloca_ : Instruction {
@@ -102,7 +113,9 @@ namespace mir {
 
         [[nodiscard]] Value *getValueOperand() const { return getOperand(0); }
 
-        [[nodiscard]] std::string to_string() const override;
+        [[nodiscard]] std::string to_string() const override {
+            return getName() + " = " + string_of(ty) + " " + string_of(getValueOperand()) + " to " + string_of(getType());
+        }
     };
 
     struct Instruction::icmp : Instruction {
