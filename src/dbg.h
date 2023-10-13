@@ -19,19 +19,7 @@
 #endif // _DEBUG_
 
 #ifndef DBG_ENABLE
-#include <algorithm>
-namespace dbg {
-template <typename T>
-T&& identity(T&& t) {
-  return std::forward<T>(t);
-}
-
-template <typename T, typename... U>
-auto identity(T&&, U&&... u) {
-  return identity(std::forward<U>(u)...);
-}
-} // namespace dbg
-#define dbg(...) dbg::identity(__VA_ARGS__)
+#define dbg(...) ((void)0)
 #endif
 
 #endif //COMPILER_DBG_H

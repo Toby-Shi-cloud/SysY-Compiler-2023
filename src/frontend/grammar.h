@@ -51,6 +51,8 @@ namespace frontend::grammar {
 
         explicit GrammarNode(grammar_type_t type) : type(type) {}
 
+        [[nodiscard]] inline const lexer::Token &getToken() const;
+
         template<typename T>
         inline void push_all(T c) { for (auto &child : c) children.push_back(std::move(child)); }
     };
@@ -62,6 +64,11 @@ namespace frontend::grammar {
     };
 
     using pTerminalNode = std::unique_ptr<TerminalNode>;
+
+    inline const lexer::Token &GrammarNode::getToken() const {
+        assert(type == grammar_type::Terminal);
+        return static_cast<const TerminalNode &>(*this).token; // NOLINT
+    }
 }
 
 inline std::ostream &operator<<(std::ostream &os, frontend::grammar::grammar_type_t type) {
