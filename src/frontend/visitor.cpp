@@ -19,7 +19,7 @@ namespace frontend::visitor {
         for (auto it = stack.rbegin(); it != stack.rend(); ++it) {
             if (it->count(name)) return it->at(name);
         }
-        return nullptr;
+        return {};
     }
 }
 
@@ -177,6 +177,26 @@ namespace frontend::visitor {
     //TODO: IfStmt, ForLoopStmt, LAndExp, LOrExp, ConstDef, VarDef, FuncDef
 
     template<>
+    SysYVisitor::return_type SysYVisitor::visit<ConstDef>(const GrammarNode &node) {
+        // IDENFR (LBRACK constExp RBRACK)* ASSIGN constInitVal
+        auto &identifier = node.children[0]->getToken();
+        auto type = getVarType(node.children.begin() + 1, node.children.end() - 2);
+        if (current_function) {
+            return generateLocalVar(type, identifier, node.children.back(), true);
+        } else {
+            auto [value, list] = visit(*node.children.back());
+            auto literal = dynamic_cast<mir::Literal *>(value);
+            assert(literal && list.empty());
+            auto variable = new mir::GlobalVar(type, std::string(identifier.raw), literal, true);
+            manager.globalVars.push_back(variable);
+            if (auto msg = symbol_table.insert(identifier.raw, {variable, literal}, identifier)) {
+                message_queue.push_back(*msg);
+            }
+            return {};
+        }
+    }
+
+    template<>
     SysYVisitor::return_type SysYVisitor::visit<Block>(const GrammarNode &node) {
         // LBRACE blockItem* RBRACE
         symbol_table.enter_block();
@@ -290,9 +310,12 @@ namespace frontend::visitor {
         while (!sv.empty()) {
             pos = sv.find("%d");
             if (pos != 0) {
-                auto literal = new mir::Literal(mir::make_literal(std::string(sv.substr(0, pos))));
+                auto s = std::string(sv.substr(0, pos));
+                auto literal = new mir::Literal(mir::make_literal(s));
                 manager.literalPool.insert(literal);
-                list.push_back(new Instruction::call(mir::Function::putstr, {literal}));
+                auto var = new mir::GlobalVar(mir::Type::getStringType((int)s.length() + 1), literal, true);
+                manager.globalVars.push_back(var);
+                list.push_back(new Instruction::call(mir::Function::putstr, {var}));
             }
             if (pos == std::string_view::npos) break;
             list.push_back(new Instruction::call(mir::Function::putint, {*exps_it++}));
@@ -310,7 +333,7 @@ namespace frontend::visitor {
     SysYVisitor::return_type SysYVisitor::visit<LVal>(const frontend::grammar::GrammarNode &node) {
         // IDENFR (LBRACK exp RBRACK)*
         auto &identifier = node.children[0]->getToken();
-        auto variable = symbol_table.lookup(identifier.raw);
+        auto [variable, literal] = symbol_table.lookup(identifier.raw);
         if (variable == nullptr) {
             message_queue.push_back(message{
                     message::ERROR, 'c', identifier.line, identifier.column,
@@ -318,20 +341,38 @@ namespace frontend::visitor {
             });
             return {zero_value, {}};
         }
-        value_list list = {};
-        if (node.children.size() > 1) {
-            auto [indices, l] = visitExps(node.children.begin() + 1, node.children.end(), {zero_value});
-            list.merge(l);
-            bool isConst = variable->isConst();
-            variable = new Instruction::getelementptr(variable->getType(), variable, indices);
-            variable->setConst(isConst);
+        auto [indices, l] = visitExps(node.children.begin() + 1, node.children.end(), {zero_value});
+        if (in_const_expr) {
+            auto result = *literal;
+            if (node.children.size() > 1) {
+                assert(l.empty());
+                for (int i = 1; i < indices.size(); i++) {
+                    auto lit = dynamic_cast<mir::Literal *>(indices[i]);
+                    assert(lit);
+                    result = result.getArray()[lit->getInt()];
+                }
+                literal = new mir::Literal(result);
+                manager.literalPool.insert(literal);
+            }
+            return {literal, {}};
+        } else {
+            value_list list = {};
+            if (node.children.size() > 1) {
+                list.merge(l);
+                bool isConst = variable->isConst();
+                auto ty = variable->getType();
+                for (int i = 1; i < indices.size(); i++) ty = ty->getBase();
+                variable = new Instruction::getelementptr(ty, variable, indices);
+                variable->setConst(isConst);
+            }
+            return {variable, list};
         }
-        return {variable, list};
     }
 
     template<>
     SysYVisitor::return_type SysYVisitor::visit<PrimaryExp>(const frontend::grammar::GrammarNode &node) {
         // LPARENT exp RPARENT | lVal | number
+        if (in_const_expr) return visitChildren(node);
         auto [value, list] = visitChildren(node);
         if (node.children[0]->type == LVal) {
             value = new Instruction::load(mir::Type::getI32Type(), value);
@@ -356,7 +397,7 @@ namespace frontend::visitor {
         if (node.children[0]->type == PrimaryExp) return visit(*node.children[0]);
         if (node.children[0]->type == Terminal) {
             auto &identifier = node.children[0]->getToken();
-            auto variable = symbol_table.lookup(identifier.raw);
+            auto variable = symbol_table.lookup(identifier.raw).first;
             if (variable == nullptr) {
                 message_queue.push_back(message{
                         message::ERROR, 'c', identifier.line, identifier.column,
@@ -428,6 +469,15 @@ namespace frontend::visitor {
     SysYVisitor::return_type SysYVisitor::visit<EqExp>(const frontend::grammar::GrammarNode &node) {
         // relExp ((EQL | NEQ) relExp)*
         return visitBinaryExp(node);
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<ConstExp>(const frontend::grammar::GrammarNode &node) {
+        // addExp
+        in_const_expr = true;
+        auto [value, list] = visit(*node.children[0]);
+        in_const_expr = false;
+        return {value, list};
     }
 }
 

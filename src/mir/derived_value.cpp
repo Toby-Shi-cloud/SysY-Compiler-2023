@@ -5,14 +5,14 @@
 #include "derived_value.h"
 
 namespace mir {
-    Function *Function::getint = new Function(FunctionType::getFunctionType(Type::getI32Type(), {}), "getint");
+    Function *Function::getint = new Function(
+            FunctionType::getFunctionType(Type::getI32Type(), {}), "getint");
     Function *Function::putint = new Function(
             FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type()}), "putint");
     Function *Function::putch = new Function(
             FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type()}), "putch");
     Function *Function::putstr = new Function(
-            FunctionType::getFunctionType(Type::getVoidType(), {PointerType::getPointerType(Type::getI8Type())}),
-            "putstr");
+            FunctionType::getFunctionType(Type::getVoidType(), {Type::getStringType()}), "putstr");
 }
 
 namespace mir {
@@ -51,7 +51,7 @@ namespace mir {
         }
 
         Literal make_literal(const std::string &str) {
-            return Literal(ArrayType::getArrayType((int)str.size() + 1, Type::getI8Type()), str);
+            return Literal(Type::getStringType(), str);
         }
 
         Literal make_literal(const std::vector<Literal> &array) {
@@ -121,18 +121,15 @@ namespace mir {
             os << std::boolalpha << literal.getBool();
         } else if (literal.getType() == Type::getI32Type()) {
             os << literal.getInt();
+        } else if (literal.getType() == Type::getStringType()) {
+            os << '"' << literal.getString() << '"';
         } else if (literal.getType()->isArrayTy()) {
-            auto base = literal.getType()->getArrayBase();
-            if (base == Type::getI8Type()) {
-                os << '"' << literal.getString() << '"';
-            } else {
-                os << '[';
-                for (size_t i = 0; i < literal.getArray().size(); i++) {
-                    if (i) os << ", ";
-                    os << literal.getArray()[i];
-                }
-                os << ']';
+            os << '[';
+            for (size_t i = 0; i < literal.getArray().size(); i++) {
+                if (i) os << ", ";
+                os << literal.getArray()[i];
             }
+            os << ']';
         } else {
             assert(false);
         }

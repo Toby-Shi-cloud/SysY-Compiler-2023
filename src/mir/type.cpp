@@ -28,6 +28,18 @@ namespace mir {
         return IntegerType::getIntegerType(32);
     }
 
+    pPointerType Type::getStringType() {
+        return PointerType::getPointerType(getI8Type());
+    }
+
+    pArrayType Type::getStringType(int size) {
+        return ArrayType::getArrayType(size, getI8Type());
+    }
+
+    bool Type::isStringTy() const {
+        return isPointerTy() && getPointerBase() == getI8Type() || isArrayTy() && getArrayBase() == getI8Type();
+    }
+
     int Type::getIntegerBits() const {
         assert(isIntegerTy());
         return static_cast<pIntegerType>(this)->bits; // NOLINT
@@ -46,6 +58,12 @@ namespace mir {
     pType Type::getArrayBase() const {
         assert(isArrayTy());
         return static_cast<pArrayType>(this)->base; // NOLINT
+    }
+
+    pType Type::getBase() const {
+        if (isPointerTy()) return getPointerBase();
+        if (isArrayTy()) return getArrayBase();
+        return nullptr;
     }
 
     pType Type::getFunctionRet() const {

@@ -55,6 +55,10 @@ namespace mir {
 
         static pIntegerType getI32Type();
 
+        static pPointerType getStringType();
+
+        static pArrayType getStringType(int size);
+
         bool operator==(const Type &other) const { return this == &other; }
 
         bool operator!=(const Type &other) const { return this != &other; }
@@ -71,7 +75,7 @@ namespace mir {
 
         [[nodiscard]] bool isFunctionTy() const { return type == FUNCTION; }
 
-        [[nodiscard]] bool isStringTy() const { return type == ARRAY && getArrayBase() == (Type *)getI8Type(); }
+        [[nodiscard]] bool isStringTy() const;
 
         [[nodiscard]] int getIntegerBits() const;
 
@@ -80,6 +84,8 @@ namespace mir {
         [[nodiscard]] int getArraySize() const;
 
         [[nodiscard]] pType getArrayBase() const;
+
+        [[nodiscard]] pType getBase() const;
 
         [[nodiscard]] pType getFunctionRet() const;
 

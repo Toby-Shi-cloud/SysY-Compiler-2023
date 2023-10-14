@@ -18,7 +18,7 @@ namespace frontend::visitor {
 
 namespace frontend::visitor {
     class SymbolTable {
-        using store_type_t = mir::Value *;
+        using store_type_t = std::pair<mir::Value *, mir::Literal *>;
         using table_t = std::unordered_map<std::string_view, store_type_t>;
 
         /**
@@ -76,6 +76,7 @@ namespace frontend::visitor {
         mir::Literal *zero_value;
         std::stack<loop_info> loop_stack;
         mir::Function *current_function;
+        bool in_const_expr = false;
 
         /**
          * Visit all children of the node. <br>
@@ -96,7 +97,8 @@ namespace frontend::visitor {
     public:
         explicit SysYVisitor(mir::Manager &manager, message_queue_t &message_queue)
                 : manager(manager), message_queue(message_queue),
-                  zero_value(new mir::Literal(mir::make_literal(0))) {
+                  zero_value(new mir::Literal(mir::make_literal(0))),
+                  current_function(nullptr) {
             manager.literalPool.insert(zero_value);
         }
 
@@ -130,6 +132,12 @@ namespace frontend::visitor {
          */
         std::pair<value_vector, value_list>
         visitExps(GrammarIterator begin, GrammarIterator end, value_vector init_value = {});
+
+        /**
+         * A visitor helper for ConstDef and VarDef within a function. <br>
+         */
+        return_type
+        generateLocalVar(mir::pType type, const lexer::Token &ident, const pcGrammarNode &initVal, bool is_const);
     };
 }
 
