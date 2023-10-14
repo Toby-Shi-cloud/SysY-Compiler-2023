@@ -67,7 +67,7 @@ namespace mir {
         [[nodiscard]] Value *getRhs() const { return getOperand(1); }
 
         [[nodiscard]] std::string to_string() const override {
-            return getName() + " = " + string_of(ty) + string_of(getLhs()) + ", " + string_of(getRhs());
+            return getName() + " = " + string_of(ty) + " " + string_of(getLhs()) + ", " + getRhs()->getName();
         }
     };
 
@@ -86,11 +86,11 @@ namespace mir {
     };
 
     struct Instruction::store : Instruction {
-        explicit store(Value *dest, Value *src) : Instruction(Type::getVoidType(), STORE, dest, src) {}
+        explicit store(Value *src, Value *dest) : Instruction(Type::getVoidType(), STORE, src, dest) {}
 
-        [[nodiscard]] Value *getDest() const { return getOperand(0); }
+        [[nodiscard]] Value *getSrc() const { return getOperand(0); }
 
-        [[nodiscard]] Value *getSrc() const { return getOperand(1); }
+        [[nodiscard]] Value *getDest() const { return getOperand(1); }
 
         [[nodiscard]] std::string to_string() const override;
     };

@@ -36,9 +36,52 @@ namespace mir {
             if (bb->instructions.empty()) continue;
             bb->setName("%" + std::to_string(counter++));
             for (auto instruction : bb->instructions) {
+                if (!instruction->isValue()) continue;
                 instruction->setName("%" + std::to_string(counter++));
             }
         }
+    }
+
+    GlobalVar::GlobalVar(pType type, std::string name, Literal *init, bool isConstant)
+            : Value(type, isConstant), init(init), unnamed(false) {
+        setName("@" + std::move(name));
+        if (init) init->used++;
+    }
+
+    GlobalVar::GlobalVar(pType type, Literal *init, bool isConstant)
+            : Value(type, isConstant), init(init), unnamed(true) {
+        if (init) init->used++;
+    }
+
+    template<typename T>
+    Literal::Literal(pType type, T value) : Value(type, true), value(value) {
+        setName(value_string());
+    }
+
+    std::string Literal::value_string() const {
+        std::stringstream ss;
+        if (getType() == Type::getI1Type()) {
+            ss << std::boolalpha << getBool();
+        } else if (getType() == Type::getI32Type()) {
+            ss << getInt();
+        } else if (getType()->isStringTy()) {
+            std::string str = getString();
+            size_t pos;
+            while ((pos = str.find('\n')) != std::string::npos) {
+                str.replace(pos, 1, "\\0A");
+            }
+            ss << "c" << '"' << str << "\\00" << '"';
+        } else if (getType()->isArrayTy()) {
+            ss << '[';
+            for (size_t i = 0; i < getArray().size(); i++) {
+                if (i) ss << ", ";
+                ss << getArray()[i];
+            }
+            ss << ']';
+        } else {
+            assert(false);
+        }
+        return ss.str();
     }
 
     inline namespace literal_operators {
@@ -51,12 +94,15 @@ namespace mir {
         }
 
         Literal make_literal(const std::string &str) {
-            return Literal(Type::getStringType(), str);
+            return Literal(Type::getStringType(str.length() + 1), str);
         }
 
-        Literal make_literal(const std::vector<Literal> &array) {
+        Literal make_literal(std::vector<Literal *> array) {
             assert(!array.empty());
-            return Literal(ArrayType::getArrayType((int)array.size(), array[0].getType()), array);
+            for (auto item: array) item->used++;
+            auto size = static_cast<int>(array.size());
+            auto base = array[0]->getType();
+            return Literal(ArrayType::getArrayType(size, base), std::move(array));
         }
 
         Literal operator+(const Literal &lhs, const Literal &rhs) {
@@ -89,7 +135,7 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, const Function &func) {
-        os << "define dso_local " << func.getType() << " " << func.getName() << "(";
+        os << "define dso_local " << func.retType << " " << func.getName() << "(";
         for (size_t i = 0; i < func.args.size(); i++) {
             if (i) os << ", ";
             os << func.args[i];
@@ -116,23 +162,7 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, const Literal &literal) {
-        os << literal.getType() << " ";
-        if (literal.getType() == Type::getI1Type()) {
-            os << std::boolalpha << literal.getBool();
-        } else if (literal.getType() == Type::getI32Type()) {
-            os << literal.getInt();
-        } else if (literal.getType() == Type::getStringType()) {
-            os << '"' << literal.getString() << '"';
-        } else if (literal.getType()->isArrayTy()) {
-            os << '[';
-            for (size_t i = 0; i < literal.getArray().size(); i++) {
-                if (i) os << ", ";
-                os << literal.getArray()[i];
-            }
-            os << ']';
-        } else {
-            assert(false);
-        }
+        os << literal.getType() << " " << literal.value_string();
         return os;
     }
 

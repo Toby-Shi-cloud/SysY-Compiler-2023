@@ -112,7 +112,9 @@ namespace mir {
     };
 
     inline std::ostream &operator<<(std::ostream &os, const Value &value) {
-        return os << value.getType() << " " << value.getName();
+        if (value.getType()->isArrayTy()) os << "ptr";
+        else os << value.getType();
+        return os << " " << value.getName();
     }
 
     template<typename T>

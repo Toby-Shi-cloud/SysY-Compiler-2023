@@ -72,6 +72,19 @@ namespace frontend::visitor {
             return message{message::ERROR, 'a', str_token.line, str_token.column + str_token.raw.size() - 2, "invalid format specifier '%'"};
         return std::nullopt;
     }
+
+    inline std::vector<mir::Value *> literalToValueVec(mir::Literal *literal) {
+        if (literal == nullptr) return {};
+        if (literal->getType() == mir::Type::getI32Type()) {
+            return {literal};
+        }
+        std::vector<mir::Value *> ret = {};
+        for (auto &ele: literal->getArray()) {
+            auto e = literalToValueVec(ele);
+            ret.insert(ret.end(), e.begin(), e.end());
+        }
+        return ret;
+    }
 }
 
 // visitor: helper methods
@@ -128,7 +141,7 @@ namespace frontend::visitor {
         for (auto it = node.children.begin() + 1; it != node.children.end(); it += 2) {
             auto &token = (*it)->getToken();
             auto [value, list] = visit(*it[1]);
-            ret_list.merge(list);
+            ret_list.splice(ret_list.end(), list);
 
             auto ret_literal = dynamic_cast<mir::Literal *>(ret_val);
             auto literal = dynamic_cast<mir::Literal *>(value);
@@ -163,30 +176,82 @@ namespace frontend::visitor {
                        [this, &list](const pcGrammarNode &ptr) -> value_type {
                            if (ptr->type == grammar_type::Terminal) return nullptr;
                            auto [value, l] = visit(*ptr);
-                           list.merge(l);
+                           list.splice(list.end(), l);
                            return value;
                        });
         indices.erase(std::remove_if(indices.begin(), indices.end(), [](value_type ptr) { return ptr == nullptr; }),
                       indices.end());
         return {indices, list};
     }
+
+    SysYVisitor::value_list
+    SysYVisitor::storeInitValue(value_type var, mir::pType type,
+                                std::vector<value_type>::iterator initVal,
+                                std::vector<value_type> *index) {
+        if (index == nullptr && type == mir::Type::getI32Type()) {
+            auto store = new Instruction::store(*initVal, var);
+            return {store};
+        } else if (type == mir::Type::getI32Type()) {
+            auto ptr = new Instruction::getelementptr(type, var, *index);
+            auto store = new Instruction::store(std::any_cast<value_type>(initVal), ptr);
+            return {ptr, store};
+        }
+        std::vector<value_type> idx = index ? *index : std::vector<value_type>{zero_value};
+        auto base = type->getArrayBase();
+        auto ele_size = base->ssize() / 4;
+        value_list ret = {};
+        for (int i = 0; i < type->getArraySize(); i++) {
+            auto l = new mir::Literal(mir::make_literal(i));
+            manager.literalPool.insert(l);
+            idx.push_back(l);
+            auto list = storeInitValue(var, base, initVal + i * ele_size, index);
+            ret.splice(ret.end(), list);
+            idx.pop_back();
+        }
+        return ret;
+    }
+
+    std::pair<SysYVisitor::value_vector, SysYVisitor::value_list>
+    SysYVisitor::visitInitVal(const GrammarNode &node) {
+        // exp | LBRACE initVal (COMMA initVal)* RBRACE
+        if (node.children.size() == 1) {
+            auto [value, list] = visit(*node.children[0]);
+            return {{value}, list};
+        }
+        value_vector values;
+        value_list lists;
+        for (auto &child: node.children) {
+            if (child->type == Terminal) continue;
+            auto [value, list] = visitInitVal(*child);
+            values.insert(values.end(), value.begin(), value.end());
+            lists.splice(lists.end(), list);
+        }
+        return {values, lists};
+    }
 }
 
 // visitor: specific methods
 namespace frontend::visitor {
-    //TODO: IfStmt, ForLoopStmt, LAndExp, LOrExp, ConstDef, VarDef, FuncDef
+    //TODO: IfStmt, ForLoopStmt, LAndExp, LOrExp, FuncDef
 
     template<>
     SysYVisitor::return_type SysYVisitor::visit<ConstDef>(const GrammarNode &node) {
         // IDENFR (LBRACK constExp RBRACK)* ASSIGN constInitVal
         auto &identifier = node.children[0]->getToken();
         auto type = getVarType(node.children.begin() + 1, node.children.end() - 2);
+        auto [value, list] = visit(*node.children.back());
+        auto literal = dynamic_cast<mir::Literal *>(value);
+        assert(literal && list.empty());
         if (current_function) {
-            return generateLocalVar(type, identifier, node.children.back(), true);
+            auto alloca_ = new Instruction::alloca_(type);
+            auto result = storeInitValue(alloca_, type, literalToValueVec(literal).begin());
+            list.push_back(alloca_);
+            list.splice(list.end(), result);
+            if (auto msg = symbol_table.insert(identifier.raw, {alloca_, literal}, identifier)) {
+                message_queue.push_back(*msg);
+            }
+            return {nullptr, list};
         } else {
-            auto [value, list] = visit(*node.children.back());
-            auto literal = dynamic_cast<mir::Literal *>(value);
-            assert(literal && list.empty());
             auto variable = new mir::GlobalVar(type, std::string(identifier.raw), literal, true);
             manager.globalVars.push_back(variable);
             if (auto msg = symbol_table.insert(identifier.raw, {variable, literal}, identifier)) {
@@ -194,6 +259,115 @@ namespace frontend::visitor {
             }
             return {};
         }
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<ConstInitVal>(const GrammarNode &node) {
+        // constExp | LBRACE constInitVal (COMMA constInitVal)* RBRACE
+        if (node.children[0]->type != Terminal) return visit(*node.children[0]);
+        std::vector<mir::Literal *> literals;
+        for (auto &child: node.children) {
+            if (child->type == Terminal) continue;
+            auto [value, list] = visit(*child);
+            auto literal = dynamic_cast<mir::Literal *>(value);
+            assert(literal && list.empty());
+            literals.push_back(literal);
+        }
+        return {new mir::Literal(mir::make_literal(literals)), {}};
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<VarDef>(const GrammarNode &node) {
+        // IDENFR (LBRACK constExp RBRACK)* (ASSIGN initVal)?
+        auto &identifier = node.children[0]->getToken();
+        auto &initVal = node.children.back()->type == InitVal ? node.children.back() : (const pcGrammarNode &) nullptr;
+        auto type = getVarType(node.children.begin() + 1, node.children.end() - (initVal ? 2 : 0));
+        if (current_function) {
+            auto alloca_ = new Instruction::alloca_(type);
+            if (auto msg = symbol_table.insert(identifier.raw, {alloca_, nullptr}, identifier)) {
+                message_queue.push_back(*msg);
+            }
+            if (initVal == nullptr) return {nullptr, {alloca_}};
+            auto [vec, list] = visitInitVal(*initVal);
+            list.push_back(alloca_);
+            list.splice(list.end(), storeInitValue(alloca_, type, vec.begin()));
+            return {nullptr, list};
+        } else {
+            mir::Literal *literal;
+            if (initVal) {
+                auto [value, list] = visit<ConstInitVal>(*initVal);
+                literal = dynamic_cast<mir::Literal *>(value);
+                assert(literal && list.empty());
+            } else {
+                literal = nullptr;
+            }
+            auto variable = new mir::GlobalVar(type, std::string(identifier.raw), literal, false);
+            manager.globalVars.push_back(variable);
+            if (auto msg = symbol_table.insert(identifier.raw, {variable, nullptr}, identifier)) {
+                message_queue.push_back(*msg);
+            }
+            return {};
+        }
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<FuncDef>(const GrammarNode &node) {
+        // funcType IDENFR LPARENT funcFParams? RPARENT block
+        return {};
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<MainFuncDef>(const GrammarNode &node) {
+        // INTTK MAINTK LPARENT RPARENT block
+        auto func = new mir::Function(mir::FunctionType::getFunctionType(mir::Type::getI32Type(), {}), "main");
+        current_function = func;
+        manager.functions.push_back(func);
+        auto [_, list] = visit(*node.children.back());
+
+        value_list _allocas{};
+        for (auto it = list.begin(); it != list.end(); ) {
+            auto alloca_ = dynamic_cast<mir::Instruction::alloca_ *>(*it);
+            if (alloca_) {
+                _allocas.push_back(alloca_);
+                it = list.erase(it);
+            } else ++it;
+        }
+        _allocas.splice(_allocas.end(), list);
+        list = _allocas;
+
+        bool is_terminator = true;
+        mir::BasicBlock *cur = nullptr;
+        for (auto item: list) {
+            auto bb = dynamic_cast<mir::BasicBlock *>(item);
+            if (bb) {
+                if (!is_terminator) {
+                    auto br = new Instruction::br(bb);
+                    cur->instructions.push_back(br);
+                }
+                cur = bb;
+                func->bbs.push_back(bb);
+                is_terminator = false;
+            } else {
+                if (is_terminator) {
+                    bb = new mir::BasicBlock();
+                    cur = bb;
+                    func->bbs.push_back(bb);
+                    is_terminator = false;
+                }
+                auto instr = dynamic_cast<mir::Instruction *>(item);
+                assert(instr);
+                cur->instructions.push_back(instr);
+                is_terminator = instr->isTerminator();
+            }
+        }
+        if (cur == nullptr || cur->instructions.back()->instrTy != Instruction::RET) {
+            auto &token = node.children.back()->children.back()->getToken();
+            message_queue.push_back({
+                message::ERROR, 'g', token.line, token.column,
+                "missing return statement in main function"
+            });
+        }
+        return {};
     }
 
     template<>
@@ -210,7 +384,7 @@ namespace frontend::visitor {
         // lVal ASSIGN exp SEMICN
         auto [variable, list] = visit(*node.children[0]);
         auto [value, l] = visit(*node.children[2]);
-        list.merge(l);
+        list.splice(list.end(), l);
         if (variable->isConst()) {
             auto &ident = node.children[0]->children[0]->getToken();
             message_queue.push_back(message{
@@ -343,27 +517,25 @@ namespace frontend::visitor {
         }
         auto [indices, l] = visitExps(node.children.begin() + 1, node.children.end(), {zero_value});
         if (in_const_expr) {
-            auto result = *literal;
             if (node.children.size() > 1) {
                 assert(l.empty());
                 for (int i = 1; i < indices.size(); i++) {
                     auto lit = dynamic_cast<mir::Literal *>(indices[i]);
                     assert(lit);
-                    result = result.getArray()[lit->getInt()];
+                    literal = literal->getArray()[lit->getInt()];
                 }
-                literal = new mir::Literal(result);
-                manager.literalPool.insert(literal);
             }
             return {literal, {}};
         } else {
             value_list list = {};
             if (node.children.size() > 1) {
-                list.merge(l);
+                list.splice(list.end(), l);
                 bool isConst = variable->isConst();
                 auto ty = variable->getType();
                 for (int i = 1; i < indices.size(); i++) ty = ty->getBase();
                 variable = new Instruction::getelementptr(ty, variable, indices);
                 variable->setConst(isConst);
+                list.push_back(variable);
             }
             return {variable, list};
         }
@@ -421,7 +593,7 @@ namespace frontend::visitor {
             }
             // visit funcRParams
             auto [value, l] = visitExps(node.children[2]->children.begin(), node.children[2]->children.end());
-            list.merge(l);
+            list.splice(list.end(), l);
             auto call = new Instruction::call(function, value);
             list.push_back(call);
             return {call, list};
@@ -510,7 +682,7 @@ namespace frontend::visitor {
         for (const auto &ptr: node.children) {
             auto [r1, r2] = visit(*ptr);
             value = r1 ? r1 : value;
-            list.merge(r2);
+            list.splice(list.end(), r2);
         }
         return {value, list};
     }

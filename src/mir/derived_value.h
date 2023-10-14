@@ -59,8 +59,8 @@ namespace mir {
         static Function *putch;
         static Function *putstr;
 
-        explicit Function(pType type, std::string name) : Value(type), retType(type->getFunctionRet()) {
-            setName(std::move(name));
+        explicit Function(pType type, const std::string &name) : Value(type), retType(type->getFunctionRet()) {
+            setName("@" + name);
         }
 
         /**
@@ -81,13 +81,9 @@ namespace mir {
         Literal *init; // nullptr if we should use ZeroInitializer
         const bool unnamed;
 
-        explicit GlobalVar(pType type, std::string name, Literal *init, bool isConstant)
-                : Value(type, isConstant), init(init), unnamed(false) {
-            setName(std::move(name));
-        }
+        explicit GlobalVar(pType type, std::string name, Literal *init, bool isConstant);
 
-        explicit GlobalVar(pType type, Literal *init, bool isConstant)
-                : Value(type, isConstant), init(init), unnamed(true) {}
+        explicit GlobalVar(pType type, Literal *init, bool isConstant);
     };
 
     /**
@@ -110,6 +106,10 @@ namespace mir {
         } instrTy;
 
         [[nodiscard]] virtual std::string to_string() const = 0;
+
+        [[nodiscard]] bool isTerminator() const { return instrTy == RET || instrTy == BR; }
+
+        [[nodiscard]] bool isValue() const { return getType() != Type::getVoidType(); }
 
         template<typename... Args>
         explicit Instruction(pType type, InstrTy instrTy, Args ...args) : User(type, args...), instrTy(instrTy) {}
@@ -151,10 +151,13 @@ namespace mir {
      * Literal is a constant value. <br>
      */
     struct Literal : Value {
+        size_t used = 0;
         std::any value;
 
         template<typename T>
-        explicit Literal(pType type, T value) : Value(type, true), value(value) {}
+        explicit Literal(pType type, T value);
+
+        [[nodiscard]] std::string value_string() const;
 
         [[nodiscard]] bool getBool() const { return *std::any_cast<bool>(&value); }
 
@@ -162,7 +165,9 @@ namespace mir {
 
         [[nodiscard]] const std::string &getString() const { return *std::any_cast<std::string>(&value); }
 
-        [[nodiscard]] const std::vector<Literal> &getArray() const { return *std::any_cast<std::vector<Literal>>(&value); }
+        [[nodiscard]] const std::vector<Literal *> &getArray() const {
+            return *std::any_cast<std::vector<Literal *>>(&value);
+        }
     };
 
     inline namespace literal_operators {
@@ -172,7 +177,7 @@ namespace mir {
 
         Literal make_literal(const std::string &str);
 
-        Literal make_literal(const std::vector<Literal> &array);
+        Literal make_literal(std::vector<Literal *> array);
 
         Literal operator+(const Literal &lhs, const Literal &rhs);
 

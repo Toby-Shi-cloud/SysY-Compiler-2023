@@ -73,7 +73,10 @@ namespace mir {
 
     std::string Instruction::call::to_string() const {
         std::stringstream ss;
-        ss << getName() << " = call " << getFunction()->getName() << "(";
+        if (getFunction()->retType != Type::getVoidType())
+            ss << getName() << " = ";
+        ss << "call " << getFunction()->getType();
+        ss << " " << getFunction()->getName() << "(";
         for (int i = 0; i < getNumArgs(); i++) {
             if (i) ss << ", ";
             ss << getArg(i);

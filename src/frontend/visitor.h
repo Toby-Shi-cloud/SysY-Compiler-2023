@@ -66,6 +66,7 @@ namespace frontend::visitor {
         using return_type = std::tuple<value_type, value_list>;
 
         struct loop_info {
+            mir::BasicBlock *loop_block;
             mir::BasicBlock *continue_block;
             mir::BasicBlock *break_block;
         };
@@ -134,10 +135,13 @@ namespace frontend::visitor {
         visitExps(GrammarIterator begin, GrammarIterator end, value_vector init_value = {});
 
         /**
-         * A visitor helper for ConstDef and VarDef within a function. <br>
+         * A visitor helper for store init value to a variable. <br>
          */
-        return_type
-        generateLocalVar(mir::pType type, const lexer::Token &ident, const pcGrammarNode &initVal, bool is_const);
+        value_list storeInitValue(value_type var, mir::pType type,
+                                  std::vector<value_type>::iterator initVal,
+                                  std::vector<value_type> *index = nullptr);
+
+        std::pair<value_vector, value_list> visitInitVal(const GrammarNode &node);
     };
 }
 
