@@ -310,6 +310,7 @@ namespace frontend::visitor {
             auto result = storeInitValue(alloca_, type, literalToValueVec(literal).begin());
             list.push_back(alloca_);
             list.splice(list.end(), result);
+            alloca_->setConst(true);
             if (auto msg = symbol_table.insert(identifier.raw, {alloca_, literal}, identifier)) {
                 message_queue.push_back(*msg);
             }
@@ -431,7 +432,7 @@ namespace frontend::visitor {
     template<>
     SysYVisitor::return_type SysYVisitor::visit<FuncFParam>(const GrammarNode &node) {
         // bType IDENFR (LBRACK RBRACK (LBRACK constExp RBRACK)*)?
-        auto identifier = node.children[1]->getToken();
+        auto &identifier = node.children[1]->getToken();
         auto type = getVarType(node.children.begin() + 2, node.children.end());
         auto virtual_value = new mir::Value(type);
         virtual_value->setName(std::string(identifier.raw));
@@ -566,6 +567,20 @@ namespace frontend::visitor {
     template<>
     SysYVisitor::return_type SysYVisitor::visit<ReturnStmt>(const GrammarNode &node) {
         // RETURNTK exp? SEMICN
+        auto &returntk = node.children[0]->getToken();
+        if (current_function->retType == mir::Type::getVoidType() && node.children.size() == 3) {
+            message_queue.push_back(message{
+                    message::ERROR, 'f', returntk.line, returntk.column,
+                    "void function should not return a value"
+            });
+            return {nullptr, {}};
+        } else if (current_function->retType != mir::Type::getVoidType() && node.children.size() == 2) {
+            message_queue.push_back(message{
+                    message::ERROR, 'f', returntk.line, returntk.column,
+                    "Non-void function should return a value"
+            });
+            return {nullptr, {}};
+        }
         if (node.children.size() == 2) return {nullptr, {new Instruction::ret()}};
         auto [value, list] = visit(*node.children[1]);
         list.push_back(new Instruction::ret(value));
@@ -597,6 +612,7 @@ namespace frontend::visitor {
         auto &strcon = node.children[2]->getToken();
         if (auto msg = check_valid(strcon)) {
             message_queue.push_back(*msg);
+            return {};
         }
         auto count_params = std::count_if(node.children.begin(), node.children.end(), &is_specific_type<Exp>);
         auto count_format = std::count(strcon.raw.begin(), strcon.raw.end(), '%');
@@ -650,7 +666,7 @@ namespace frontend::visitor {
                     message::ERROR, 'c', identifier.line, identifier.column,
                     "undefined symbol '" + std::string(identifier.raw) + "'"
             });
-            return {zero_value, {}};
+            return {undefined, {}};
         }
         auto [indices, l] = visitExps(node.children.begin() + 1, node.children.end(), {zero_value});
         if (in_const_expr) {

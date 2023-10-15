@@ -83,6 +83,7 @@ namespace frontend::visitor {
         std::stack<condition_info> cond_stack;
         mir::Function *current_function;
         bool in_const_expr = false;
+        mir::Value *undefined = new mir::Value(mir::Type::getVoidType());
         std::vector<const lexer::Token *> token_buffer;
 
         /**
