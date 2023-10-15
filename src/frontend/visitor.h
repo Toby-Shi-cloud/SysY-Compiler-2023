@@ -63,7 +63,7 @@ namespace frontend::visitor {
         using value_type = mir::Value *;
         using value_list = std::list<value_type>;
         using value_vector = std::vector<value_type>;
-        using return_type = std::tuple<value_type, value_list>;
+        using return_type = std::pair<value_type, value_list>;
 
         struct loop_info {
             mir::BasicBlock *loop_block;
@@ -78,6 +78,7 @@ namespace frontend::visitor {
         std::stack<loop_info> loop_stack;
         mir::Function *current_function;
         bool in_const_expr = false;
+        std::vector<const lexer::Token *> token_buffer;
 
         /**
          * Visit all children of the node. <br>
@@ -142,6 +143,11 @@ namespace frontend::visitor {
                                   std::vector<value_type> *index = nullptr);
 
         std::pair<value_vector, value_list> visitInitVal(const GrammarNode &node);
+
+        /**
+         * A helper method to convert a list of values to bbs, and add to current function.
+         */
+        void listToBB(value_list &list, const lexer::Token &end_token);
     };
 }
 

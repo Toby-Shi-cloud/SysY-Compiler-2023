@@ -6,6 +6,7 @@
 #include "visitor.h"
 #include "../mir/instruction.h"
 
+// Symbol Table
 namespace frontend::visitor {
     std::optional<message> SymbolTable::insert(std::string_view name, store_type_t value, const lexer::Token &token) {
         if (stack.back().count(name)) return message{
@@ -150,6 +151,7 @@ namespace frontend::visitor {
 
             if (f && ret_literal && literal && ret_list.empty()) {
                 ret_literal = new mir::Literal(f(*ret_literal, *literal));
+                ret_val = ret_literal;
                 manager.literalPool.insert(ret_literal);
             }
             else {
@@ -227,6 +229,62 @@ namespace frontend::visitor {
             lists.splice(lists.end(), list);
         }
         return {values, lists};
+    }
+
+    void SysYVisitor::listToBB(value_list &list, const lexer::Token &end_token) {
+        value_list _allocas{};
+        for (auto it = list.begin(); it != list.end();) {
+            auto alloca_ = dynamic_cast<mir::Instruction::alloca_ *>(*it);
+            if (alloca_) {
+                _allocas.push_back(alloca_);
+                it = list.erase(it);
+            } else ++it;
+        }
+        _allocas.splice(_allocas.end(), list);
+        list = _allocas;
+
+        bool is_terminator = true;
+        mir::BasicBlock *cur = nullptr;
+        for (auto item: list) {
+            auto bb = dynamic_cast<mir::BasicBlock *>(item);
+            if (bb) {
+                if (!is_terminator) {
+                    auto br = new Instruction::br(bb);
+                    cur->instructions.push_back(br);
+                }
+                cur = bb;
+                current_function->bbs.push_back(bb);
+                is_terminator = false;
+            } else {
+                if (is_terminator) {
+                    bb = new mir::BasicBlock();
+                    cur = bb;
+                    current_function->bbs.push_back(bb);
+                    is_terminator = false;
+                }
+                auto instr = dynamic_cast<mir::Instruction *>(item);
+                assert(instr);
+                cur->instructions.push_back(instr);
+                is_terminator = instr->isTerminator();
+            }
+        }
+
+        if (current_function->getType()->getFunctionRet() != mir::Type::getVoidType()) {
+            if (cur == nullptr || cur->instructions.back()->instrTy != Instruction::RET) {
+                message_queue.push_back({
+                    message::ERROR, 'g', end_token.line, end_token.column,
+                    "Non-void function does not return a value"
+                });
+            }
+        } else {
+            if (cur == nullptr) {
+                cur = new mir::BasicBlock();
+                current_function->bbs.push_back(cur);
+                cur->instructions.push_back(new Instruction::ret());
+            } else if (!cur->instructions.back()->isTerminator()) {
+                cur->instructions.push_back(new Instruction::ret());
+            }
+        }
     }
 }
 
@@ -313,6 +371,44 @@ namespace frontend::visitor {
     template<>
     SysYVisitor::return_type SysYVisitor::visit<FuncDef>(const GrammarNode &node) {
         // funcType IDENFR LPARENT funcFParams? RPARENT block
+        auto funcRetType = node.children.front()->children.front()->getToken().type == VOIDTK ?
+                           mir::Type::getVoidType() : mir::Type::getI32Type();
+        auto &identifier = node.children[1]->getToken();
+        decltype(token_buffer)().swap(token_buffer);
+        value_list params_list = node.children.size() == 6 ? visit(*node.children[3]).second : value_list{};
+        std::vector<mir::pType> params;
+        std::transform(params_list.begin(), params_list.end(), std::back_inserter(params),
+                       [](value_type value) {
+                           return value->getType();
+                       });
+        auto funcType = mir::FunctionType::getFunctionType(funcRetType, std::move(params));
+        auto func = new mir::Function(funcType, std::string(identifier.raw));
+        current_function = func;
+        manager.functions.push_back(func);
+        if (auto msg = symbol_table.insert(identifier.raw, {func, nullptr}, identifier)) {
+            message_queue.push_back(*msg);
+        }
+        symbol_table.enter_cache_block();
+        auto it1 = params_list.begin();
+        auto it2 = token_buffer.begin();
+        value_list init_list = {};
+        for (; it1 != params_list.end(); ++it1, ++it2) {
+            auto arg = func->addArgument((*it1)->getType());
+            mir::Value *val = arg;
+            if (arg->getType() == mir::Type::getI32Type()) {
+                auto alloca_ = new Instruction::alloca_(mir::Type::getI32Type());
+                auto store_ = new Instruction::store(arg, alloca_);
+                init_list.push_back(alloca_);
+                init_list.push_back(store_);
+                val = alloca_;
+            }
+            if (auto msg = symbol_table.insert((*it1)->getName(), {val, nullptr}, **it2)) {
+                message_queue.push_back(*msg);
+            }
+        }
+        auto [_, list] = visit(*node.children.back());
+        init_list.splice(init_list.end(), list);
+        listToBB(init_list, node.children.back()->children.back()->getToken());
         return {};
     }
 
@@ -323,51 +419,19 @@ namespace frontend::visitor {
         current_function = func;
         manager.functions.push_back(func);
         auto [_, list] = visit(*node.children.back());
-
-        value_list _allocas{};
-        for (auto it = list.begin(); it != list.end(); ) {
-            auto alloca_ = dynamic_cast<mir::Instruction::alloca_ *>(*it);
-            if (alloca_) {
-                _allocas.push_back(alloca_);
-                it = list.erase(it);
-            } else ++it;
-        }
-        _allocas.splice(_allocas.end(), list);
-        list = _allocas;
-
-        bool is_terminator = true;
-        mir::BasicBlock *cur = nullptr;
-        for (auto item: list) {
-            auto bb = dynamic_cast<mir::BasicBlock *>(item);
-            if (bb) {
-                if (!is_terminator) {
-                    auto br = new Instruction::br(bb);
-                    cur->instructions.push_back(br);
-                }
-                cur = bb;
-                func->bbs.push_back(bb);
-                is_terminator = false;
-            } else {
-                if (is_terminator) {
-                    bb = new mir::BasicBlock();
-                    cur = bb;
-                    func->bbs.push_back(bb);
-                    is_terminator = false;
-                }
-                auto instr = dynamic_cast<mir::Instruction *>(item);
-                assert(instr);
-                cur->instructions.push_back(instr);
-                is_terminator = instr->isTerminator();
-            }
-        }
-        if (cur == nullptr || cur->instructions.back()->instrTy != Instruction::RET) {
-            auto &token = node.children.back()->children.back()->getToken();
-            message_queue.push_back({
-                message::ERROR, 'g', token.line, token.column,
-                "missing return statement in main function"
-            });
-        }
+        listToBB(list, node.children.back()->children.back()->getToken());
         return {};
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<FuncFParam>(const GrammarNode &node) {
+        // bType IDENFR (LBRACK RBRACK (LBRACK constExp RBRACK)*)?
+        auto identifier = node.children[1]->getToken();
+        auto type = getVarType(node.children.begin() + 2, node.children.end());
+        auto virtual_value = new mir::Value(type);
+        virtual_value->setName(std::string(identifier.raw));
+        token_buffer.push_back(&identifier);
+        return {nullptr, {virtual_value}};
     }
 
     template<>
