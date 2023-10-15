@@ -5,9 +5,10 @@
 #include "instruction.h"
 
 namespace mir {
-    static inline std::vector<Value *> merge(Value *ptr, const std::vector<Value *> &other) {
+    static inline std::vector<Value *>
+    merge(Value *ptr, std::vector<Value *>::const_iterator cbegin, std::vector<Value *>::const_iterator cend) {
         std::vector<Value *> args = {ptr};
-        args.insert(args.end(), other.begin(), other.end());
+        args.insert(args.end(), cbegin, cend);
         return args;
     }
 
@@ -22,9 +23,9 @@ namespace mir {
     std::string Instruction::br::to_string() const {
         if (hasCondition()) {
             assert(getCondition()->getType() == (pType) Type::getI1Type());
-            return "br " + string_of(getCondition()) + ", " + string_of(getIfTrue()) + ", " + string_of(getIfFalse());
+            return "br " + string_of(getCondition()) + ", label " + getIfTrue()->getName() + ", label " + getIfFalse()->getName();
         } else {
-            return "br " + string_of(getTarget());
+            return "br label " + getTarget()->getName();
         }
     }
 
@@ -41,11 +42,13 @@ namespace mir {
     }
 
     Instruction::getelementptr::getelementptr(pType type, Value *ptr, const std::vector<Value *> &idxs)
-            : Instruction(type, GETELEMENTPTR, merge(ptr, idxs)) {}
+            : Instruction(type, GETELEMENTPTR, merge(ptr, idxs.begin() + ptr->getType()->isPointerTy(), idxs.end())) {}
 
     std::string Instruction::getelementptr::to_string() const {
         std::stringstream ss;
-        ss << getName() << " = getelementptr " << getPointerOperand()->getType()
+        auto index_ty = getPointerOperand()->getType();
+        if (index_ty->isPointerTy()) index_ty = index_ty->getPointerBase();
+        ss << getName() << " = getelementptr " << index_ty
            << ", ptr " << getPointerOperand()->getName();
         for (int i = 0; i < getNumIndices(); i++) {
             ss << ", " << getIndexOperand(i);
@@ -69,7 +72,7 @@ namespace mir {
     }
 
     Instruction::call::call(Function *func, const std::vector<Value *> &args)
-            : Instruction(func->getType()->getFunctionRet(), CALL, merge(func, args)) {}
+            : Instruction(func->getType()->getFunctionRet(), CALL, merge(func, args.begin(), args.end())) {}
 
     std::string Instruction::call::to_string() const {
         std::stringstream ss;

@@ -270,7 +270,7 @@ namespace frontend::visitor {
         }
 
         if (current_function->getType()->getFunctionRet() != mir::Type::getVoidType()) {
-            if (cur == nullptr || cur->instructions.back()->instrTy != Instruction::RET) {
+            if (cur == nullptr || cur->instructions.empty() || cur->instructions.back()->instrTy != Instruction::RET) {
                 message_queue.push_back({
                     message::ERROR, 'g', end_token.line, end_token.column,
                     "Non-void function does not return a value"
@@ -281,17 +281,22 @@ namespace frontend::visitor {
                 cur = new mir::BasicBlock();
                 current_function->bbs.push_back(cur);
                 cur->instructions.push_back(new Instruction::ret());
-            } else if (!cur->instructions.back()->isTerminator()) {
+            } else if (cur->instructions.empty() || !cur->instructions.back()->isTerminator()) {
                 cur->instructions.push_back(new Instruction::ret());
             }
         }
+    }
+
+    SysYVisitor::value_type SysYVisitor::truncToI1(value_type value, value_list &list) {
+        if (value->getType() == mir::Type::getI1Type()) return value;
+        auto icmp =  new Instruction::icmp(mir::Instruction::icmp::NE, value, zero_value);
+        list.push_back(icmp);
+        return icmp;
     }
 }
 
 // visitor: specific methods
 namespace frontend::visitor {
-    //TODO: IfStmt, ForLoopStmt, LAndExp, LOrExp, FuncDef
-
     template<>
     SysYVisitor::return_type SysYVisitor::visit<ConstDef>(const GrammarNode &node) {
         // IDENFR (LBRACK constExp RBRACK)* ASSIGN constInitVal
@@ -441,6 +446,74 @@ namespace frontend::visitor {
         auto result = visitChildren(node);
         symbol_table.exit_block();
         return result;
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<IfStmt>(const GrammarNode &node) {
+        // IFTK LPARENT cond RPARENT stmt (ELSETK stmt)?
+        cond_stack.push({new mir::BasicBlock(), new mir::BasicBlock()});
+        auto [cond_v, cond_l] = visit(*node.children[2]);
+        auto [if_v, if_l] = visit(*node.children[4]);
+        value_list list = {};
+        list.splice(list.end(), cond_l);
+        list.push_back(cond_stack.top().true_block);
+        list.splice(list.end(), if_l);
+        if (node.children.size() == 7) {
+            auto [else_v, else_l] = visit(*node.children[6]);
+            auto end_block = new mir::BasicBlock();
+            list.push_back(new Instruction::br(end_block));
+            list.push_back(cond_stack.top().false_block);
+            list.splice(list.end(), else_l);
+            list.push_back(end_block);
+        } else {
+            list.push_back(cond_stack.top().false_block);
+        }
+        cond_stack.pop();
+        return {nullptr, list};
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<ForLoopStmt>(const GrammarNode &node) {
+        // FORTK LPARENT forStmt? SEMICN cond? SEMICN forStmt? RPARENT stmt
+        auto is_semicn = [](const pcGrammarNode &ptr) {
+            return ptr->type == Terminal && ptr->getToken().type == SEMICN;
+        };
+        auto semicn1 = std::find_if(node.children.begin(), node.children.end(), is_semicn);
+        auto semicn2 = std::find_if(semicn1 + 1, node.children.end(), is_semicn);
+        auto forStmt1_it = std::find_if(node.children.begin(), semicn1, &is_specific_type<ForStmt>);
+        auto cond_it = std::find_if(semicn1 + 1, semicn2, &is_specific_type<Cond>);
+        auto forStmt2_it = std::find_if(semicn2 + 1, node.children.end(), &is_specific_type<ForStmt>);
+        auto &forStmt1 = forStmt1_it == semicn1 ? (const pcGrammarNode &) nullptr : *forStmt1_it;
+        auto &cond = cond_it == semicn2 ? (const pcGrammarNode &) nullptr : *cond_it;
+        auto &forStmt2 = forStmt2_it == node.children.end() ? (const pcGrammarNode &) nullptr : *forStmt2_it;
+        auto &stmt = node.children.back();
+        // forStmt1 -> (br) -> (true) -> stmt -> (continue) -> forStmt2 -> (cond) -> cond -> (break/false)
+        auto cond_block = new mir::BasicBlock();
+        loop_stack.push({new mir::BasicBlock(), new mir::BasicBlock()});
+        cond_stack.push({new mir::BasicBlock(), loop_stack.top().break_block});
+        value_list list = {};
+        if (forStmt1) {
+            auto [v, l] = visit(*forStmt1);
+            list.splice(list.end(), l);
+        }
+        list.push_back(new Instruction::br(cond_block));
+        list.push_back(cond_stack.top().true_block);
+        auto [_v, _l] = visit(*stmt);
+        list.splice(list.end(), _l);
+        list.push_back(loop_stack.top().continue_block);
+        if (forStmt2) {
+            auto [v, l] = visit(*forStmt2);
+            list.splice(list.end(), l);
+        }
+        list.push_back(cond_block);
+        if (cond) {
+            auto [v, l] = visit(*cond);
+            list.splice(list.end(), l);
+        }
+        list.push_back(cond_stack.top().false_block);
+        cond_stack.pop();
+        loop_stack.pop();
+        return {nullptr, list};
     }
 
     template<>
@@ -610,7 +683,7 @@ namespace frontend::visitor {
         // LPARENT exp RPARENT | lVal | number
         if (in_const_expr) return visitChildren(node);
         auto [value, list] = visitChildren(node);
-        if (node.children[0]->type == LVal) {
+        if (node.children[0]->type == LVal && value->getType() == mir::Type::getI32Type()) {
             value = new Instruction::load(mir::Type::getI32Type(), value);
             list.push_back(value);
         }
@@ -705,6 +778,43 @@ namespace frontend::visitor {
     SysYVisitor::return_type SysYVisitor::visit<EqExp>(const frontend::grammar::GrammarNode &node) {
         // relExp ((EQL | NEQ) relExp)*
         return visitBinaryExp(node);
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<LAndExp>(const frontend::grammar::GrammarNode &node) {
+        // eqExp (AND eqExp)*
+        auto [value, list] = visit(*node.children[0]);
+        value = truncToI1(value, list);
+        for (auto it = node.children.begin() + 1; it != node.children.end(); ++it) {
+            if ((*it)->type == Terminal) continue;
+            auto bb = new mir::BasicBlock();
+            list.push_back(new Instruction::br(value, bb, cond_stack.top().false_block));
+            list.push_back(bb);
+            auto [v, l] = visit(**it);
+            value = truncToI1(v, l);
+            list.splice(list.end(), l);
+        }
+        list.push_back(new Instruction::br(value, cond_stack.top().true_block, cond_stack.top().false_block));
+        return {value, list};
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<LOrExp>(const frontend::grammar::GrammarNode &node) {
+        // lAndExp (OR lAndExp)*
+        auto count = std::count_if(node.children.begin(), node.children.end(), &is_specific_type<LAndExp>);
+        value_type value = nullptr;
+        value_list list = {};
+        for (int i = 0; i < count; i++) {
+            auto &lAndExp = *node.children[i * 2];
+            mir::BasicBlock *false_block = i + 1 == count ? cond_stack.top().false_block : new mir::BasicBlock();
+            cond_stack.push({cond_stack.top().true_block, false_block});
+            auto [v, l] = visit(lAndExp);
+            value = truncToI1(v, l);
+            list.splice(list.end(), l);
+            if (i + 1 != count) list.push_back(false_block);
+            cond_stack.pop();
+        }
+        return {value, list};
     }
 
     template<>

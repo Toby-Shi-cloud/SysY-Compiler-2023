@@ -66,9 +66,13 @@ namespace frontend::visitor {
         using return_type = std::pair<value_type, value_list>;
 
         struct loop_info {
-            mir::BasicBlock *loop_block;
             mir::BasicBlock *continue_block;
             mir::BasicBlock *break_block;
+        };
+
+        struct condition_info {
+            mir::BasicBlock *true_block;
+            mir::BasicBlock *false_block;
         };
 
         mir::Manager &manager;
@@ -76,6 +80,7 @@ namespace frontend::visitor {
         SymbolTable symbol_table;
         mir::Literal *zero_value;
         std::stack<loop_info> loop_stack;
+        std::stack<condition_info> cond_stack;
         mir::Function *current_function;
         bool in_const_expr = false;
         std::vector<const lexer::Token *> token_buffer;
@@ -148,6 +153,11 @@ namespace frontend::visitor {
          * A helper method to convert a list of values to bbs, and add to current function.
          */
         void listToBB(value_list &list, const lexer::Token &end_token);
+
+        /**
+         * A helper method to convert a value to I1.
+         */
+        value_type truncToI1(value_type value, value_list &list);
     };
 }
 
