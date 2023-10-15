@@ -10,6 +10,7 @@ mir::Manager mir_manager;
 int main(int argc, char **argv) {
     std::ifstream fin(argc >= 2 ? argv[1] : "testfile.txt");
     std::ofstream fout(argc >= 3 ? argv[2] : "output.txt");
+    std::ofstream ferr(argc >= 4 ? argv[3] : "error.txt");
 
     std::string src, s;
     while (std::getline(fin, s)) {
@@ -24,8 +25,12 @@ int main(int argc, char **argv) {
     frontend::sort_by_line(message_queue);
     for (auto &message: message_queue) {
         std::cout << message << std::endl;
+        ferr << message.line << " " << (char)message.code << std::endl;
     }
-    mir_manager.cleanPool();
-    mir_manager.output(fout);
+
+    if (message_queue.empty()) {
+        mir_manager.cleanPool();
+        mir_manager.output(fout);
+    }
     return 0;
 }

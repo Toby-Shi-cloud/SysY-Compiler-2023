@@ -3,6 +3,7 @@
 //
 
 #include "derived_value.h"
+#include <sstream>
 
 namespace mir {
     Function *Function::getint = new Function(

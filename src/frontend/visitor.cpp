@@ -62,7 +62,7 @@ namespace frontend::visitor {
                     backslash = true;
                 } else if (ch == '%') {
                     percent = true;
-                } else if (ch != 32 && ch != 33 && ch < 40 && ch > 126) {
+                } else if (ch != 32 && ch != 33 && (ch < 40 || ch > 126)) {
                     return message{message::ERROR, 'a', line, column, "invalid character '"s + ch + "'"};
                 }
             }
@@ -730,6 +730,24 @@ namespace frontend::visitor {
             }
             // visit funcRParams
             auto [value, l] = visitExps(node.children[2]->children.begin(), node.children[2]->children.end());
+            if (function->getType()->getFunctionParamCount() != value.size()) {
+                message_queue.push_back(message{
+                        message::ERROR, 'd', identifier.line, identifier.column,
+                        std::string("too ") +
+                        (function->getType()->getFunctionParamCount() < value.size() ? "many" : "few") +
+                        " arguments for function '" + std::string(identifier.raw) + "'"
+                });
+            } else {
+                for (int i = 0; i < value.size(); i++) {
+                    if (!value[i]->getType()->convertableTo(function->getType()->getFunctionParam(i))) {
+                        message_queue.push_back(message{
+                                message::ERROR, 'e', identifier.line, identifier.column,
+                                std::string("incompatible type for the ") + std::to_string(i + 1) +
+                                "th argument of function '" + std::string(identifier.raw) + "'"
+                        });
+                    }
+                }
+            }
             list.splice(list.end(), l);
             auto call = new Instruction::call(function, value);
             list.push_back(call);
@@ -737,6 +755,17 @@ namespace frontend::visitor {
         }
         auto [value, list] = visit(*node.children[1]);
         auto &unary_op = node.children[0]->children[0]->getToken();
+        if (in_const_expr) {
+            auto literal = dynamic_cast<mir::Literal *>(value);
+            assert(literal && list.empty());
+            if (unary_op.type == MINU) {
+                literal = new mir::Literal(mir::make_literal(-literal->getInt()));
+                manager.literalPool.insert(literal);
+            } else if (unary_op.type != PLUS) {
+                assert(false);
+            }
+            return {literal, {}};
+        }
         switch (unary_op.type) {
         case PLUS:
             break;
