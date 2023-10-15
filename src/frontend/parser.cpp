@@ -15,7 +15,7 @@ namespace frontend::parser {
         if (auto result = grammarNode(CompUnit, gen)) {
             return result;
         }
-        throw std::runtime_error("No main function found");
+        throw std::runtime_error("Error while parsing CompUnit");
     }
 
     template<>
@@ -126,10 +126,10 @@ namespace frontend::parser {
 
     template<>
     pGrammarNode SysYParser::parse_impl<Stmt>() {
-        auto gen = generator<AssignStmt>() | generator<ExpStmt>() | generator<BlockStmt>() |
+        auto gen = generator<AssignStmt>() | generator<BlockStmt>() |
                    generator<IfStmt>() | generator<ForLoopStmt>() | generator<BreakStmt>() |
                    generator<ContinueStmt>() | generator<ReturnStmt>() | generator<GetintStmt>() |
-                   generator<PrintfStmt>();
+                   generator<PrintfStmt>() | generator<ExpStmt>();
         return grammarNode(Stmt, gen);
     }
 
@@ -141,7 +141,7 @@ namespace frontend::parser {
 
     template<>
     pGrammarNode SysYParser::parse_impl<ExpStmt>() {
-        auto gen = generator<Exp>() * OPTION + generator<SEMICN>();
+        auto gen = generator<SEMICN>() | (generator<Exp>() + generator<SEMICN>('i'));
         return grammarNode(ExpStmt, gen);
     }
 
