@@ -625,6 +625,7 @@ namespace frontend::visitor {
                     " but " + std::to_string(count_params) + " given";
             auto &printftk = node.children[0]->getToken();
             message_queue.push_back(message{message::ERROR, 'l', printftk.line, printftk.column, msg});
+            return {};
         }
         auto [exps, list] = visitExps(node.children.begin() + 3, node.children.end() - 2);
         auto exps_it = exps.begin();
