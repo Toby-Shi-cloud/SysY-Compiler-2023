@@ -68,9 +68,11 @@ namespace frontend::visitor {
             }
         }
         if (backslash)
-            return message{message::ERROR, 'a', str_token.line, str_token.column + str_token.raw.size() - 2, "invalid escape sequence '\\'"};
+            return message{message::ERROR, 'a', str_token.line, str_token.column + str_token.raw.size() - 2,
+                           "invalid escape sequence '\\'"};
         if (percent)
-            return message{message::ERROR, 'a', str_token.line, str_token.column + str_token.raw.size() - 2, "invalid format specifier '%'"};
+            return message{message::ERROR, 'a', str_token.line, str_token.column + str_token.raw.size() - 2,
+                           "invalid format specifier '%'"};
         return std::nullopt;
     }
 
@@ -128,14 +130,14 @@ namespace frontend::visitor {
                 {PLUS, {&operator+, &get_binary_instruction<Instruction::add>}},
                 {MINU, {&operator-, &get_binary_instruction<Instruction::sub>}},
                 {MULT, {&operator*, &get_binary_instruction<Instruction::mul>}},
-                {DIV, {&operator/, &get_binary_instruction<Instruction::sdiv>}},
-                {MOD, {&operator%, &get_binary_instruction<Instruction::srem>}},
-                {LSS, {nullptr, &get_icmp_instruction<icmp::SLT>}},
-                {LEQ, {nullptr, &get_icmp_instruction<icmp::SLE>}},
-                {GRE, {nullptr, &get_icmp_instruction<icmp::SGT>}},
-                {GEQ, {nullptr, &get_icmp_instruction<icmp::SGE>}},
-                {EQL, {nullptr, &get_icmp_instruction<icmp::EQ>}},
-                {NEQ, {nullptr, &get_icmp_instruction<icmp::NE>}},
+                {DIV,  {&operator/, &get_binary_instruction<Instruction::sdiv>}},
+                {MOD,  {&operator%, &get_binary_instruction<Instruction::srem>}},
+                {LSS,  {nullptr,    &get_icmp_instruction<icmp::SLT>}},
+                {LEQ,  {nullptr,    &get_icmp_instruction<icmp::SLE>}},
+                {GRE,  {nullptr,    &get_icmp_instruction<icmp::SGT>}},
+                {GEQ,  {nullptr,    &get_icmp_instruction<icmp::SGE>}},
+                {EQL,  {nullptr,    &get_icmp_instruction<icmp::EQ>}},
+                {NEQ,  {nullptr,    &get_icmp_instruction<icmp::NE>}},
         };
 
         auto [ret_val, ret_list] = visit(*node.children[0]);
@@ -153,8 +155,7 @@ namespace frontend::visitor {
                 ret_literal = new mir::Literal(f(*ret_literal, *literal));
                 ret_val = ret_literal;
                 manager.literalPool.insert(ret_literal);
-            }
-            else {
+            } else {
                 if (ret_val->getType() != mir::Type::getI32Type()) {
                     ret_val = new mir::Instruction::zext{mir::Type::getI32Type(), ret_val};
                     ret_list.push_back(ret_val);
@@ -195,7 +196,7 @@ namespace frontend::visitor {
             return {store};
         } else if (type == mir::Type::getI32Type()) {
             auto ptr = new Instruction::getelementptr(type, var, *index);
-            auto store = new Instruction::store(std::any_cast<value_type>(initVal), ptr);
+            auto store = new Instruction::store(*initVal, ptr);
             return {ptr, store};
         }
         std::vector<value_type> idx = index ? *index : std::vector<value_type>{zero_value};
@@ -289,7 +290,7 @@ namespace frontend::visitor {
 
     SysYVisitor::value_type SysYVisitor::truncToI1(value_type value, value_list &list) {
         if (value->getType() == mir::Type::getI1Type()) return value;
-        auto icmp =  new Instruction::icmp(mir::Instruction::icmp::NE, value, zero_value);
+        auto icmp = new Instruction::icmp(mir::Instruction::icmp::NE, value, zero_value);
         list.push_back(icmp);
         return icmp;
     }
@@ -641,7 +642,7 @@ namespace frontend::visitor {
                 auto s = std::string(sv.substr(0, pos));
                 auto literal = new mir::Literal(mir::make_literal(s));
                 manager.literalPool.insert(literal);
-                auto var = new mir::GlobalVar(mir::Type::getStringType((int)s.length() + 1), literal, true);
+                auto var = new mir::GlobalVar(mir::Type::getStringType((int) s.length() + 1), literal, true);
                 manager.globalVars.push_back(var);
                 list.push_back(new Instruction::call(mir::Function::putstr, {var}));
             }
