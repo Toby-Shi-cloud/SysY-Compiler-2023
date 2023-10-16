@@ -327,14 +327,16 @@ namespace frontend::visitor {
         }
     }
 
+    template<> SysYVisitor::return_type SysYVisitor::visit<ConstExp>(const GrammarNode &node);
+
     template<>
     SysYVisitor::return_type SysYVisitor::visit<ConstInitVal>(const GrammarNode &node) {
         // constExp | LBRACE constInitVal (COMMA constInitVal)* RBRACE
-        if (node.children[0]->type != Terminal) return visit(*node.children[0]);
+        if (node.children[0]->type != Terminal) return visit<ConstExp>(*node.children[0]);
         std::vector<mir::Literal *> literals;
         for (auto &child: node.children) {
             if (child->type == Terminal) continue;
-            auto [value, list] = visit(*child);
+            auto [value, list] = visit<ConstInitVal>(*child);
             auto literal = dynamic_cast<mir::Literal *>(value);
             assert(literal && list.empty());
             literals.push_back(literal);
@@ -701,7 +703,7 @@ namespace frontend::visitor {
                 assert(l.empty());
                 for (int i = 1; i < indices.size(); i++) {
                     auto lit = dynamic_cast<mir::Literal *>(indices[i]);
-                    assert(lit);
+                    assert(lit && literal);
                     literal = literal->getArray()[lit->getInt()];
                 }
             }
