@@ -191,6 +191,7 @@ namespace frontend::visitor {
     SysYVisitor::storeInitValue(value_type var, mir::pType type,
                                 std::vector<value_type>::iterator initVal,
                                 std::vector<value_type> *index) {
+        static value_vector _idx = std::vector<value_type>{zero_value};
         if (index == nullptr && type == mir::Type::getI32Type()) {
             auto store = new Instruction::store(*initVal, var);
             return {store};
@@ -199,17 +200,17 @@ namespace frontend::visitor {
             auto store = new Instruction::store(*initVal, ptr);
             return {ptr, store};
         }
-        std::vector<value_type> idx = index ? *index : std::vector<value_type>{zero_value};
+        index = index ? index : &_idx;
         auto base = type->getArrayBase();
         auto ele_size = base->ssize() / 4;
         value_list ret = {};
         for (int i = 0; i < type->getArraySize(); i++) {
             auto l = new mir::Literal(mir::make_literal(i));
             manager.literalPool.insert(l);
-            idx.push_back(l);
+            index->push_back(l);
             auto list = storeInitValue(var, base, initVal + i * ele_size, index);
             ret.splice(ret.end(), list);
-            idx.pop_back();
+            index->pop_back();
         }
         return ret;
     }
@@ -511,6 +512,9 @@ namespace frontend::visitor {
         if (cond) {
             auto [v, l] = visit(*cond);
             list.splice(list.end(), l);
+        } else {
+            auto br = new Instruction::br(cond_stack.top().true_block);
+            list.push_back(br);
         }
         list.push_back(cond_stack.top().false_block);
         cond_stack.pop();
