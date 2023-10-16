@@ -126,8 +126,8 @@ namespace frontend::parser {
 
     template<>
     pGrammarNode SysYParser::parse_impl<Stmt>() {
-        auto gen = generator<AssignStmt>() | generator<BlockStmt>() |
-                   generator<IfStmt>() | generator<ForLoopStmt>() | generator<BreakStmt>() |
+        auto gen = generator<AssignStmt>() | generator<BlockStmt>() | generator<IfStmt>() |
+                   generator<WhileStmt>() | generator<ForLoopStmt>() | generator<BreakStmt>() |
                    generator<ContinueStmt>() | generator<ReturnStmt>() | generator<GetintStmt>() |
                    generator<PrintfStmt>() | generator<ExpStmt>();
         return grammarNode(Stmt, gen);
@@ -156,6 +156,13 @@ namespace frontend::parser {
         auto gen = generator<IFTK>() + generator<LPARENT>() + generator<Cond>() + generator<RPARENT>('j') +
                    generator<Stmt>() + (generator<ELSETK>() + generator<Stmt>()) * OPTION;
         return grammarNode(IfStmt, gen);
+    }
+
+    template<>
+    pGrammarNode SysYParser::parse_impl<WhileStmt>() {
+        auto gen = generator<WHILETK>() + generator<LPARENT>() + generator<Cond>() + generator<RPARENT>() +
+                   generator<Stmt>();
+        return grammarNode(WhileStmt, gen);
     }
 
     template<>

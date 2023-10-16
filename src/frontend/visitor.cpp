@@ -476,6 +476,27 @@ namespace frontend::visitor {
     }
 
     template<>
+    SysYVisitor::return_type SysYVisitor::visit<WhileStmt>(const GrammarNode &node) {
+        // WHILETK LPARENT cond RPARENT stmt
+        auto &cond = node.children[2];
+        auto &stmt = node.children[4];
+        // (br) -> (true) -> stmt -> (continue) -> cond -> (break/false)
+        loop_stack.push({new mir::BasicBlock(), new mir::BasicBlock()});
+        cond_stack.push({new mir::BasicBlock(), loop_stack.top().break_block});
+        value_list list = {new Instruction::br(loop_stack.top().continue_block)};
+        list.push_back(cond_stack.top().true_block);
+        auto [stmt_v, stmt_l] = visit(*stmt);
+        list.splice(list.end(), stmt_l);
+        list.push_back(loop_stack.top().continue_block);
+        auto [cond_v, cond_l] = visit(*cond);
+        list.splice(list.end(), cond_l);
+        list.push_back(cond_stack.top().false_block);
+        cond_stack.pop();
+        loop_stack.pop();
+        return {nullptr, list};
+    }
+
+    template<>
     SysYVisitor::return_type SysYVisitor::visit<ForLoopStmt>(const GrammarNode &node) {
         // FORTK LPARENT forStmt? SEMICN cond? SEMICN forStmt? RPARENT stmt
         auto is_semicn = [](const pcGrammarNode &ptr) {
@@ -890,14 +911,14 @@ namespace frontend::visitor {
                  &SysYVisitor::visit<FuncFParams>, &SysYVisitor::visit<FuncFParam>, &SysYVisitor::visit<Block>,
                  &SysYVisitor::visit<BlockItem>, &SysYVisitor::visit<Stmt>, &SysYVisitor::visit<AssignStmt>,
                  &SysYVisitor::visit<ExpStmt>, &SysYVisitor::visit<BlockStmt>, &SysYVisitor::visit<IfStmt>,
-                 &SysYVisitor::visit<ForLoopStmt>, &SysYVisitor::visit<BreakStmt>, &SysYVisitor::visit<ContinueStmt>,
-                 &SysYVisitor::visit<ReturnStmt>, &SysYVisitor::visit<GetintStmt>, &SysYVisitor::visit<PrintfStmt>,
-                 &SysYVisitor::visit<ForStmt>, &SysYVisitor::visit<Exp>, &SysYVisitor::visit<Cond>,
-                 &SysYVisitor::visit<LVal>, &SysYVisitor::visit<PrimaryExp>, &SysYVisitor::visit<Number>,
-                 &SysYVisitor::visit<UnaryExp>, &SysYVisitor::visit<UnaryOp>, &SysYVisitor::visit<FuncRParams>,
-                 &SysYVisitor::visit<MulExp>, &SysYVisitor::visit<AddExp>, &SysYVisitor::visit<RelExp>,
-                 &SysYVisitor::visit<EqExp>, &SysYVisitor::visit<LAndExp>, &SysYVisitor::visit<LOrExp>,
-                 &SysYVisitor::visit<ConstExp>, &SysYVisitor::visit<Terminal>};
+                 &SysYVisitor::visit<WhileStmt>, &SysYVisitor::visit<ForLoopStmt>, &SysYVisitor::visit<BreakStmt>,
+                 &SysYVisitor::visit<ContinueStmt>, &SysYVisitor::visit<ReturnStmt>, &SysYVisitor::visit<GetintStmt>,
+                 &SysYVisitor::visit<PrintfStmt>, &SysYVisitor::visit<ForStmt>, &SysYVisitor::visit<Exp>,
+                 &SysYVisitor::visit<Cond>, &SysYVisitor::visit<LVal>, &SysYVisitor::visit<PrimaryExp>,
+                 &SysYVisitor::visit<Number>, &SysYVisitor::visit<UnaryExp>, &SysYVisitor::visit<UnaryOp>,
+                 &SysYVisitor::visit<FuncRParams>, &SysYVisitor::visit<MulExp>, &SysYVisitor::visit<AddExp>,
+                 &SysYVisitor::visit<RelExp>, &SysYVisitor::visit<EqExp>, &SysYVisitor::visit<LAndExp>,
+                 &SysYVisitor::visit<LOrExp>, &SysYVisitor::visit<ConstExp>, &SysYVisitor::visit<Terminal>};
         return (this->*methods[node.type])(node);
     }
 

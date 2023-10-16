@@ -28,6 +28,7 @@ stmt: lVal ASSIGN exp SEMICN # assignStmt
     | exp? SEMICN # expStmt
     | block # blockStmt
     | IFTK LPARENT cond RPARENT stmt (ELSETK stmt)? # ifStmt
+    | WHILETK LPARENT cond RPARENT stmt # whileStmt
     | FORTK LPARENT forStmt? SEMICN cond? SEMICN forStmt? RPARENT stmt # forLoopStmt
     | BREAKTK SEMICN # breakStmt
     | CONTINUETK SEMICN # continueStmt
@@ -65,6 +66,7 @@ BREAKTK: 'break';
 CONTINUETK: 'continue';
 IFTK: 'if';
 ELSETK: 'else';
+WHILETK: 'while';
 FORTK: 'for';
 GETINTTK: 'getint';
 PRINTFTK: 'printf';
