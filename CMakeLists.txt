@@ -26,3 +26,10 @@ add_executable(Compiler
         src/mir/instruction.h
         src/mir/manager.h
 )
+
+if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+    enable_testing()
+    add_test(NAME LLVM-IR-Test
+            COMMAND ./auto_test.sh ${CMAKE_CURRENT_BINARY_DIR}/Compiler
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+endif ()

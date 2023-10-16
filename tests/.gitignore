@@ -1,0 +1,12 @@
+# LLVM IR
+*.ll
+*.bc
+
+# Binary
+/Compiler
+*.profraw
+
+# Files
+*.DS_Store
+/*.txt
+/testfile.*
