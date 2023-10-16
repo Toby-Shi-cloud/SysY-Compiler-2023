@@ -14,7 +14,7 @@ for suit in C B A; do
     echo "=====$suit====="
     for ((i=1;i<=30;i++)); do
         ./link.sh $suit $i
-        ./run.sh && diff -ZB output.txt testfile.out
+        ./run.sh && diff output.txt testfile.out
         if [[ $? != 0 ]]; then
             echo "Test $suit $i failed!"
             exit 1
