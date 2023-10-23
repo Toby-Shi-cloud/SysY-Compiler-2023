@@ -1,0 +1,18 @@
+const int pow2[10] = { 1, 2, 4, 8, 16, 32, 64, 128, 256, 512 };
+int cc[2][2] = {{1,2},{3,4}};
+int ccc[1] = { 4 };
+int a, b, c;
+int aa, bb;
+int p;
+
+int main()
+{
+    printf("21373433");
+    printf("\n");
+    a = getint();
+    b = getint();
+    c = getint();
+    if (a == 0 && b == 0 || c == 0) printf("11111\n");
+    if (a != 0 && b == 0) printf("22222\n");
+    return 0;
+}

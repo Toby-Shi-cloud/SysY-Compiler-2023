@@ -1,0 +1,128 @@
+// matrix power
+// https://www.luogu.com.cn/problem/P3390
+
+const int maxn = 100; // max size of matrix
+const int mod = 1000 * 1000 * 1000 + 7; // 1e9 + 7
+int n;
+
+int matrix[100][100]; // Matrix: n * n
+int k;
+
+// memset, different from std's
+void _memset(int _ptr[], int _val, int _length) {
+    int _i;
+    for (_i = 0; _i < _length; _i = _i + 1) {
+        _ptr[_i] = _val;
+    }
+}
+
+// memcpy, different from std's
+void _memcpy(int _dst[], int _src[], int _length) {
+    int _i = 0;
+    for (;_i < _length;) {
+        _dst[_i] = _src[_i];
+        _i = _i + 1;
+    }
+}
+
+/*
+ * int * int
+ * note: as we use signed int, to avert overflow,
+ * we assume that the input is less than 2^30.
+ * then we can split 30-bit int to '15-bit & 15-bit'
+ * return: _ret[0] low 30-bit, _ret[1] high 30-bit
+ */
+void _mult_int(int x, int y, /* out */ int _ret[/*2*/]) {
+    const int _pow15 = 32768; // 2^15
+    const int _pow30 = 1073741824; // 2^30
+    int x1 = x / _pow15, x0 = x % _pow15;
+    int y1 = y / _pow15, y0 = y % _pow15;
+    int ans2 = x1 * y1; // _pow30
+    int ans1 = x1 * y0 + x0 * y1; // _pow15
+    int ans0 = x0 * y0; // _pow0
+    _ret[0] = ans0 + (ans1 % _pow15) * _pow15;
+    _ret[1] = ans2 + ans1 / _pow15 + _ret[0] / _pow30;
+    _ret[0] = _ret[0] % _pow30;
+    return /* _ret */;
+}
+
+
+// long % int
+int _mod_long(/* in */ int _long[/*2*/], int p) {
+    const int _pow15 = 32768; // 2^15
+    const int _pow30 = 1073741824; // 2^30
+    int _round = _pow30 % p; // high 30-bit * _round % p
+    int _temp[2] = { _long[0], _long[1] };
+    int _ret = _long[0] % p;
+    for (;;) {
+        if (!_temp[1]) break;
+        _mult_int(_temp[1], _round, _temp);
+        _ret = (_ret + _temp[0]) % p;
+    }
+    return _ret;
+}
+
+int _mult_mod(int x, int y, int p) {
+    int _mult_ret[2];
+    _mult_int(x, y, _mult_ret);
+    return _mod_long(_mult_ret, p);
+}
+
+// Matrix operator*(const Matrix &x, const Matrix &y)
+void matrix_mult(
+/* in */ int m1[/*100*/][100],
+/* in */ int m2[/*100*/][100],
+/* out */ int _ret[/*100*/][100]) {
+    _memset(_ret[0], 0, 100 * 100);
+    int i, j, k;
+    for(i = 0; i < n; i = i + 1)
+        for(j = 0; j < n; j = j + 1)
+            for(k = 0; k < n; k = k + 1)
+                _ret[i][j] = (_ret[i][j] + _mult_mod(m1[i][k], m2[k][j], mod)) % mod;
+    return /* _mult_ret */;
+}
+
+// Matrix ^ long
+void matrix_pow(
+/* in */ int m[/*100*/][100],
+/* in */ int e,
+/* out */ int _ret[/*100*/][100]) {
+    _memset(_ret[0], 0, 100 * 100);
+    if (e == 0) {
+        int i;
+        for (i = 0; ; i = i + 1) {
+            if (i == n) return;
+            _ret[i][i] = 1;
+        }
+    }
+    const int _5p29 = 536870912; // 2^30 / 2
+    int _temp[100][100];
+    int _sqr_m[100][100];
+    matrix_mult(m, m, _sqr_m);
+    matrix_pow(_sqr_m, e / 2, _temp);
+    if (e % 2 == 1) {
+        // e & 1
+        matrix_mult(m, _temp, _ret);
+    } else {
+        _memcpy(_ret[0], _temp[0], 100 * 100);
+    }
+}
+
+int main() {
+    printf("21373433\n");
+    n = getint();
+    k = getint();
+    int i, j;
+    for(i = 0; i < n; i = i + 1)
+        for(j = 0; j < n; j = j + 1)
+            matrix[i][j] = getint();
+    int ans[100][100];
+    matrix_pow(matrix, k, ans);
+    for(i = 0; i < n; i = i + 1){
+        for(j = 0; j < n; j = j + 1)
+            if(j) printf(" %d", ans[i][j]);
+            else printf("%d", ans[i][j]);
+        printf("\n");
+    }
+    return 0;
+}

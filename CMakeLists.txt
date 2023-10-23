@@ -29,7 +29,16 @@ add_executable(Compiler
 
 if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     enable_testing()
-    add_test(NAME LLVM-IR-Test
-            COMMAND ./auto_test.sh ${CMAKE_CURRENT_BINARY_DIR}/Compiler
+    add_test(NAME LLVM-IR-Test-A
+            COMMAND ./auto_test.sh ${CMAKE_CURRENT_BINARY_DIR}/Compiler A30
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    add_test(NAME LLVM-IR-Test-B
+            COMMAND ./auto_test.sh ${CMAKE_CURRENT_BINARY_DIR}/Compiler B30
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    add_test(NAME LLVM-IR-Test-C
+            COMMAND ./auto_test.sh ${CMAKE_CURRENT_BINARY_DIR}/Compiler C30
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    add_test(NAME LLVM-IR-Test-D
+            COMMAND ./auto_test.sh ${CMAKE_CURRENT_BINARY_DIR}/Compiler D6
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 endif ()

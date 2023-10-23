@@ -1,0 +1,36 @@
+const int a[1] = {4};
+int c[3], aa[2][1], b;
+const int constDef[1][1] = {{1+2}};
+
+void foo(int arg1[], int arg2[][1])
+{
+    arg1[0] = arg2[0][0];
+    for (;;) {
+        int c = 0;
+        if(0) continue;
+        break;
+    }
+    int i = 1;
+    for (; i < 100; i = i + 1) ;
+    for (i = -1; 100 != i; i = i + 1) { i = i * 5 / 5; }
+    for (i = 1; 100000 > i; ) { i = i * 2; }
+    for (i = 1; ; i = i + 1) if (i == 100) break;
+    printf("%d\n", arg2[0][0]);
+}
+
+int boo(int agg, int ag[])
+{
+    ag[0] = agg;
+    ag[1] = agg;
+    return ag[1];
+}
+
+int main()
+{
+    printf("21373433");
+    printf("\n");
+    aa[0][0] = 123;
+    foo(aa[1], aa);
+    boo(boo(aa[0][0], c), c);
+    return 0;
+}

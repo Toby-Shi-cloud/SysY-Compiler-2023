@@ -1,0 +1,48 @@
+int a;
+void foo() {
+    printf("%d\n", a);
+    int i = 1;
+    for (; i < 1012345678; ) i = i * 2;
+    for (i = 0; 100 != i && 200 != i && 0 < i; i = i + 1) { i = i * 2; }
+}
+int main() {
+    printf("21373433\n");
+    // 21373433;
+    // printf("???\n");
+    /*
+    // printf("???????\n"); */
+    a = getint();
+    if (a >= a && a <= a && a == a) {
+        if (a > a) printf("+");
+        if (a < a) printf("-");
+        if (a != a) printf("*");
+        foo();
+        a = getint();
+        if (a) printf("getint()\n");
+        foo();
+        int a;
+        a = getint();
+        foo();
+        a = a + a;
+        a = a * a;
+        a = a / a;
+        a = a - a;
+        if (!+-a) printf("zero!\n");
+        a = (1 + 2 + 3 * 22 * (5 + 6)) % 100 + a * a % (a + 1);
+        foo();
+        int c[1+2+3+4+5+6+7];
+        const int p = 3+4+5+6+7+8;
+        c[2] = p;
+        {
+            ;;;;
+            int a[1+2*4][100%20];
+            a[1][1] = 10;
+        }
+        { const int s = 0, r = 0, z = 0;
+            { const int ss = 0, rr = 0;
+                { const int zz = 100; foo(); }
+            }
+        }
+    }
+    return 0;
+}
