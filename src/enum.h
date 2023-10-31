@@ -21,7 +21,7 @@ namespace magic_enum {
         constexpr auto rp = sv.find(']');
         constexpr auto enum_name = sv.substr(lp + 8, cm - lp - 8);
         constexpr auto enum_value = sv.substr(cm + 6, rp - cm - 6);
-        if constexpr (enum_value.find('(') != std::string_view::npos)
+        if constexpr (enum_value.find('(') != std::string_view::npos || enum_value[0] >= '0' && enum_value[0] <= '9')
             return std::make_pair(enum_name, ""sv);
         else if constexpr (enum_value.find(':') != std::string_view::npos)
             return std::make_pair(enum_name, enum_value.substr(enum_value.rfind(':') + 1));
