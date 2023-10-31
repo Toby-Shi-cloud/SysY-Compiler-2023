@@ -19,6 +19,6 @@ if [[ $# == 2 ]]; then
   number=$2
 fi
 
-ln -s "$datadir"/testfile"$number".txt "$mydir"/testfile.txt
-ln -s "$datadir"/input"$number".txt "$mydir"/input.txt
-ln -s "$datadir"/output"$number".txt "$mydir"/output.txt
+cp "$datadir"/testfile"$number".txt "$mydir"/testfile.txt
+cp "$datadir"/input"$number".txt "$mydir"/input.txt
+cp "$datadir"/output"$number".txt "$mydir"/output.txt
