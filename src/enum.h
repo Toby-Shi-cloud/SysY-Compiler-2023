@@ -9,8 +9,7 @@
 #include <string_view>
 
 namespace magic_enum {
-    template<typename E>
-    using underlying_type_t = std::underlying_type_t<E>;
+    using std::underlying_type_t;
 
     template<typename Enum, Enum e>
     static constexpr auto enum_to_string_helper() noexcept {
