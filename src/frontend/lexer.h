@@ -71,26 +71,4 @@ namespace frontend::lexer {
     };
 }
 
-inline std::ostream &operator<<(std::ostream &os, const frontend::lexer::Token &token) {
-    return os << token.type << " " << token.raw;
-}
-
-#include "../dbg.h"
-
-#ifdef DBG_ENABLE
-namespace dbg {
-    template<>
-    [[maybe_unused]]
-    inline bool pretty_print(std::ostream &stream, const frontend::lexer::Token &value) {
-        stream << "{ "
-               << "type: " << value.type << ", "
-               << "raw: " << value.raw << ", "
-               << "line: " << value.line << ", "
-               << "column: " << value.column
-               << " }";
-        return true;
-    }
-}
-#endif // DBG_ENABLE
-
 #endif //COMPILER_LEXER_H

@@ -9,14 +9,6 @@
 #include <sstream>
 
 namespace mir {
-    template<typename T>
-    static inline decltype(std::stringstream{} << std::declval<T>(), std::string{})
-    string_of(const T &value) {
-        std::stringstream ss;
-        ss << value;
-        return ss.str();
-    }
-
     struct Instruction::ret : Instruction {
         explicit ret() : Instruction(Type::getVoidType(), RET) {}
 
@@ -26,7 +18,7 @@ namespace mir {
             return getNumOperands() == 0 ? nullptr : getOperand(0);
         }
 
-        [[nodiscard]] std::string to_string() const override;
+        std::ostream &output(std::ostream &os) const override;
     };
 
     struct Instruction::br : Instruction {
@@ -53,7 +45,7 @@ namespace mir {
             return hasCondition() ? getOperand<BasicBlock>(2) : getOperand<BasicBlock>(0);
         }
 
-        [[nodiscard]] std::string to_string() const override;
+        std::ostream &output(std::ostream &os) const override;
     };
 
     template<Instruction::InstrTy ty>
@@ -66,15 +58,15 @@ namespace mir {
 
         [[nodiscard]] Value *getRhs() const { return getOperand(1); }
 
-        [[nodiscard]] std::string to_string() const override {
-            return getName() + " = " + string_of(ty) + " " + string_of(getLhs()) + ", " + getRhs()->getName();
+        std::ostream &output(std::ostream &os) const override {
+            return os << getName() << " = " << ty << " " << getLhs() << ", " << getRhs()->getName();
         }
     };
 
     struct Instruction::alloca_ : Instruction {
         explicit alloca_(pType type) : Instruction(type, ALLOCA) {}
 
-        [[nodiscard]] std::string to_string() const override;
+        std::ostream &output(std::ostream &os) const override;
     };
 
     struct Instruction::load : Instruction {
@@ -82,7 +74,7 @@ namespace mir {
 
         [[nodiscard]] Value *getPointerOperand() const { return getOperand(0); }
 
-        [[nodiscard]] std::string to_string() const override;
+        std::ostream &output(std::ostream &os) const override;
     };
 
     struct Instruction::store : Instruction {
@@ -92,7 +84,7 @@ namespace mir {
 
         [[nodiscard]] Value *getDest() const { return getOperand(1); }
 
-        [[nodiscard]] std::string to_string() const override;
+        std::ostream &output(std::ostream &os) const override;
     };
 
     struct Instruction::getelementptr : Instruction {
@@ -104,7 +96,7 @@ namespace mir {
 
         [[nodiscard]] size_t getNumIndices() const { return getNumOperands() - 1; }
 
-        [[nodiscard]] std::string to_string() const override;
+        std::ostream &output(std::ostream &os) const override;
     };
 
     template<Instruction::InstrTy ty>
@@ -113,8 +105,8 @@ namespace mir {
 
         [[nodiscard]] Value *getValueOperand() const { return getOperand(0); }
 
-        [[nodiscard]] std::string to_string() const override {
-            return getName() + " = " + string_of(ty) + " " + string_of(getValueOperand()) + " to " + string_of(getType());
+        std::ostream &output(std::ostream &os) const override {
+            return os << getName() << " = " << ty << " " << getValueOperand() << " to " << getType();
         }
     };
 
@@ -133,7 +125,7 @@ namespace mir {
 
         [[nodiscard]] Value *getRhs() const { return getOperand(1); }
 
-        [[nodiscard]] std::string to_string() const override;
+        std::ostream &output(std::ostream &os) const override;
     };
 
     inline std::ostream &operator<<(std::ostream &os, Instruction::icmp::Cond cond) {
@@ -152,7 +144,7 @@ namespace mir {
 
         [[nodiscard]] size_t getNumIncomingValues() const { return getNumOperands() / 2; }
 
-        [[nodiscard]] std::string to_string() const override;
+        std::ostream &output(std::ostream &os) const override;
     };
 
     struct Instruction::call : Instruction {
@@ -164,7 +156,7 @@ namespace mir {
 
         [[nodiscard]] size_t getNumArgs() const { return getNumOperands() - 1; }
 
-        [[nodiscard]] std::string to_string() const override;
+        std::ostream &output(std::ostream &os) const override;
     };
 }
 

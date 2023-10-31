@@ -105,7 +105,7 @@ namespace mir {
             ICMP, PHI, CALL
         } instrTy;
 
-        [[nodiscard]] virtual std::string to_string() const = 0;
+        [[nodiscard]] virtual std::ostream &output(std::ostream &os) const = 0;
 
         [[nodiscard]] bool isTerminator() const { return instrTy == RET || instrTy == BR; }
 

@@ -8,6 +8,7 @@
 #include <array>
 #include <optional>
 #include <algorithm>
+#include "../dbg.h"
 #include "../enum.h"
 
 namespace frontend::token::token_type {
@@ -63,6 +64,26 @@ namespace frontend::token {
         size_t line;
         size_t column;
     };
+
+    inline std::ostream &operator<<(std::ostream &os, const Token &token) {
+        return os << token.type << " " << token.raw;
+    }
 }
+
+#ifdef DBG_ENABLE
+namespace dbg {
+    template<>
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, const frontend::token::Token &value) {
+        stream << "{ "
+               << "type: " << value.type << ", "
+               << "raw: " << value.raw << ", "
+               << "line: " << value.line << ", "
+               << "column: " << value.column
+               << " }";
+        return true;
+    }
+}
+#endif // DBG_ENABLE
 
 #endif //COMPILER_TOKEN_H

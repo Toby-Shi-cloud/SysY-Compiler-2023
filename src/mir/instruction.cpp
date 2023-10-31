@@ -12,79 +12,76 @@ namespace mir {
         return args;
     }
 
-    std::string Instruction::ret::to_string() const {
+    std::ostream &Instruction::ret::output(std::ostream &os) const {
         if (auto value = getReturnValue()) {
-            return "ret " + string_of(value);
+            return os << "ret " << value;
         } else {
-            return "ret void";
+            return os << "ret void";
         }
     }
 
-    std::string Instruction::br::to_string() const {
+    std::ostream &Instruction::br::output(std::ostream &os) const {
         if (hasCondition()) {
             assert(getCondition()->getType() == (pType) Type::getI1Type());
-            return "br " + string_of(getCondition()) + ", label " + getIfTrue()->getName() + ", label " + getIfFalse()->getName();
+            return os << "br " << getCondition() << ", label " << getIfTrue()->getName() << ", label " << getIfFalse()->getName();
         } else {
-            return "br label " + getTarget()->getName();
+            return os << "br label " << getTarget()->getName();
         }
     }
 
-    std::string Instruction::alloca_::to_string() const {
-        return getName() + " = alloca " + string_of(getType()) + ", align 4";
+    std::ostream &Instruction::alloca_::output(std::ostream &os) const {
+        return os << getName() << " = alloca " << getType() << ", align 4";
     }
 
-    std::string Instruction::load::to_string() const {
-        return getName() + " = load " + string_of(getType()) + ", ptr " + getPointerOperand()->getName();
+    std::ostream &Instruction::load::output(std::ostream &os) const {
+        return os << getName() << " = load " << getType() << ", ptr " << getPointerOperand()->getName();
     }
 
-    std::string Instruction::store::to_string() const {
-        return "store " + string_of(getSrc()) + ", ptr " + getDest()->getName();
+    std::ostream &Instruction::store::output(std::ostream &os) const {
+        return os << "store " << getSrc() << ", ptr " << getDest()->getName();
     }
 
     Instruction::getelementptr::getelementptr(pType type, Value *ptr, const std::vector<Value *> &idxs)
             : Instruction(type, GETELEMENTPTR, merge(ptr, idxs.begin() + ptr->getType()->isPointerTy(), idxs.end())) {}
 
-    std::string Instruction::getelementptr::to_string() const {
-        std::stringstream ss;
+    std::ostream &Instruction::getelementptr::output(std::ostream &os) const {
         auto index_ty = getPointerOperand()->getType();
         if (index_ty->isPointerTy()) index_ty = index_ty->getPointerBase();
-        ss << getName() << " = getelementptr " << index_ty
+        os << getName() << " = getelementptr " << index_ty
            << ", ptr " << getPointerOperand()->getName();
         for (int i = 0; i < getNumIndices(); i++) {
-            ss << ", " << getIndexOperand(i);
+            os << ", " << getIndexOperand(i);
         }
-        return ss.str();
+        return os;
     }
 
-    std::string Instruction::icmp::to_string() const {
-        return getName() + " = icmp " + string_of(cond) + " " + string_of(getLhs()) + ", " + getRhs()->getName();
+    std::ostream &Instruction::icmp::output(std::ostream &os) const {
+        return os << getName() << " = icmp " << cond << " " << getLhs() << ", " << getRhs()->getName();
     }
 
-    std::string Instruction::phi::to_string() const {
-        std::stringstream ss;
-        ss << getName() << " = phi " << getType() << " ";
+    std::ostream &Instruction::phi::output(std::ostream &os) const {
+        os << getName() << " = phi " << getType() << " ";
         for (int i = 0; i < getNumIncomingValues(); i++) {
-            if (i) ss << ", ";
+            if (i) os << ", ";
             auto [value, label] = getIncomingValue(i);
-            ss << "[ " << value->getName() << ", " << label->getName() << " ]";
+            os << "[ " << value->getName() << ", " << label->getName() << " ]";
         }
-        return ss.str();
+        return os;
     }
 
     Instruction::call::call(Function *func, const std::vector<Value *> &args)
             : Instruction(func->getType()->getFunctionRet(), CALL, merge(func, args.begin(), args.end())) {}
 
-    std::string Instruction::call::to_string() const {
-        std::stringstream ss;
+    std::ostream &Instruction::call::output(std::ostream &os) const {
         if (getFunction()->retType != Type::getVoidType())
-            ss << getName() << " = ";
-        ss << "call " << getFunction()->getType();
-        ss << " " << getFunction()->getName() << "(";
+            os << getName() << " = ";
+        os << "call " << getFunction()->getType();
+        os << " " << getFunction()->getName() << "(";
         for (int i = 0; i < getNumArgs(); i++) {
-            if (i) ss << ", ";
-            ss << getArg(i);
+            if (i) os << ", ";
+            os << getArg(i);
         }
-        ss << ")";
-        return ss.str();
+        os << ")";
+        return os;
     }
 }

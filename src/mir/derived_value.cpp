@@ -159,7 +159,7 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, const Instruction &instr) {
-        return os << instr.to_string();
+        return instr.output(os);
     }
 
     std::ostream &operator<<(std::ostream &os, const Literal &literal) {
