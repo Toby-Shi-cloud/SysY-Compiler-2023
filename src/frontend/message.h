@@ -8,6 +8,7 @@
 #include <vector>
 #include <ostream>
 #include <algorithm>
+#include "../enum.h"
 
 namespace frontend {
     struct message {
@@ -29,21 +30,12 @@ namespace frontend {
     }
 }
 
-inline std::ostream &operator<<(std::ostream &_o, frontend::message::type_t type) {
-    switch (type) {
-        case frontend::message::type_t::INFO:
-            return _o << "INFO";
-        case frontend::message::type_t::WARNING:
-            return _o << "WARNING";
-        case frontend::message::type_t::ERROR:
-            return _o << "ERROR";
-        default:
-            return _o << "UNKNOWN";
-    }
+inline std::ostream &operator<<(std::ostream &os, frontend::message::type_t type) {
+    return os << magic_enum::enum_to_string(type);
 }
 
-inline std::ostream &operator<<(std::ostream &_o, const frontend::message &msg) {
-    return _o << msg.type << "[" << msg.line << ":" << msg.column << "]: " << msg.msg;
+inline std::ostream &operator<<(std::ostream &os, const frontend::message &msg) {
+    return os << msg.type << "[" << msg.line << ":" << msg.column << "]: " << msg.msg;
 }
 
 #endif //COMPILER_MESSAGE_H

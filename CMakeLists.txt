@@ -8,7 +8,9 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif ()
 
 add_executable(Compiler
-        src/main.cpp src/dbg.h
+        src/main.cpp
+        src/dbg.h
+        src/enum.h
         src/frontend/lexer.cpp
         src/frontend/lexer.h
         src/frontend/grammar.h

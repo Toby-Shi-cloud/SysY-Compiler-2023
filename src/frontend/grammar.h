@@ -8,6 +8,7 @@
 #include <memory>
 #include <vector>
 #include "lexer.h"
+#include "../enum.h"
 
 // Grammar type
 namespace frontend::grammar::grammar_type {
@@ -24,18 +25,9 @@ namespace frontend::grammar::grammar_type {
         Terminal
     };
 
-    constexpr const char *name[] = {
-            "CompUnit", "Decl",
-            "ConstDecl", "BType", "ConstDef", "ConstInitVal",
-            "VarDecl", "VarDef", "InitVal",
-            "FuncDef", "MainFuncDef", "FuncType", "FuncFParams", "FuncFParam",
-            "Block", "BlockItem",
-            "Stmt", "AssignStmt", "ExpStmt", "BlockStmt", "IfStmt", "WhileStmt", "ForLoopStmt",
-            "BreakStmt", "ContinueStmt", "ReturnStmt", "GetintStmt", "PrintfStmt",
-            "ForStmt", "Exp", "Cond", "LVal", "PrimaryExp", "Number", "UnaryExp", "UnaryOp",
-            "FuncRParams", "MulExp", "AddExp", "RelExp", "EqExp", "LAndExp", "LOrExp", "ConstExp",
-            "Terminal"
-    };
+    inline std::ostream &operator<<(std::ostream &os, _grammar_type type) {
+        return os << magic_enum::enum_to_string(type);
+    }
 }
 
 // Forward declaration
@@ -69,10 +61,6 @@ namespace frontend::grammar {
         assert(type == grammar_type::Terminal);
         return static_cast<const TerminalNode &>(*this).token; // NOLINT
     }
-}
-
-inline std::ostream &operator<<(std::ostream &os, frontend::grammar::grammar_type_t type) {
-    return os << frontend::grammar::grammar_type::name[type];
 }
 
 #ifdef DBG_ENABLE

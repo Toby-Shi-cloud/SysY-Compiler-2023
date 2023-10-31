@@ -8,6 +8,7 @@
 #include <ostream>
 #include <optional>
 #include <string_view>
+#include "../enum.h"
 
 using namespace std::string_view_literals;
 
@@ -23,16 +24,9 @@ namespace frontend::lexer::token_type {
         IDENFR
     };
 
-    constexpr const char *name[] = {
-            "ERRORTOKEN",
-            "INTCON", "STRCON",
-            "MAINTK", "CONSTTK", "INTTK", "VOIDTK", "BREAKTK", "CONTINUETK",
-            "IFTK", "ELSETK", "WHILETK", "FORTK", "GETINTTK", "PRINTFTK", "RETURNTK",
-            "NOT", "AND", "OR", "PLUS", "MINU", "MULT", "DIV", "MOD",
-            "LSS", "LEQ", "GRE", "GEQ", "EQL", "NEQ", "ASSIGN", "SEMICN", "COMMA",
-            "LPARENT", "RPARENT", "LBRACK", "RBRACK", "LBRACE", "RBRACE",
-            "IDENFR"
-    };
+    inline std::ostream &operator<<(std::ostream &os, _token_type type) {
+        return os << magic_enum::enum_to_string(type);
+    }
 
     constexpr const char *raw[] = {
             "<ERROR>",
@@ -155,10 +149,6 @@ namespace frontend::lexer {
 
         inline Token next_token_error_token();
     };
-}
-
-inline std::ostream &operator<<(std::ostream &os, frontend::lexer::token_type_t type) {
-    return os << frontend::lexer::token_type::name[type];
 }
 
 inline std::ostream &operator<<(std::ostream &os, const frontend::lexer::Token &token) {
