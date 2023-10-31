@@ -8,7 +8,7 @@
 
 // Symbol Table
 namespace frontend::visitor {
-    std::optional<message> SymbolTable::insert(std::string_view name, store_type_t value, const lexer::Token &token) {
+    std::optional<message> SymbolTable::insert(std::string_view name, store_type_t value, const Token &token) {
         if (stack.back().count(name)) return message{
             message::ERROR, 'b', token.line, token.column, "redefinition of '" + std::string(name) + "'"
         };
@@ -41,8 +41,8 @@ namespace frontend::visitor {
         return new mir::Instruction::icmp{cond, lhs, rhs};
     }
 
-    inline std::optional<message> check_valid(const lexer::Token &str_token) {
-        assert(str_token.type == lexer::token_type::STRCON);
+    inline std::optional<message> check_valid(const Token &str_token) {
+        assert(str_token.type == token_type::STRCON);
         using namespace std::string_literals;
         bool backslash = false;
         bool percent = false;
@@ -93,8 +93,7 @@ namespace frontend::visitor {
 // visitor: helper methods
 namespace frontend::visitor {
     using namespace grammar_type;
-    using namespace lexer::token_type;
-    using lexer::token_type_t;
+    using namespace token_type;
     using mir::Instruction;
 
     mir::pType SysYVisitor::getVarType(GrammarIterator begin, GrammarIterator end) {
@@ -233,7 +232,7 @@ namespace frontend::visitor {
         return {values, lists};
     }
 
-    void SysYVisitor::listToBB(value_list &list, const lexer::Token &end_token) {
+    void SysYVisitor::listToBB(value_list &list, const Token &end_token) {
         value_list _allocas{};
         for (auto it = list.begin(); it != list.end();) {
             auto alloca_ = dynamic_cast<mir::Instruction::alloca_ *>(*it);

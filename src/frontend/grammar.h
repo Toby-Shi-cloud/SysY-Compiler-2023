@@ -7,7 +7,8 @@
 
 #include <memory>
 #include <vector>
-#include "lexer.h"
+#include "token.h"
+#include "../dbg.h"
 #include "../enum.h"
 
 // Grammar type
@@ -43,21 +44,21 @@ namespace frontend::grammar {
 
         explicit GrammarNode(grammar_type_t type) : type(type) {}
 
-        [[nodiscard]] inline const lexer::Token &getToken() const;
+        [[nodiscard]] inline const token::Token &getToken() const;
 
         template<typename T>
         inline void push_all(T c) { for (auto &child : c) children.push_back(std::move(child)); }
     };
 
     struct TerminalNode : GrammarNode {
-        const lexer::Token token;
+        const token::Token token;
 
-        explicit TerminalNode(const lexer::Token &token) : GrammarNode(grammar_type::Terminal), token(token) {}
+        explicit TerminalNode(const token::Token &token) : GrammarNode(grammar_type::Terminal), token(token) {}
     };
 
     using pTerminalNode = std::unique_ptr<TerminalNode>;
 
-    inline const lexer::Token &GrammarNode::getToken() const {
+    inline const token::Token &GrammarNode::getToken() const {
         assert(type == grammar_type::Terminal);
         return static_cast<const TerminalNode &>(*this).token; // NOLINT
     }

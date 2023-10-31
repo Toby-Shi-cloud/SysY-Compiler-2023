@@ -6,8 +6,8 @@
 #define COMPILER_PARSER_H
 
 #include <list>
-#include <functional>
 #include <utility>
+#include "lexer.h"
 #include "grammar.h"
 #include "message.h"
 
@@ -38,7 +38,7 @@ namespace frontend::parser {
     generator_t operator*(const generator_t &gen, _many);
 
     class SysYParser {
-        using token_buffer = std::vector<lexer::Token>;
+        using token_buffer = std::vector<token::Token>;
         using token_iterator = token_buffer::iterator;
         token_buffer tokens;
         token_iterator current;
@@ -47,7 +47,7 @@ namespace frontend::parser {
 
         friend generator_t operator+(const generator_t &, const generator_t &);
 
-        template<lexer::token_type_t type>
+        template<token::token_type_t type>
         inline static auto generator(int error_code = 0) -> generator_t {
             return [error_code](SysYParser *self) -> optGrammarNodeList {
                 if (auto node = self->need_terminal(type, error_code)) {
@@ -73,7 +73,7 @@ namespace frontend::parser {
             };
         }
 
-        pTerminalNode need_terminal(lexer::token_type_t type, int error_code);
+        pTerminalNode need_terminal(token::token_type_t type, int error_code);
 
         inline pGrammarNode grammarNode(grammar_type_t type, const generator_t &gen) {
             if (auto list = gen(this)) {

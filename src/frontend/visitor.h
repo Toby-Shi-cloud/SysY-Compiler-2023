@@ -13,6 +13,7 @@
 #include <unordered_map>
 
 namespace frontend::visitor {
+    using namespace frontend::token;
     using namespace frontend::grammar;
 }
 
@@ -44,7 +45,7 @@ namespace frontend::visitor {
          * @param token the token where the symbol is defined.
          * @return a message if the symbol already exists, or nullopt if the symbol is inserted successfully.
          */
-        std::optional<message> insert(std::string_view name, store_type_t value, const lexer::Token &token);
+        std::optional<message> insert(std::string_view name, store_type_t value, const Token &token);
 
         /**
          * @brief Lookup a symbol in the current block.
@@ -84,7 +85,7 @@ namespace frontend::visitor {
         mir::Function *current_function;
         bool in_const_expr = false;
         mir::Value *undefined = new mir::Value(mir::Type::getVoidType());
-        std::vector<const lexer::Token *> token_buffer;
+        std::vector<const Token *> token_buffer;
 
         /**
          * Visit all children of the node. <br>
@@ -153,7 +154,7 @@ namespace frontend::visitor {
         /**
          * A helper method to convert a list of values to bbs, and add to current function.
          */
-        void listToBB(value_list &list, const lexer::Token &end_token);
+        void listToBB(value_list &list, const Token &end_token);
 
         /**
          * A helper method to convert a value to I1.

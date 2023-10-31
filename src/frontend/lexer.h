@@ -6,90 +6,10 @@
 #define COMPILER_LEXER_H
 
 #include <ostream>
-#include <optional>
-#include <string_view>
-#include "../enum.h"
-
-using namespace std::string_view_literals;
-
-namespace frontend::lexer::token_type {
-    enum _token_type {
-        ERRORTOKEN,
-        INTCON, STRCON,
-        MAINTK, CONSTTK, INTTK, VOIDTK, BREAKTK, CONTINUETK,
-        IFTK, ELSETK, WHILETK, FORTK, GETINTTK, PRINTFTK, RETURNTK,
-        NOT, AND, OR, PLUS, MINU, MULT, DIV, MOD,
-        LSS, LEQ, GRE, GEQ, EQL, NEQ, ASSIGN, SEMICN, COMMA,
-        LPARENT, RPARENT, LBRACK, RBRACK, LBRACE, RBRACE,
-        IDENFR
-    };
-
-    inline std::ostream &operator<<(std::ostream &os, _token_type type) {
-        return os << magic_enum::enum_to_string(type);
-    }
-
-    constexpr const char *raw[] = {
-            "<ERROR>",
-            "<int>", "<const char *>",
-            "main", "const", "int", "void", "break", "continue",
-            "if", "else", "while", "for", "getint", "printf", "return",
-            "!", "&&", "||", "+", "-", "*", "/", "%",
-            "<", "<=", ">", ">=", "==", "!=", "=", ";", ",",
-            "(", ")", "[", "]", "{", "}",
-            "<identifier>"
-    };
-
-    constexpr std::pair<std::string_view, _token_type> words[] = {
-            {"main"sv,     MAINTK},
-            {"const"sv,    CONSTTK},
-            {"int"sv,      INTTK},
-            {"void"sv,     VOIDTK},
-            {"break"sv,    BREAKTK},
-            {"continue"sv, CONTINUETK},
-            {"if"sv,       IFTK},
-            {"else"sv,     ELSETK},
-            {"while"sv,    WHILETK},
-            {"for"sv,      FORTK},
-            {"getint"sv,   GETINTTK},
-            {"printf"sv,   PRINTFTK},
-            {"return"sv,   RETURNTK},
-            {"&&"sv,       AND},
-            {"||"sv,       OR},
-            {"<="sv,       LEQ},
-            {">="sv,       GEQ},
-            {"=="sv,       EQL},
-            {"!="sv,       NEQ},
-            {"!"sv,        NOT},
-            {"+"sv,        PLUS},
-            {"-"sv,        MINU},
-            {"*"sv,        MULT},
-            {"/"sv,        DIV},
-            {"%"sv,        MOD},
-            {"<"sv,        LSS},
-            {">"sv,        GRE},
-            {"="sv,        ASSIGN},
-            {";"sv,        SEMICN},
-            {","sv,        COMMA},
-            {"("sv,        LPARENT},
-            {")"sv,        RPARENT},
-            {"["sv,        LBRACK},
-            {"]"sv,        RBRACK},
-            {"{"sv,        LBRACE},
-            {"}"sv,        RBRACE}
-    };
-}
+#include "token.h"
 
 namespace frontend::lexer {
-    struct Token;
-    using token_type_t = token_type::_token_type;
-    using token_opt = std::optional<Token>;
-
-    struct Token {
-        token_type_t type;
-        std::string_view raw;
-        size_t line;
-        size_t column;
-    };
+    using namespace frontend::token;
 
     class Lexer {
         using position_t = std::string_view::iterator;

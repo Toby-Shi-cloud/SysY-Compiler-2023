@@ -8,25 +8,26 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif ()
 
 add_executable(Compiler
-        src/main.cpp
         src/dbg.h
         src/enum.h
+        src/main.cpp
+        src/frontend/grammar.h
         src/frontend/lexer.cpp
         src/frontend/lexer.h
-        src/frontend/grammar.h
-        src/frontend/parser.h
-        src/frontend/visitor.h
-        src/frontend/parser.cpp
-        src/frontend/visitor.cpp
         src/frontend/message.h
-        src/mir/type.cpp
-        src/mir/type.h
-        src/mir/value.h
+        src/frontend/parser.cpp
+        src/frontend/parser.h
+        src/frontend/token.h
+        src/frontend/visitor.cpp
+        src/frontend/visitor.h
         src/mir/derived_value.cpp
         src/mir/derived_value.h
         src/mir/instruction.cpp
         src/mir/instruction.h
         src/mir/manager.h
+        src/mir/type.cpp
+        src/mir/type.h
+        src/mir/value.h
 )
 
 if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
