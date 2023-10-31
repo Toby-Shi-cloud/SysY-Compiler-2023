@@ -5,6 +5,9 @@
 #ifndef COMPILER_TOKEN_H
 #define COMPILER_TOKEN_H
 
+#include <array>
+#include <optional>
+#include <algorithm>
 #include "../enum.h"
 
 namespace frontend::token::token_type {

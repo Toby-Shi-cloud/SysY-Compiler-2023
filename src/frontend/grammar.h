@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <vector>
+#include <functional>
 #include "token.h"
 #include "../dbg.h"
 #include "../enum.h"
