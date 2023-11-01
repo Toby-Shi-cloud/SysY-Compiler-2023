@@ -53,16 +53,16 @@ namespace mips {
 
 namespace mips {
     rBlock Block::splice(mips::Block::inst_node_t pos) {
-        if (pos == end()) return nullptr;
+        if (pos == instructions.end()) return nullptr;
         assert(pos->get()->isFuncCall());
         auto nxt = pos;
-        if (++nxt == end() && !conditionalJump) {
+        if (++nxt == instructions.end() && !conditionalJump) {
             conditionalJump = std::move(*pos);
             instructions.erase(pos);
             return nullptr;
         }
         auto nBlock = new Block(parent);
-        nBlock->instructions.splice(nBlock->begin(), instructions, nxt, end());
+        nBlock->instructions.splice(nBlock->instructions.begin(), instructions, nxt, instructions.end());
         nBlock->conditionalJump = std::move(conditionalJump);
         nBlock->fallthroughJump = std::move(fallthroughJump);
         for (auto &inst: nBlock->instructions) inst->parent = nBlock;

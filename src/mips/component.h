@@ -46,15 +46,73 @@ namespace mips {
             return instructions.erase(args...);
         }
 
-        [[nodiscard]] inline auto begin() const { return instructions.begin(); }
+        template<typename Self>
+        struct inst_container_t {
+            Self self;
 
-        [[nodiscard]] inline auto begin() { return instructions.begin(); }
+            class block_iterator {
+                using It = decltype(self->instructions.begin());
+                Self self;
+                It list_it;
+                unsigned current;
 
-        [[nodiscard]] inline auto end() const { return instructions.end(); }
+            public:
+                block_iterator(Self self, It list_it, unsigned current)
+                        : self(self), list_it(list_it), current(current) {
+                    if (self->instructions.empty()) ++*this;
+                }
 
-        [[nodiscard]] inline auto end() { return instructions.end(); }
+                inline block_iterator &operator++() {
+                    if (list_it != self->instructions.end()) ++list_it;
+                    if (list_it != self->instructions.end()) return *this;
+                    if (current == 0) {
+                        current = 1;
+                        if (self->conditionalJump != nullptr) return *this;
+                    }
+                    if (current == 1) {
+                        current = 2;
+                        if (self->fallthroughJump != nullptr) return *this;
+                    }
+                    current = 3;
+                    return *this;
+                }
 
-        [[nodiscard]] inline bool empty() const { return instructions.empty() && !conditionalJump && !fallthroughJump; }
+                inline block_iterator operator++(int) {
+                    auto ret = *this;
+                    ++*this;
+                    return ret;
+                }
+
+                inline auto operator*() -> decltype(*list_it) {
+                    if (list_it != self->instructions.end()) return *list_it;
+                    if (current == 1) return self->conditionalJump;
+                    if (current == 2) return self->fallthroughJump;
+                    return *list_it;
+                }
+
+                inline auto operator->() -> decltype(list_it.operator->()) {
+                    return &**this;
+                }
+
+                inline bool operator==(const block_iterator &it) const {
+                    return self == it.self && list_it == it.list_it && current == it.current;
+                }
+
+                inline bool operator!=(const block_iterator &it) const {
+                    return !(*this == it);
+                }
+            };
+
+            [[nodiscard]] inline auto begin() const { return block_iterator{self, self->instructions.begin(), 0}; }
+
+            [[nodiscard]] inline auto end() const { return block_iterator{self, self->instructions.end(), 3}; }
+
+            [[nodiscard]] inline bool empty() const { return begin() == end(); }
+        };
+
+        [[nodiscard]] inst_container_t<Block *> allInstructions() { return {this}; }
+
+        [[nodiscard]] inst_container_t<const Block *> allInstructions() const { return {this}; }
 
         /**
          * splice the block into two blocks.
@@ -113,7 +171,7 @@ namespace mips {
         inline void allocName() {
             size_t counter = 0;
             for (auto &bb: blocks) {
-                if (bb->empty()) continue;
+                if (bb->allInstructions().empty()) continue;
                 bb->label->name = "$." + label->name + "_" + std::to_string(counter++);
             }
             exitB->label->name = "$." + label->name + ".end";
@@ -140,12 +198,10 @@ namespace mips {
     };
 
     inline std::ostream &operator<<(std::ostream &os, const Block &block) {
-        if (block.empty()) return os;
+        if (block.allInstructions().empty()) return os;
         if (!block.label->name.empty()) os << block.label << ":" << std::endl;
-        for (auto &inst: block)
+        for (auto &inst: block.allInstructions())
             os << "\t" << *inst << std::endl;
-        if (block.conditionalJump) os << "\t" << *block.conditionalJump << std::endl;
-        if (block.fallthroughJump) os << "\t" << *block.fallthroughJump << std::endl;
         return os;
     }
 
@@ -184,9 +240,9 @@ namespace mips {
         for (auto &var: module.globalVars)
             if (var->isString) os << *var;
         os << std::endl << "\t.text" << std::endl;
-        for (auto &func: module.functions)
-            os << *func << std::endl;
         os << *module.main;
+        for (auto &func: module.functions)
+            os << std::endl << *func;
         return os;
     }
 }

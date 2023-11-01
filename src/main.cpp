@@ -10,11 +10,24 @@ frontend::message_queue_t message_queue;
 mir::Manager mir_manager;
 mips::Module mips_module;
 
+const char *source_file = "testfile.txt";
+const char *llvm_ir_file = "llvm_ir.txt";
+const char *mips_file = "mips.txt";
+const char *error_file = "error.txt";
+
 int main(int argc, char **argv) {
-    std::ifstream fin(argc >= 2 ? argv[1] : "testfile.txt");
-    std::ofstream fir(argc >= 3 ? argv[2] : "llvm_ir.txt");
-    std::ofstream fmips(argc >= 4 ? argv[3] : "mips.txt");
-    std::ofstream ferr(argc >= 5 ? argv[4] : "error.txt");
+    decltype(source_file) *ptr = &source_file;
+    for (int i = 1; i < argc; i++) {
+        using namespace std::string_literals;
+        if (argv[i] == "-S"s) ptr = &mips_file;
+        else if (argv[i] == "-emit-llvm"s) ptr = &llvm_ir_file;
+        else *ptr = argv[i], ptr = &source_file;
+    }
+
+    std::ifstream fin(source_file);
+    std::ofstream fir(llvm_ir_file);
+    std::ofstream fmips(mips_file);
+    std::ofstream ferr(error_file);
 
     std::string src, s;
     while (std::getline(fin, s)) {

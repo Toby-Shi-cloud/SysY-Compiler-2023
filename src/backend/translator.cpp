@@ -28,7 +28,8 @@ namespace backend {
     template<mips::Instruction::Ty rTy, mips::Instruction::Ty iTy>
     mips::rRegister Translator::createBinaryInstHelper(mips::rRegister lhs, mir::Value *rhs) {
         auto dst = curFunc->newVirRegister();
-        if (auto literal = dynamic_cast<mir::IntegerLiteral *>(rhs)) {
+        if (auto literal = dynamic_cast<mir::IntegerLiteral *>(rhs);
+                literal && literal->value < 1 << 16) {
             // rhs is immediate
             int imm = literal->value;
             if constexpr (rTy == mips::Instruction::Ty::SUBU) imm = -imm; // use addiu instead
@@ -108,17 +109,17 @@ namespace backend {
                     mips::Instruction::Ty::J, bMap[brInst->getTarget()]->label.get()));
         } else {
             auto cond = dynamic_cast<mir::Instruction::icmp *>(brInst->getCondition());
-            auto lhs = getRegister(cond->getLhs());
-            assert(lhs);
             if (cond->cond == mir::Instruction::icmp::EQ) {
+                auto lhs = getRegister(cond->getLhs());
                 auto rhs = getRegister(cond->getRhs());
-                assert(rhs);
+                assert(lhs && rhs);
                 curBlock->push_back(std::make_unique<mips::BranchInst>(
                         mips::Instruction::Ty::BNE, lhs, rhs,
                         bMap[brInst->getIfFalse()]->label.get()));
             } else if (cond->cond == mir::Instruction::icmp::NE) {
+                auto lhs = getRegister(cond->getLhs());
                 auto rhs = getRegister(cond->getRhs());
-                assert(rhs);
+                assert(lhs && rhs);
                 curBlock->push_back(std::make_unique<mips::BranchInst>(
                         mips::Instruction::Ty::BEQ, lhs, rhs,
                         bMap[brInst->getIfFalse()]->label.get()));
@@ -386,19 +387,21 @@ namespace backend {
         assert(curFunc->allocaSize % 4 == 0);
         assert(curFunc->argSize % 4 == 0);
 
+        // reformat blocks & alloca registers
+        spliceBlocks();
+        for (auto &block: curFunc->blocks)
+            compute_pre_suc(block.get());
+        // mergeBlocks();
+        register_alloca(curFunc);
+
+        // save registers before function & restore registers
         if (isMain) curFunc->shouldSave.clear(); // save nothing
         compute_func_start();
         if (isMain)
             curFunc->exitB->push_back(std::make_unique<mips::SyscallInst>(
                     mips::SyscallInst::SyscallId::ExitProc));
         else compute_func_exit();
-        spliceBlocks();
 
-        for (auto &block: curFunc->blocks)
-            compute_pre_suc(block.get());
-        // mergeBlocks();
-
-        register_alloca(curFunc);
         curFunc->allocName();
     }
 
@@ -504,7 +507,7 @@ namespace backend {
 
     void Translator::compute_func_start() {
         int cnt = 0;
-        auto it = curFunc->blocks.front()->begin();
+        auto it = curFunc->blocks.front()->instructions.begin();
         for (auto reg: curFunc->shouldSave) {
             curFunc->blocks.front()->insert(it, std::make_unique<mips::StoreInst>(
                     mips::Instruction::Ty::SW, reg,
@@ -549,7 +552,7 @@ namespace backend {
         constexpr auto pred_if_jal = [](auto &&inst) { return inst->isFuncCall(); };
         for (auto it = curFunc->begin(); it != curFunc->end();) {
             auto &block = *it;
-            auto pos = std::find_if(block->begin(), block->end(), pred_if_jal);
+            auto pos = std::find_if(block->instructions.begin(), block->instructions.end(), pred_if_jal);
             if (auto nb = block->splice(pos)) it = curFunc->blocks.emplace(++it, nb);
             else it++;
         }

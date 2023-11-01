@@ -50,7 +50,9 @@ jobs:
         working-directory: ${{github.workspace}}/build
         # Execute tests defined by the CMake configuration.
         # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-        run: chmod +x ${{github.workspace}}/tests/*.sh && ctest -C ${{env.BUILD_TYPE}}
+        run: chmod +x ${{github.workspace}}/tests/*.sh
+          && chmod +x ${{github.workspace}}/tests/*.py
+          && ctest -C ${{env.BUILD_TYPE}}
 
       - name: Upload Log If Failed
         if: ${{failure()}}
