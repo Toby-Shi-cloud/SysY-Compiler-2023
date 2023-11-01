@@ -7,6 +7,7 @@
 
 #include "message.h"
 #include "grammar.h"
+#include "message.h"
 #include "../mir/manager.h"
 #include <list>
 #include <stack>
@@ -54,8 +55,6 @@ namespace frontend::visitor {
         store_type_t lookup(std::string_view name);
     };
 }
-
-#include "message.h"
 
 namespace frontend::visitor {
     using GrammarIterator = std::vector<pcGrammarNode>::const_iterator;

@@ -168,20 +168,8 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, Instruction::InstrTy ty) {
-        static constexpr const char *names[] = {
-                // Terminator Instructions
-                "ret", "br",
-                // Binary Operations
-                "add", "sub", "mul", "udiv", "sdiv", "urem", "srem",
-                // Bitwise Binary Operations
-                "shl", "lshr", "ashr", "and", "or", "xor",
-                // Memory Access and Addressing Operations
-                "alloca", "load", "store", "getelementptr",
-                // Conversion Operations
-                "trunc", "zext", "sext",
-                // Other Operations
-                "icmp", "phi", "call"
-        };
-        return os << names[ty];
+        for (char c : magic_enum::enum_to_string(ty))
+            os << static_cast<char>(::tolower(c));
+        return os;
     }
 }

@@ -129,10 +129,9 @@ namespace mir {
     };
 
     inline std::ostream &operator<<(std::ostream &os, Instruction::icmp::Cond cond) {
-        static constexpr const char *str[] = {
-                "eq", "ne", "ugt", "uge", "ult", "ule", "sgt", "sge", "slt", "sle"
-        };
-        return os << str[cond];
+        for (char c : magic_enum::enum_to_string(cond))
+            os << static_cast<char>(::tolower(c));
+        return os;
     }
 
     struct Instruction::phi : Instruction {

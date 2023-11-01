@@ -6,6 +6,7 @@
 #define COMPILER_DERIVED_VALUE_H
 
 #include "value.h"
+#include "../enum.h"
 #include <any>
 #include <ostream>
 
