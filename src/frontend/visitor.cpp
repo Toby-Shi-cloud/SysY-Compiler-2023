@@ -666,11 +666,17 @@ namespace frontend::visitor {
             pos = sv.find("%d");
             if (pos != 0) {
                 auto s = std::string(sv.substr(0, pos));
-                auto literal = new mir::Literal(mir::make_literal(s));
-                manager.literalPool.insert(literal);
-                auto var = new mir::GlobalVar(mir::Type::getStringType((int) s.length() + 1), literal, true);
-                manager.globalVars.push_back(var);
-                list.push_back(new Instruction::call(mir::Function::putstr, {var}));
+                if (s.size() == 1) {
+                    auto literal = new mir::Literal(mir::make_literal(s[0]));
+                    manager.literalPool.insert(literal);
+                    list.push_back(new Instruction::call(mir::Function::putch, {literal}));
+                } else {
+                    auto literal = new mir::Literal(mir::make_literal(s));
+                    manager.literalPool.insert(literal);
+                    auto var = new mir::GlobalVar(mir::Type::getStringType((int) s.length() + 1), literal, true);
+                    manager.globalVars.push_back(var);
+                    list.push_back(new Instruction::call(mir::Function::putstr, {var}));
+                }
             }
             if (pos == std::string_view::npos) break;
             list.push_back(new Instruction::call(mir::Function::putint, {*exps_it++}));
