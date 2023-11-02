@@ -17,10 +17,18 @@ namespace magic_enum {
         static_assert(std::is_enum_v<Enum>, "Enum must be an enum.");
         constexpr std::string_view sv = __PRETTY_FUNCTION__;
         constexpr auto lp = sv.find('[');
-        constexpr auto cm = sv.find(',');
         constexpr auto rp = sv.find(']');
-        constexpr auto enum_name = sv.substr(lp + 8, cm - lp - 8);
-        constexpr auto enum_value = sv.substr(cm + 6, rp - cm - 6);
+#if defined(__clang__)
+        constexpr auto cm = sv.find(',');
+#elif defined(__GNUC__) && !defined(__clang__)
+        constexpr auto cm = sv.find(';');
+#else
+    #error "This compiler is not supported!"
+#endif
+        constexpr auto enum_name_ = sv.substr(lp + 1, cm - lp - 1);
+        constexpr auto enum_name = enum_name_.substr(enum_name_.find("Enum") + 7);
+        constexpr auto enum_value_ = sv.substr(cm + 1, rp - cm - 1);
+        constexpr auto enum_value = enum_value_.substr(enum_value_.find("e") + 4);
         if constexpr (enum_value.find('(') != std::string_view::npos || enum_value[0] >= '0' && enum_value[0] <= '9')
             return std::make_pair(enum_name, ""sv);
         else if constexpr (enum_value.find(':') != std::string_view::npos)
