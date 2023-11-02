@@ -51,7 +51,7 @@ namespace magic_enum {
     template<typename Enum, underlying_type_t<Enum> e, typename = std::enable_if_t<
             !enum_value<Enum, (Enum) e>.empty()>>
     static inline constexpr auto enum_to_string_impl(underlying_type_t<Enum> v) noexcept {
-        if ((Enum) v == e) return enum_value<Enum, (Enum) e>;
+        if (v == e) return enum_value<Enum, (Enum) e>;
         else return enum_to_string_impl<Enum, e + 1>(v);
     }
 
@@ -62,7 +62,19 @@ namespace magic_enum {
 
     template<typename Enum>
     static inline constexpr auto enum_to_string(Enum v) noexcept {
-        return enum_to_string_impl<Enum, 0>(v);
+        return enum_to_string_impl<Enum, 0>((underlying_type_t<Enum>) v);
+    }
+
+    namespace static_test_only {
+        enum class Foo {
+            Zero, One, Two, Three
+        };
+
+        static_assert(enum_name<Foo, Foo::Zero> == "magic_enum::static_test_only::Foo");
+        static_assert(enum_value<Foo, (Foo) 1> == "One");
+        static_assert(enum_to_string<Foo>(2) == "Two");
+        static_assert(enum_to_string(Foo::Three) == "Three");
+        static_assert(enum_to_string<Foo>(4) == "Unknown");
     }
 }
 
