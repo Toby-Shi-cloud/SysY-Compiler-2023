@@ -5,8 +5,6 @@
 #ifndef COMPILER_DBG_H
 #define COMPILER_DBG_H
 
-#include <cassert>
-
 #ifdef _DEBUG_
 #define DBG_ENABLE
 #if __has_include(<dbg.h>) // has_include(...)
@@ -16,10 +14,16 @@
 #else
 #undef DBG_ENABLE
 #endif // has_include(...)
+#else
+#ifndef NDEBUG
+#define NDEBUG
+#endif
 #endif // _DEBUG_
 
 #ifndef DBG_ENABLE
 #define dbg(...) ((void)0)
 #endif
+
+#include <cassert>
 
 #endif //COMPILER_DBG_H

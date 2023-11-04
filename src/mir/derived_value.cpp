@@ -95,7 +95,7 @@ namespace mir {
         }
 
         Literal make_literal(const std::string &str) {
-            return Literal(Type::getStringType(str.length() + 1), str);
+            return Literal(Type::getStringType((int) str.length() + 1), str);
         }
 
         Literal make_literal(std::vector<Literal *> array) {
@@ -153,8 +153,9 @@ namespace mir {
         os << var.getName() << " = ";
         os << (var.unnamed ? "private unnamed_addr " : "dso_local ");
         os << (var.isConst() ? "constant " : "global ");
-        (var.init ? os << var.init : os << var.getType() << " zeroinitializer") << ", align ";
-        os << (var.getType()->isStringTy() ? 1 : 4);
+        if (var.init) os << var.init;
+        else os << var.getType() << (var.getType()->isIntegerTy() ? " 0" : " zeroinitializer");
+        os << ", align " << (var.getType()->isStringTy() ? 1 : 4);
         return os;
     }
 
