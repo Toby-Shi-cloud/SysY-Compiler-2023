@@ -30,7 +30,6 @@ int main(int argc, char **argv) {
     }
 
     if (message_queue.empty()) {
-        mir_manager.cleanPool();
         mir_manager.output(fir);
     }
     return 0;

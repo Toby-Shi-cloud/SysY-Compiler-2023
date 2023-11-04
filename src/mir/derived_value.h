@@ -82,9 +82,15 @@ namespace mir {
         Literal *init; // nullptr if we should use ZeroInitializer
         const bool unnamed;
 
-        explicit GlobalVar(pType type, std::string name, Literal *init, bool isConstant);
+        explicit GlobalVar(pType type, std::string name, Literal *init, bool isConstant)
+                : Value(type, isConstant), init(init), unnamed(false) {
+            setName("@" + std::move(name));
+        }
 
-        explicit GlobalVar(pType type, Literal *init, bool isConstant);
+        explicit GlobalVar(pType type, Literal *init, bool isConstant)
+                : Value(type, isConstant), init(init), unnamed(true) {}
+
+        ~GlobalVar() override;
     };
 
     /**
@@ -152,44 +158,43 @@ namespace mir {
      * Literal is a constant value. <br>
      */
     struct Literal : Value {
-        size_t used = 0;
-        std::any value;
+        explicit Literal(pType type) : Value(type, true) {}
 
-        template<typename T>
-        explicit Literal(pType type, T value);
-
-        [[nodiscard]] std::string value_string() const;
-
-        [[nodiscard]] bool getBool() const { return *std::any_cast<bool>(&value); }
-
-        [[nodiscard]] int getInt() const { return *std::any_cast<int>(&value); }
-
-        [[nodiscard]] const std::string &getString() const { return *std::any_cast<std::string>(&value); }
-
-        [[nodiscard]] const std::vector<Literal *> &getArray() const {
-            return *std::any_cast<std::vector<Literal *>>(&value);
+        explicit Literal(pType type, std::string name) : Value(type, true) {
+            setName(std::move(name));
         }
     };
 
-    inline namespace literal_operators {
-        Literal make_literal(bool i1);
+    struct IntegerLiteral : Literal {
+        const int value;
 
-        Literal make_literal(int i32);
+        explicit IntegerLiteral(int value)
+                : Literal(Type::getI32Type(), std::to_string(value)), value(value) {}
+    };
 
-        Literal make_literal(const std::string &str);
+    IntegerLiteral operator+(const IntegerLiteral &lhs, const IntegerLiteral &rhs);
 
-        Literal make_literal(std::vector<Literal *> array);
+    IntegerLiteral operator-(const IntegerLiteral &lhs, const IntegerLiteral &rhs);
 
-        Literal operator+(const Literal &lhs, const Literal &rhs);
+    IntegerLiteral operator*(const IntegerLiteral &lhs, const IntegerLiteral &rhs);
 
-        Literal operator-(const Literal &lhs, const Literal &rhs);
+    IntegerLiteral operator/(const IntegerLiteral &lhs, const IntegerLiteral &rhs);
 
-        Literal operator*(const Literal &lhs, const Literal &rhs);
+    IntegerLiteral operator%(const IntegerLiteral &lhs, const IntegerLiteral &rhs);
 
-        Literal operator/(const Literal &lhs, const Literal &rhs);
+    struct StringLiteral : Literal {
+        const std::string value;
 
-        Literal operator%(const Literal &lhs, const Literal &rhs);
-    }
+        explicit StringLiteral(std::string value);
+    };
+
+    struct ArrayLiteral : Literal {
+        const std::vector<Literal *> values;
+
+        explicit ArrayLiteral(std::vector<Literal *> values);
+
+        ~ArrayLiteral() override;
+    };
 
     std::ostream &operator<<(std::ostream &os, const BasicBlock &bb);
 

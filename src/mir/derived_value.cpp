@@ -43,88 +43,77 @@ namespace mir {
         }
     }
 
-    GlobalVar::GlobalVar(pType type, std::string name, Literal *init, bool isConstant)
-            : Value(type, isConstant), init(init), unnamed(false) {
-        setName("@" + std::move(name));
-        if (init) init->used++;
+    GlobalVar::~GlobalVar() {
+        // IntegerLiteral is owned by pool.
+        if (getType()->isIntegerTy()) return;
+        delete init;
     }
 
-    GlobalVar::GlobalVar(pType type, Literal *init, bool isConstant)
-            : Value(type, isConstant), init(init), unnamed(true) {
-        if (init) init->used++;
+    IntegerLiteral operator+(const IntegerLiteral &lhs, const IntegerLiteral &rhs) {
+        return IntegerLiteral(lhs.value + rhs.value);
     }
 
-    template<typename T>
-    Literal::Literal(pType type, T value) : Value(type, true), value(value) {
-        setName(value_string());
+    IntegerLiteral operator-(const IntegerLiteral &lhs, const IntegerLiteral &rhs) {
+        return IntegerLiteral(lhs.value - rhs.value);
     }
 
-    std::string Literal::value_string() const {
-        std::stringstream ss;
-        if (getType() == Type::getI1Type()) {
-            ss << std::boolalpha << getBool();
-        } else if (getType() == Type::getI32Type()) {
-            ss << getInt();
-        } else if (getType()->isStringTy()) {
-            std::string str = getString();
-            size_t pos;
-            while ((pos = str.find('\n')) != std::string::npos) {
-                str.replace(pos, 1, "\\0A");
+    IntegerLiteral operator*(const IntegerLiteral &lhs, const IntegerLiteral &rhs) {
+        return IntegerLiteral(lhs.value * rhs.value);
+    }
+
+    IntegerLiteral operator/(const IntegerLiteral &lhs, const IntegerLiteral &rhs) {
+        return IntegerLiteral(lhs.value / rhs.value);
+    }
+
+    IntegerLiteral operator%(const IntegerLiteral &lhs, const IntegerLiteral &rhs) {
+        return IntegerLiteral(lhs.value % rhs.value);
+    }
+
+    static inline char hex(int x) {
+        assert(0 <= x && x < 16);
+        if (x < 10) return static_cast<char>('0' + x);
+        else return static_cast<char>('A' + x - 10);
+    }
+
+    StringLiteral::StringLiteral(std::string value)
+            : Literal(Type::getStringType((int) value.length() + 1)), value(std::move(value)) {
+        std::string s = R"(c")";
+        for (char c: this->value) {
+            if (c < 0x20) {
+                s += '\\';
+                s += hex(c / 16);
+                s += hex(c % 16);
+            } else if (c == '\\') {
+                s += R"(\\)";
+            } else if (c == '"') {
+                s += R"(\")";
+            } else {
+                s += c;
             }
-            ss << "c" << '"' << str << "\\00" << '"';
-        } else if (getType()->isArrayTy()) {
-            ss << '[';
-            for (size_t i = 0; i < getArray().size(); i++) {
-                if (i) ss << ", ";
-                ss << getArray()[i];
-            }
-            ss << ']';
-        } else {
-            assert(false);
         }
-        return ss.str();
+        s += R"(\00")";
+        setName(std::move(s));
     }
 
-    inline namespace literal_operators {
-        Literal make_literal(bool i1) {
-            return Literal(Type::getI1Type(), i1);
+    ArrayLiteral::ArrayLiteral(std::vector<Literal *> values)
+            : Literal(ArrayType::getArrayType((int) values.size(), values[0]->getType())),
+              values(std::move(values)) {
+        std::string s = "[";
+        for (size_t i = 0; i < this->values.size(); i++) {
+            if (i) s += ", ";
+            s += this->values[i]->getType()->to_string();
+            s += " ";
+            s += this->values[i]->getName();
         }
+        s += ']';
+        setName(std::move(s));
+    }
 
-        Literal make_literal(int i32) {
-            return Literal(Type::getI32Type(), i32);
-        }
-
-        Literal make_literal(const std::string &str) {
-            return Literal(Type::getStringType((int) str.length() + 1), str);
-        }
-
-        Literal make_literal(std::vector<Literal *> array) {
-            assert(!array.empty());
-            for (auto item: array) item->used++;
-            auto size = static_cast<int>(array.size());
-            auto base = array[0]->getType();
-            return Literal(ArrayType::getArrayType(size, base), std::move(array));
-        }
-
-        Literal operator+(const Literal &lhs, const Literal &rhs) {
-            return make_literal(lhs.getInt() + rhs.getInt());
-        }
-
-        Literal operator-(const Literal &lhs, const Literal &rhs) {
-            return make_literal(lhs.getInt() - rhs.getInt());
-        }
-
-        Literal operator*(const Literal &lhs, const Literal &rhs) {
-            return make_literal(lhs.getInt() * rhs.getInt());
-        }
-
-        Literal operator/(const Literal &lhs, const Literal &rhs) {
-            return make_literal(lhs.getInt() / rhs.getInt());
-        }
-
-        Literal operator%(const Literal &lhs, const Literal &rhs) {
-            return make_literal(lhs.getInt() % rhs.getInt());
-        }
+    ArrayLiteral::~ArrayLiteral() {
+        // IntegerLiteral is owned by pool.
+        if (getType()->getArrayBase()->isIntegerTy()) return;
+        for (auto value: values)
+            delete value;
     }
 
     std::ostream &operator<<(std::ostream &os, const BasicBlock &bb) {
@@ -164,7 +153,7 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, const Literal &literal) {
-        os << literal.getType() << " " << literal.value_string();
+        os << literal.getType() << " " << literal.getName();
         return os;
     }
 

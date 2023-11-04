@@ -105,10 +105,8 @@ namespace frontend::visitor {
     public:
         explicit SysYVisitor(mir::Manager &manager, message_queue_t &message_queue)
                 : manager(manager), message_queue(message_queue),
-                  zero_value(new mir::Literal(mir::make_literal(0))),
-                  current_function(nullptr) {
-            manager.literalPool.insert(zero_value);
-        }
+                  zero_value(manager.getIntegerLiteral(0)),
+                  current_function(nullptr) {}
 
         /**
          * Visit the node. <br>

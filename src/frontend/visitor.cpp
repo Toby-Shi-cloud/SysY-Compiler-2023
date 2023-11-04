@@ -75,19 +75,6 @@ namespace frontend::visitor {
                            "invalid format specifier '%'"};
         return std::nullopt;
     }
-
-    inline std::vector<mir::Value *> literalToValueVec(mir::Literal *literal) {
-        if (literal == nullptr) return {};
-        if (literal->getType() == mir::Type::getI32Type()) {
-            return {literal};
-        }
-        std::vector<mir::Value *> ret = {};
-        for (auto &ele: literal->getArray()) {
-            auto e = literalToValueVec(ele);
-            ret.insert(ret.end(), e.begin(), e.end());
-        }
-        return ret;
-    }
 }
 
 // visitor: helper methods
@@ -111,9 +98,9 @@ namespace frontend::visitor {
             } else {
                 assert(exp->type == grammar_type::ConstExp);
                 auto [value, list] = visit(*exp);
-                auto literal = dynamic_cast<mir::Literal *>(value);
+                auto literal = dynamic_cast<mir::IntegerLiteral *>(value);
                 assert(literal && list.empty());
-                result = mir::ArrayType::getArrayType(literal->getInt(), result);
+                result = mir::ArrayType::getArrayType(literal->value, result);
             }
         }
 
@@ -121,22 +108,21 @@ namespace frontend::visitor {
     }
 
     SysYVisitor::return_type SysYVisitor::visitBinaryExp(const GrammarNode &node) {
-        using literal_operator = decltype(&mir::literal_operators::operator+);
+        using literal_operator = decltype(&mir::operator+);
         using normal_operator = decltype(&get_binary_instruction<Instruction::add>);
-        using namespace mir::literal_operators;
         using icmp = mir::Instruction::icmp;
         static std::unordered_map<token_type_t, std::pair<literal_operator, normal_operator>> call_table = {
-                {PLUS, {&operator+, &get_binary_instruction<Instruction::add>}},
-                {MINU, {&operator-, &get_binary_instruction<Instruction::sub>}},
-                {MULT, {&operator*, &get_binary_instruction<Instruction::mul>}},
-                {DIV,  {&operator/, &get_binary_instruction<Instruction::sdiv>}},
-                {MOD,  {&operator%, &get_binary_instruction<Instruction::srem>}},
-                {LSS,  {nullptr,    &get_icmp_instruction<icmp::SLT>}},
-                {LEQ,  {nullptr,    &get_icmp_instruction<icmp::SLE>}},
-                {GRE,  {nullptr,    &get_icmp_instruction<icmp::SGT>}},
-                {GEQ,  {nullptr,    &get_icmp_instruction<icmp::SGE>}},
-                {EQL,  {nullptr,    &get_icmp_instruction<icmp::EQ>}},
-                {NEQ,  {nullptr,    &get_icmp_instruction<icmp::NE>}},
+                {PLUS, {&mir::operator+, &get_binary_instruction<Instruction::add>}},
+                {MINU, {&mir::operator-, &get_binary_instruction<Instruction::sub>}},
+                {MULT, {&mir::operator*, &get_binary_instruction<Instruction::mul>}},
+                {DIV,  {&mir::operator/, &get_binary_instruction<Instruction::sdiv>}},
+                {MOD,  {&mir::operator%, &get_binary_instruction<Instruction::srem>}},
+                {LSS,  {nullptr,         &get_icmp_instruction<icmp::SLT>}},
+                {LEQ,  {nullptr,         &get_icmp_instruction<icmp::SLE>}},
+                {GRE,  {nullptr,         &get_icmp_instruction<icmp::SGT>}},
+                {GEQ,  {nullptr,         &get_icmp_instruction<icmp::SGE>}},
+                {EQL,  {nullptr,         &get_icmp_instruction<icmp::EQ>}},
+                {NEQ,  {nullptr,         &get_icmp_instruction<icmp::NE>}},
         };
 
         auto [ret_val, ret_list] = visit(*node.children[0]);
@@ -145,15 +131,14 @@ namespace frontend::visitor {
             auto [value, list] = visit(*it[1]);
             ret_list.splice(ret_list.end(), list);
 
-            auto ret_literal = dynamic_cast<mir::Literal *>(ret_val);
-            auto literal = dynamic_cast<mir::Literal *>(value);
+            auto ret_literal = dynamic_cast<mir::IntegerLiteral *>(ret_val);
+            auto literal = dynamic_cast<mir::IntegerLiteral *>(value);
 
             auto [f, g] = call_table[token.type];
 
             if (f && ret_literal && literal && ret_list.empty()) {
-                ret_literal = new mir::Literal(f(*ret_literal, *literal));
+                ret_literal = manager.getIntegerLiteral(f(*ret_literal, *literal).value);
                 ret_val = ret_literal;
-                manager.literalPool.insert(ret_literal);
             } else {
                 if (ret_val->getType() != mir::Type::getI32Type()) {
                     ret_val = new mir::Instruction::zext{mir::Type::getI32Type(), ret_val};
@@ -204,8 +189,7 @@ namespace frontend::visitor {
         auto ele_size = base->ssize() / 4;
         value_list ret = {};
         for (int i = 0; i < type->getArraySize(); i++) {
-            auto l = new mir::Literal(mir::make_literal(i));
-            manager.literalPool.insert(l);
+            auto l = manager.getIntegerLiteral(i);
             index->push_back(l);
             auto list = storeInitValue(var, base, initVal + i * ele_size, index);
             ret.splice(ret.end(), list);
@@ -306,24 +290,19 @@ namespace frontend::visitor {
         auto [value, list] = visit(*node.children.back());
         auto literal = dynamic_cast<mir::Literal *>(value);
         assert(literal && list.empty());
+        // always global
+        mir::GlobalVar *variable;
         if (current_function) {
-            auto alloca_ = new Instruction::alloca_(type);
-            auto result = storeInitValue(alloca_, type, literalToValueVec(literal).begin());
-            list.push_back(alloca_);
-            list.splice(list.end(), result);
-            alloca_->setConst(true);
-            if (auto msg = symbol_table.insert(identifier.raw, {alloca_, literal}, identifier)) {
-                message_queue.push_back(*msg);
-            }
-            return {nullptr, list};
+            variable = new mir::GlobalVar(type, literal, true);
+            variable->setName("@__const." + current_function->getName().substr(1) + "." + std::string(identifier.raw));
         } else {
-            auto variable = new mir::GlobalVar(type, std::string(identifier.raw), literal, true);
-            manager.globalVars.push_back(variable);
-            if (auto msg = symbol_table.insert(identifier.raw, {variable, literal}, identifier)) {
-                message_queue.push_back(*msg);
-            }
-            return {};
+            variable = new mir::GlobalVar(type, std::string(identifier.raw), literal, true);
         }
+        manager.globalVars.push_back(variable);
+        if (auto msg = symbol_table.insert(identifier.raw, {variable, literal}, identifier)) {
+            message_queue.push_back(*msg);
+        }
+        return {};
     }
 
     template<> SysYVisitor::return_type SysYVisitor::visit<ConstExp>(const GrammarNode &node);
@@ -340,7 +319,7 @@ namespace frontend::visitor {
             assert(literal && list.empty());
             literals.push_back(literal);
         }
-        return {new mir::Literal(mir::make_literal(literals)), {}};
+        return {new mir::ArrayLiteral(std::move(literals)), {}};
     }
 
     template<>
@@ -667,14 +646,10 @@ namespace frontend::visitor {
             if (pos != 0) {
                 auto s = std::string(sv.substr(0, pos));
                 if (s.size() == 1) {
-                    auto literal = new mir::Literal(mir::make_literal(s[0]));
-                    manager.literalPool.insert(literal);
+                    auto literal = manager.getIntegerLiteral(s[0]);
                     list.push_back(new Instruction::call(mir::Function::putch, {literal}));
                 } else {
-                    auto literal = new mir::Literal(mir::make_literal(s));
-                    manager.literalPool.insert(literal);
-                    auto var = new mir::GlobalVar(mir::Type::getStringType((int) s.length() + 1), literal, true);
-                    manager.globalVars.push_back(var);
+                    auto var = manager.getStringLiteral(s);
                     list.push_back(new Instruction::call(mir::Function::putstr, {var}));
                 }
             }
@@ -707,9 +682,10 @@ namespace frontend::visitor {
             if (node.children.size() > 1) {
                 assert(l.empty());
                 for (int i = 1; i < indices.size(); i++) {
-                    auto lit = dynamic_cast<mir::Literal *>(indices[i]);
+                    auto lit = dynamic_cast<mir::IntegerLiteral *>(indices[i]);
+                    auto arr = dynamic_cast<mir::ArrayLiteral *>(literal);
                     assert(lit && literal);
-                    literal = literal->getArray()[lit->getInt()];
+                    literal = arr->values[lit->value];
                 }
             }
             return {literal, {}};
@@ -745,8 +721,7 @@ namespace frontend::visitor {
         // INTCON
         auto &token = node.children[0]->getToken();
         auto value = std::stoi(token.raw.data());
-        auto literal = new mir::Literal(mir::make_literal(value));
-        manager.literalPool.insert(literal);
+        auto literal = manager.getIntegerLiteral(value);
         return {literal, {}};
     }
 
@@ -806,13 +781,12 @@ namespace frontend::visitor {
         auto [value, list] = visit(*node.children[1]);
         auto &unary_op = node.children[0]->children[0]->getToken();
         if (in_const_expr) {
-            auto literal = dynamic_cast<mir::Literal *>(value);
+            auto literal = dynamic_cast<mir::IntegerLiteral *>(value);
             assert(literal && list.empty());
             if (unary_op.type == MINU) {
-                literal = new mir::Literal(mir::make_literal(-literal->getInt()));
-                manager.literalPool.insert(literal);
-            } else if (unary_op.type != PLUS) {
-                assert(false);
+                literal = manager.getIntegerLiteral(-literal->value);
+            } else {
+                assert(unary_op.type == PLUS);
             }
             return {literal, {}};
         }

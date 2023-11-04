@@ -11,40 +11,47 @@ namespace mir {
     struct Manager {
         std::vector<Function *> functions;
         std::vector<GlobalVar *> globalVars;
-        std::unordered_set<Literal *> literalPool;
+        std::unordered_map<int, IntegerLiteral *> integerPool;
+        std::unordered_map<std::string, GlobalVar *> stringPool;
 
         ~Manager() {
             for (auto function : functions)
                 delete function;
             for (auto globalVar : globalVars)
                 delete globalVar;
-            for (auto literal : literalPool)
-                delete literal;
+            for (auto literal : integerPool)
+                delete literal.second;
+            // stringPool is a subset of globalVars
+        }
+
+        IntegerLiteral *getIntegerLiteral(int value) {
+            if (integerPool.find(value) == integerPool.end()) {
+                integerPool[value] = new IntegerLiteral(value);
+            }
+            return integerPool[value];
+        }
+
+        GlobalVar *getStringLiteral(const std::string &value) {
+            if (stringPool.find(value) == stringPool.end()) {
+                auto str = new StringLiteral(value);
+                auto var = new GlobalVar(str->getType(), str, true);
+                var->setName("@.str");
+                globalVars.push_back(var);
+                stringPool[value] = var;
+            }
+            return stringPool[value];
         }
 
         void allocName() {
-            size_t counter = 0;
+            std::unordered_map<std::string, int> names;
             for (auto globalVar : globalVars) {
-                if (globalVar->unnamed) {
-                    globalVar->setName("@.str" + (counter ? "." + std::to_string(counter) : ""));
-                    ++counter;
+                auto &cnt = names[globalVar->getName()];
+                if (cnt++) {
+                    globalVar->setName(globalVar->getName() + "." + std::to_string(cnt));
                 }
             }
             for (auto function : functions) {
                 function->allocName();
-            }
-        }
-
-        void cleanPool() {
-            auto it = literalPool.begin();
-            while (it != literalPool.end()) {
-                auto literal = *it;
-                if (!literal->isUsed() && literal->used == 0) {
-                    it = literalPool.erase(it);
-                    delete literal;
-                } else {
-                    it++;
-                }
             }
         }
 
