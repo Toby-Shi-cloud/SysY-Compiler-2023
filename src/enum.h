@@ -7,29 +7,44 @@
 
 #include <type_traits>
 #include <string_view>
+
 namespace magic_enum {
     using std::underlying_type_t;
 }
 
 namespace magic_enum::detail {
     template<size_t N>
-    struct static_string_impl {
+    struct static_string {
         char data[N + 1]{};
 
-        explicit constexpr static_string_impl(const char (&str)[N + 1]) noexcept: data(str) {}
+        explicit constexpr static_string(const char (&str)[N + 1]) noexcept: data(str) {}
 
-        explicit constexpr static_string_impl(std::string_view sv) noexcept {
+        explicit constexpr static_string(std::string_view sv) noexcept {
             for (size_t i = 0; i < N; i++) data[i] = sv[i];
             data[N] = '\0';
         }
 
         template<typename Func>
-        explicit constexpr static_string_impl(std::string_view sv, Func f) noexcept {
+        explicit constexpr static_string(std::string_view sv, Func f) noexcept {
             for (size_t i = 0; i < N; i++) data[i] = f(sv[i]);
             data[N] = '\0';
         }
 
+        template<typename Func>
+        explicit constexpr static_string(static_string<N> ss, Func f) noexcept {
+            for (size_t i = 0; i < N; i++) data[i] = f(ss[i]);
+            data[N] = '\0';
+        }
+
+        constexpr char operator[](size_t i) const noexcept { return data[i]; }
+
+        constexpr char &operator[](size_t i) noexcept { return data[i]; }
+
         constexpr explicit operator std::string_view() const noexcept { return data; }
+
+        [[nodiscard]] constexpr bool empty() const noexcept { return N == 0; }
+
+        [[nodiscard]] constexpr size_t length() const noexcept { return N; }
     };
 
     constexpr int tolower(int ch) {
@@ -65,13 +80,16 @@ namespace magic_enum::detail {
         return std::make_pair(enum_name, enum_value);
     }
 
-    template<typename Enum, Enum e>
-    constexpr auto enum_name = enum_to_string_helper<Enum, e>().first;
+#define STATIC_STRING(sv) static_string<sv.length()>(sv)
+
+    template<typename Enum>
+    constexpr auto enum_name = STATIC_STRING((enum_to_string_helper<Enum, (Enum) 0>().first));
 
     template<typename Enum, Enum e>
-    constexpr auto enum_value = enum_to_string_helper<Enum, e>().second;
+    constexpr auto enum_value = STATIC_STRING((enum_to_string_helper<Enum, e>().second));
 
-#define STATIC_STRING(sv, f) static_string_impl<sv.length()>(sv, f)
+#undef STATIC_STRING
+#define STATIC_STRING(sv, f) static_string<sv.length()>(sv, f)
 
     template<typename Enum, Enum e>
     constexpr auto enum_value_lower = STATIC_STRING((enum_value<Enum, e>), tolower);
@@ -90,18 +108,17 @@ namespace magic_enum::detail {
     template<typename Enum, underlying_type_t<Enum> e, int ty,
             typename = std::enable_if_t<!enum_value<Enum, (Enum) e>.empty()>>
     static inline constexpr auto enum_to_string_impl(underlying_type_t<Enum> v) noexcept {
+        static_assert(ty >= 0 && ty <= 2, "ty must be 0, 1 or 2.");
         if (v == e) {
-            if constexpr (ty == 0) return enum_value<Enum, (Enum) e>;
+            if constexpr (ty == 0) return std::string_view(enum_value<Enum, (Enum) e>);
             else if constexpr (ty == 1) return std::string_view(enum_value_lower<Enum, (Enum) e>);
             else if constexpr (ty == 2) return std::string_view(enum_value_upper<Enum, (Enum) e>);
-            else return v.no_exists_methods();
         }
         return enum_to_string_impl<Enum, e + 1, ty>(v);
     }
 }
 
 namespace magic_enum {
-
     template<typename Enum, int ty = 0>
     static inline constexpr auto enum_to_string(underlying_type_t<Enum> v) noexcept {
         return detail::enum_to_string_impl<Enum, 0, ty>(v);
@@ -137,8 +154,8 @@ namespace magic_enum {
             Zero, One, Two, Three
         };
 
-        static_assert(detail::enum_name<Foo, Foo::Zero> == "magic_enum::static_test_only::Foo");
-        static_assert(detail::enum_value<Foo, (Foo) 1> == "One");
+        static_assert(std::string_view(detail::enum_name<Foo>) == "magic_enum::static_test_only::Foo");
+        static_assert(std::string_view(detail::enum_value<Foo, (Foo) 1>) == "One");
         static_assert(enum_to_string<Foo>(2) == "Two");
         static_assert(enum_to_string(Foo::Three) == "Three");
         static_assert(enum_to_string<Foo>(4) == "Unknown");
