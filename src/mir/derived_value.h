@@ -2,13 +2,14 @@
 // Created by toby on 2023/10/5.
 //
 
-#ifndef COMPILER_DERIVED_VALUE_H
-#define COMPILER_DERIVED_VALUE_H
+#ifndef COMPILER_MIR_DERIVED_VALUE_H
+#define COMPILER_MIR_DERIVED_VALUE_H
 
 #include "value.h"
 #include "../enum.h"
 #include <any>
 #include <ostream>
+#include <algorithm>
 
 /**
  * Derived Values <br>
@@ -46,6 +47,8 @@ namespace mir {
         explicit BasicBlock() : Value(Type::getLabelType()) {}
 
         ~BasicBlock() override;
+
+        void push_back(Instruction *instr);
     };
 
     /**
@@ -111,12 +114,19 @@ namespace mir {
             // Other Operations
             ICMP, PHI, CALL
         } instrTy;
+        BasicBlock *parent = nullptr;
 
         [[nodiscard]] virtual std::ostream &output(std::ostream &os) const = 0;
 
-        [[nodiscard]] bool isTerminator() const { return instrTy == RET || instrTy == BR; }
+        [[nodiscard]] inline bool isTerminator() const { return instrTy == RET || instrTy == BR; }
 
-        [[nodiscard]] bool isValue() const { return getType() != Type::getVoidType(); }
+        [[nodiscard]] inline bool isValue() const { return getType() != Type::getVoidType(); }
+
+        [[nodiscard]] inline bool activeAfter() const {
+            return std::any_of(use->users.begin(), use->users.end(), [this](auto user) {
+                return dynamic_cast<mir::Instruction *>(user)->parent != parent;
+            });
+        }
 
         template<typename... Args>
         explicit Instruction(pType type, InstrTy instrTy, Args ...args) : User(type, args...), instrTy(instrTy) {}
@@ -209,4 +219,4 @@ namespace mir {
     std::ostream &operator<<(std::ostream &os, Instruction::InstrTy ty);
 }
 
-#endif //COMPILER_DERIVED_VALUE_H
+#endif //COMPILER_MIR_DERIVED_VALUE_H

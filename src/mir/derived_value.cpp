@@ -22,6 +22,11 @@ namespace mir {
             delete instruction;
     }
 
+    void BasicBlock::push_back(mir::Instruction *instr) {
+        instructions.push_back(instr);
+        instr->parent = this;
+    }
+
     Argument *Function::addArgument(pType type) {
         auto arg = new Argument(type, this);
         args.push_back(arg);

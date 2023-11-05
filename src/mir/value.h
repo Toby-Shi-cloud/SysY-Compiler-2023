@@ -2,8 +2,8 @@
 // Created by toby on 2023/10/5.
 //
 
-#ifndef COMPILER_VALUE_H
-#define COMPILER_VALUE_H
+#ifndef COMPILER_MIR_VALUE_H
+#define COMPILER_MIR_VALUE_H
 
 #include "type.h"
 #include <string>
@@ -30,8 +30,6 @@ namespace mir {
      * Value is the base class for all mir values.
      */
     class Value {
-        friend class User;
-
         /**
          * Every Value has a type. <br>
          */
@@ -50,6 +48,7 @@ namespace mir {
          */
         bool isConstant;
 
+    public:
         /**
          * Value owns Use. <br>
          * Value must transfer use to another Value
@@ -59,7 +58,6 @@ namespace mir {
          */
         Use *use;
 
-    public:
         explicit Value(pType type, bool isConstant) : use(new Use{this}), type(type), isConstant(isConstant) {}
 
         explicit Value(pType type) : Value(type, false) {}
@@ -79,6 +77,8 @@ namespace mir {
         [[nodiscard]] inline bool isUsed() const { return !use->users.empty(); }
 
         [[nodiscard]] inline bool isConst() const { return isConstant; }
+
+        [[nodiscard]] inline long getId() const { return ::strtol(getName().c_str(), nullptr, 0); }
     };
 
     /**
@@ -124,4 +124,4 @@ namespace mir {
     }
 }
 
-#endif //COMPILER_VALUE_H
+#endif //COMPILER_MIR_VALUE_H

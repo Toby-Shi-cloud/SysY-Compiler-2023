@@ -2,8 +2,8 @@
 // Created by toby2 on 2023/10/12.
 //
 
-#ifndef COMPILER_INSTRUCTION_H
-#define COMPILER_INSTRUCTION_H
+#ifndef COMPILER_MIR_INSTRUCTION_H
+#define COMPILER_MIR_INSTRUCTION_H
 
 #include "derived_value.h"
 #include <sstream>
@@ -159,4 +159,4 @@ namespace mir {
     };
 }
 
-#endif //COMPILER_INSTRUCTION_H
+#endif //COMPILER_MIR_INSTRUCTION_H

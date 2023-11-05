@@ -235,7 +235,7 @@ namespace frontend::visitor {
             if (bb) {
                 if (!is_terminator) {
                     auto br = new Instruction::br(bb);
-                    cur->instructions.push_back(br);
+                    cur->push_back(br);
                 }
                 cur = bb;
                 current_function->bbs.push_back(bb);
@@ -249,7 +249,7 @@ namespace frontend::visitor {
                 }
                 auto instr = dynamic_cast<mir::Instruction *>(item);
                 assert(instr);
-                cur->instructions.push_back(instr);
+                cur->push_back(instr);
                 is_terminator = instr->isTerminator();
             }
         }
@@ -265,9 +265,9 @@ namespace frontend::visitor {
             if (cur == nullptr) {
                 cur = new mir::BasicBlock();
                 current_function->bbs.push_back(cur);
-                cur->instructions.push_back(new Instruction::ret());
+                cur->push_back(new Instruction::ret());
             } else if (cur->instructions.empty() || !cur->instructions.back()->isTerminator()) {
-                cur->instructions.push_back(new Instruction::ret());
+                cur->push_back(new Instruction::ret());
             }
         }
     }

@@ -2,8 +2,8 @@
 // Created by toby2 on 2023/10/13.
 //
 
-#ifndef COMPILER_MANAGER_H
-#define COMPILER_MANAGER_H
+#ifndef COMPILER_MIR_MANAGER_H
+#define COMPILER_MIR_MANAGER_H
 
 #include "derived_value.h"
 
@@ -73,4 +73,4 @@ namespace mir {
     };
 }
 
-#endif //COMPILER_MANAGER_H
+#endif //COMPILER_MIR_MANAGER_H

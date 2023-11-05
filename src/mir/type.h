@@ -2,8 +2,8 @@
 // Created by toby on 2023/9/26.
 //
 
-#ifndef COMPILER_TYPE_H
-#define COMPILER_TYPE_H
+#ifndef COMPILER_MIR_TYPE_H
+#define COMPILER_MIR_TYPE_H
 
 #include "../dbg.h"
 #include <vector>
@@ -151,4 +151,4 @@ namespace mir {
     };
 }
 
-#endif //COMPILER_TYPE_H
+#endif //COMPILER_MIR_TYPE_H
