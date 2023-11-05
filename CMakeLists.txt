@@ -28,6 +28,9 @@ add_executable(Compiler
         src/mir/type.cpp
         src/mir/type.h
         src/mir/value.h
+        src/mips/component.h
+        src/mips/instruction.h
+        src/mips/operand.h
 )
 
 if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
