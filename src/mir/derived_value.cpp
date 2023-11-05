@@ -163,8 +163,6 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, Instruction::InstrTy ty) {
-        for (char c : magic_enum::enum_to_string(ty))
-            os << static_cast<char>(::tolower(c));
-        return os;
+        return os << magic_enum::enum_to_string_lower(ty);
     }
 }

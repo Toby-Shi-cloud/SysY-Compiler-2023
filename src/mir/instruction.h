@@ -129,9 +129,7 @@ namespace mir {
     };
 
     inline std::ostream &operator<<(std::ostream &os, Instruction::icmp::Cond cond) {
-        for (char c : magic_enum::enum_to_string(cond))
-            os << static_cast<char>(::tolower(c));
-        return os;
+        return os << magic_enum::enum_to_string_lower(cond);
     }
 
     struct Instruction::phi : Instruction {
