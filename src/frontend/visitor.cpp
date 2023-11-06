@@ -4,7 +4,6 @@
 
 #include <iostream>
 #include "visitor.h"
-#include "../mir/instruction.h"
 
 // Symbol Table
 namespace frontend::visitor {

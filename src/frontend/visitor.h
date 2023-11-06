@@ -5,13 +5,13 @@
 #ifndef COMPILER_VISITOR_H
 #define COMPILER_VISITOR_H
 
-#include "message.h"
-#include "grammar.h"
-#include "message.h"
-#include "../mir/manager.h"
 #include <list>
 #include <stack>
 #include <unordered_map>
+#include "message.h"
+#include "grammar.h"
+#include "message.h"
+#include "../mir.h"
 
 namespace frontend::visitor {
     using namespace frontend::token;
