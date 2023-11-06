@@ -7,30 +7,40 @@
 
 #include <variant>
 #include <ostream>
-#include "../dbg.h"
+#include "alias.h"
 
 namespace mips {
-    struct Label {
+    struct Operand {
+        virtual inline std::ostream &output(std::ostream &os) const = 0;
+    };
+
+    struct Label : Operand {
         std::string name;
 
         explicit Label(std::string name) : name(std::move(name)) {}
 
-        friend inline std::ostream &operator<<(std::ostream &os, const Label &label) {
-            return os << label.name;
+        inline std::ostream &output(std::ostream &os) const override {
+            return os << name;
         }
     };
 
-    struct Immediate {
+    struct Immediate : Operand {
         int value;
 
         explicit Immediate(int value) : value(value) {}
 
-        friend inline std::ostream &operator<<(std::ostream &os, const Immediate &imm) {
-            return os << imm.value;
+        inline std::ostream &output(std::ostream &os) const override {
+            return os << value;
         }
     };
 
-    struct PhyRegister {
+    struct Register : Operand {
+        [[nodiscard]] inline bool isVirtual() const;
+
+        [[nodiscard]] inline bool isPhysical() const;
+    };
+
+    struct PhyRegister : Register {
         static constexpr const char *names[] = {
                 "$zero", "$at", "$v0", "$v1", "$a0", "$a1", "$a2", "$a3",
                 "$t0", "$t1", "$t2", "$t3", "$t4", "$t5", "$t6", "$t7",
@@ -51,34 +61,57 @@ namespace mips {
 
         explicit PhyRegister(const std::string &name) : id(name2id.at(name)) {}
 
-        friend inline std::ostream &operator<<(std::ostream &os, const PhyRegister &reg) {
-            return os << names[reg.id];
+        [[nodiscard]] inline bool isUniversal() const { return id >= 8 && id <= 25; }
+
+        [[nodiscard]] inline bool isRet() const { return id >= 2 && id <= 3; }
+
+        [[nodiscard]] inline bool isArg() const { return id >= 4 && id <= 7; }
+
+        [[nodiscard]] inline bool isTemp() const { return id >= 8 && id <= 9 || id >= 24 && id <= 25; }
+
+        [[nodiscard]] inline bool isSaved() const { return id >= 16 && id <= 23; }
+
+        [[nodiscard]] inline bool isGp() const { return id == 28; }
+
+        [[nodiscard]] inline bool isSp() const { return id == 29; }
+
+        [[nodiscard]] inline bool isFp() const { return id == 30; }
+
+        [[nodiscard]] inline bool isRa() const { return id == 31; }
+
+        [[nodiscard]] inline bool isHi() const { return id == 32; }
+
+        [[nodiscard]] inline bool isLo() const { return id == 33; }
+
+        [[nodiscard]] inline bool isHiLo() const { return id >= 32; }
+
+        inline std::ostream &output(std::ostream &os) const override {
+            return os << names[id];
         }
     };
 
-    struct VirRegister {
+    struct VirRegister : Register {
         static inline unsigned counter = 0;
         unsigned id;
 
         explicit VirRegister() : id(counter++) {}
 
-        friend inline std::ostream &operator<<(std::ostream &os, const VirRegister &reg) {
-            return os << "$(vr" << reg.id << ")";
+        inline std::ostream &output(std::ostream &os) const override {
+            return os << "$(vr" << id << ")";
         }
     };
 
-    using Register = std::variant<PhyRegister, VirRegister>;
-    using Operand = std::variant<Label, Immediate, Register>;
-
-#define OPERAND_TEMPLATE \
-template<typename T, typename = std::enable_if_t<std::is_same_v<T, Register> || std::is_same_v<T, Operand>>>
-
-    OPERAND_TEMPLATE
-    inline std::ostream &operator<<(std::ostream &os, const T &var) {
-        return std::visit([&os](auto &&arg) -> std::ostream & { return os << arg; }, var);
+    inline bool Register::isVirtual() const {
+        return dynamic_cast<const VirRegister *>(this) != nullptr;
     }
 
-#undef OPERAND_TEMPLATE
+    inline bool Register::isPhysical() const {
+        return dynamic_cast<const PhyRegister *>(this) != nullptr;
+    }
+
+    inline std::ostream &operator<<(std::ostream &os, const Operand &operand) {
+        return operand.output(os);
+    }
 }
 
 #endif //COMPILER_MIPS_OPERAND_H

@@ -9,29 +9,21 @@
 #include <ostream>
 #include <unordered_set>
 #include "operand.h"
-#include "instruction.h"
-
-namespace mips {
-    struct Block;
-    struct Function;
-    struct GlobalVar;
-    struct Module;
-}
 
 namespace mips {
     struct Block {
         std::string name;
-        Function *parent;
-        std::vector<Instruction *> instructions;
-        std::vector<Block *> predecessors, successors;
-        std::vector<Register *> liveIn, liveOut;
-        std::vector<Register *> use, def;
+        rFunction parent;
+        std::vector<pInstruction> instructions;
+        std::vector<rBlock> predecessors, successors;
+        std::vector<rRegister> liveIn, liveOut;
+        std::vector<rRegister> use, def;
     };
 
     struct Function {
         std::string name;
-        std::vector<Block *> blocks;
-        std::unordered_set<VirRegister *> usedVirRegs;
+        std::vector<pBlock> blocks;
+        std::unordered_set<pVirRegister> usedVirRegs;
         unsigned allocaSize, argSize;
     };
 
@@ -43,9 +35,9 @@ namespace mips {
     };
 
     struct Module {
-        std::vector<Function *> functions;
-        std::vector<GlobalVar *> globalVars;
-        Function *main;
+        std::vector<pFunction> functions;
+        std::vector<pGlobalVar> globalVars;
+        pFunction main;
     };
 }
 
