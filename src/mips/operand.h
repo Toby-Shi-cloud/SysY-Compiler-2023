@@ -139,15 +139,18 @@ namespace mips {
         return dynamic_cast<const PhyRegister *>(this) != nullptr;
     }
 
-    inline std::ostream &operator<<(std::ostream &os, const Operand &operand) {
+    template<typename T, typename = std::enable_if_t<std::is_base_of_v<Operand, T>>>
+    inline std::ostream &operator<<(std::ostream &os, const T &operand) {
         return operand.output(os);
     }
 
-    inline std::ostream &operator<<(std::ostream &os, const Operand *operand) {
+    template<typename T, typename = std::enable_if_t<std::is_base_of_v<Operand, T>>>
+    inline std::ostream &operator<<(std::ostream &os, const T *operand) {
         return operand->output(os);
     }
 
-    inline std::ostream &operator<<(std::ostream &os, const std::unique_ptr<Operand> &operand) {
+    template<typename T, typename = std::enable_if_t<std::is_base_of_v<Operand, T>>>
+    inline std::ostream &operator<<(std::ostream &os, const std::unique_ptr<T> &operand) {
         return operand->output(os);
     }
 }

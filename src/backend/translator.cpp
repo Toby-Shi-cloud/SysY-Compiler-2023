@@ -527,6 +527,7 @@ namespace backend {
         } else {
             dbg(dynamic_cast<mir::Instruction *>(mirValue));
             assert(false);
+            return nullptr;
         }
     }
 }
