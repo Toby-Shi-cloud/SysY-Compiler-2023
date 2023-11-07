@@ -5,8 +5,8 @@
 #ifndef COMPILER_MIR_INSTRUCTION_H
 #define COMPILER_MIR_INSTRUCTION_H
 
-#include "derived_value.h"
 #include <sstream>
+#include "derived_value.h"
 
 namespace mir {
     struct Instruction::ret : Instruction {

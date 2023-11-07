@@ -5,10 +5,10 @@
 #ifndef COMPILER_MIR_VALUE_H
 #define COMPILER_MIR_VALUE_H
 
-#include "type.h"
 #include <string>
 #include <ostream>
 #include <unordered_set>
+#include "type.h"
 
 // Use List
 namespace mir {

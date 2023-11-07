@@ -5,11 +5,11 @@
 #ifndef COMPILER_MIR_DERIVED_VALUE_H
 #define COMPILER_MIR_DERIVED_VALUE_H
 
-#include "value.h"
-#include "../enum.h"
 #include <any>
 #include <ostream>
 #include <algorithm>
+#include "value.h"
+#include "../enum.h"
 
 /**
  * Derived Values <br>
