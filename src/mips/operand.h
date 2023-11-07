@@ -24,6 +24,19 @@ namespace mips {
         }
     };
 
+    struct Address : Operand {
+        rRegister base;
+        int offset;
+        rLabel label;
+
+        explicit Address(rRegister base, int offset, rLabel label = nullptr)
+                : base(base), offset(offset), label(label) {}
+
+        inline std::ostream &output(std::ostream &os) const override {
+            return os << label << " + " << offset << "(" << base << ")";
+        }
+    };
+
     struct Immediate : Operand {
         int value;
 

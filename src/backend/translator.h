@@ -26,6 +26,14 @@ namespace backend {
             rMap[operand] = value;
         }
 
+        template<mips::Instruction::Ty rTy, mips::Instruction::Ty iTy>
+        mips::rRegister createBinaryInstHelper(mips::rRegister lhs, mir::Value *rhs);
+
+        template<mir::Instruction::InstrTy ty>
+        mips::rRegister translateBinaryInstHelper(mips::rRegister lhs, mir::Value *rhs);
+
+        mips::rRegister addressCompute(mips::rAddress addr);
+
         void translateRetInst(mir::Instruction::ret *retInst);
 
         void translateBranchInst(mir::Instruction::br *brInst);
@@ -62,6 +70,17 @@ namespace backend {
 
         inline mips::rRegister getRegister(mir::Value *mirValue) {
             return dynamic_cast<mips::rRegister>(translateOperand(mirValue));
+        }
+
+        inline mips::rAddress getAddress(mir::Value *mirValue) {
+            auto ptr = translateOperand(mirValue);
+            if (auto addr = dynamic_cast<mips::rAddress>(ptr))
+                return addr;
+            if (auto reg = dynamic_cast<mips::rRegister>(ptr))
+                return curFunc->newAddress(reg, 0);
+            if (auto label = dynamic_cast<mips::rLabel>(ptr))
+                return curFunc->newAddress(mips::PhyRegister::get(0), 0, label);
+            return nullptr;
         }
 
         inline void translateFunctions() {

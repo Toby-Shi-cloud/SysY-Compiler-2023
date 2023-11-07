@@ -77,8 +77,6 @@ namespace mir {
         [[nodiscard]] inline bool isUsed() const { return !use->users.empty(); }
 
         [[nodiscard]] inline bool isConst() const { return isConstant; }
-
-        [[nodiscard]] inline long getId() const { return ::strtol(getName().c_str(), nullptr, 0); }
     };
 
     /**

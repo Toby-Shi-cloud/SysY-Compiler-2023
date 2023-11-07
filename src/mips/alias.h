@@ -21,6 +21,7 @@ namespace mips {
     def(Operand);
     def(Register);
     def(Label);
+    def(Address);
     def(Immediate);
     def(PhyRegister);
     def(VirRegister);

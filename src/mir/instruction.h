@@ -96,6 +96,12 @@ namespace mir {
 
         [[nodiscard]] size_t getNumIndices() const { return getNumOperands() - 1; }
 
+        [[nodiscard]] pType getIndexTy() const {
+            auto index_ty = getPointerOperand()->getType();
+            if (index_ty->isPointerTy()) index_ty = index_ty->getPointerBase();
+            return index_ty;
+        }
+
         std::ostream &output(std::ostream &os) const override;
     };
 

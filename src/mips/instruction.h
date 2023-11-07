@@ -17,8 +17,8 @@ namespace mips {
         enum class Ty {
             NOP, ADDU, SUBU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV, SLT, SLTU, MOVN, MOVZ, MUL,
             MULT, MULTU, MADD, MADDU, MSUB, MSUBU, DIV, DIVU, CLO, CLZ,
-            ADDIU, ANDI, ORI, XORI, SLL, SRL, SRA, SLTI, SLTIU, LUI,
-            LW, LWL, LWR, LB, LH, LHU, LBU, SW, SWL, SWR, SB, SH,
+            ADDIU, ANDI, ORI, XORI, SLL, SRL, SRA, SLTI, SLTIU, LUI, REM, REMU,
+            LA, LW, LWL, LWR, LB, LH, LHU, LBU, SW, SWL, SWR, SB, SH,
             BEQ, BNE, BGEZ, BGTZ, BLEZ, BLTZ, BGEZAL, BLTZAL,
             MFHI, MFLO, MTHI, MTLO, J, JR, JAL, JALR, SYSCALL
         } ty;
@@ -123,6 +123,9 @@ namespace mips {
         explicit LoadInst(Ty ty, rRegister dst, rLabel label)
                 : Instruction{ty, {dst}, {}}, label(label), offset(nullptr) {}
 
+        explicit LoadInst(Ty ty, rRegister dst, rAddress address)
+                : LoadInst(ty, dst, address->base, address->offset, address->label) {}
+
         [[nodiscard]] inline rRegister dst() const { return regDef[0]; }
 
         [[nodiscard]] inline rRegister base() const { return regUse[0]; }
@@ -130,7 +133,7 @@ namespace mips {
         inline std::ostream &output(std::ostream &os) const override {
             os << ty << "\t" << dst() << ", ";
             if (label) os << label;
-            if (label && offset) os << "+";
+            if (label && offset) os << " + ";
             if (offset) os << offset << "(" << base() << ")";
             return os;
         }
@@ -146,14 +149,21 @@ namespace mips {
         explicit StoreInst(Ty ty, rRegister src, rRegister base, int offset, rLabel label)
                 : Instruction{ty, {}, {src, base}}, label(label), offset(new Immediate(offset)) {}
 
+        explicit StoreInst(Ty ty, rRegister src, rLabel label)
+                : Instruction{ty, {}, {src}}, label(label), offset(nullptr) {}
+
+        explicit StoreInst(Ty ty, rRegister src, rAddress address)
+                : StoreInst(ty, src, address->base, address->offset, address->label) {}
+
         [[nodiscard]] inline rRegister src() const { return regUse[0]; }
 
         [[nodiscard]] inline rRegister base() const { return regUse[1]; }
 
         inline std::ostream &output(std::ostream &os) const override {
             os << ty << "\t" << src() << ", ";
-            if (label) os << label << "+";
-            os << offset << "(" << base() << ")";
+            if (label) os << label;
+            if (label && offset) os << " + ";
+            if (offset) os << offset << "(" << base() << ")";
             return os;
         }
     };
@@ -231,7 +241,7 @@ namespace mips {
         explicit SyscallInst(SyscallId id) : Instruction{Ty::SYSCALL}, id(id) {}
 
         inline std::ostream &output(std::ostream &os) const override {
-            os << "ori\t$v0,$zero," << static_cast<unsigned>(id) << std::endl;
+            os << "ori\t$v0, $zero, " << static_cast<unsigned>(id) << std::endl;
             return os << "\t" << ty;
         }
     };

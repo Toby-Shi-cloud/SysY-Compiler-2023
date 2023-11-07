@@ -45,9 +45,7 @@ namespace mir {
             : Instruction(type, GETELEMENTPTR, merge(ptr, idxs.begin() + ptr->getType()->isPointerTy(), idxs.end())) {}
 
     std::ostream &Instruction::getelementptr::output(std::ostream &os) const {
-        auto index_ty = getPointerOperand()->getType();
-        if (index_ty->isPointerTy()) index_ty = index_ty->getPointerBase();
-        os << getName() << " = getelementptr " << index_ty
+        os << getName() << " = getelementptr " << getIndexTy()
            << ", ptr " << getPointerOperand()->getName();
         for (int i = 0; i < getNumIndices(); i++) {
             os << ", " << getIndexOperand(i);

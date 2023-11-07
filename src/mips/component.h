@@ -32,6 +32,7 @@ namespace mips {
         pBlock exitB = std::make_unique<Block>("$BB." + label->name + ".end", this);
         std::vector<pBlock> blocks;
         std::unordered_set<pVirRegister> usedVirRegs;
+        std::unordered_set<pAddress> usedAddress;
 
         explicit Function(std::string name)
                 : label(std::make_unique<Label>(std::move(name))),
@@ -45,6 +46,13 @@ namespace mips {
             auto reg = new VirRegister();
             usedVirRegs.emplace(reg);
             return reg;
+        }
+
+        template<typename ...Args>
+        inline rAddress newAddress(Args ...args) {
+            auto addr = new Address(args...);
+            usedAddress.emplace(addr);
+            return addr;
         }
     };
 
