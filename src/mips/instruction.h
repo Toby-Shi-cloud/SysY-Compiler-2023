@@ -55,12 +55,14 @@ namespace mips {
 
         [[nodiscard]] inline bool isSyscallInst() const { return ty == Ty::SYSCALL; }
 
-        virtual inline std::ostream &output(std::ostream &os) const = 0;
-    };
+        friend inline std::ostream &operator<<(std::ostream &os, Instruction::Ty t) {
+            return os << magic_enum::enum_to_string_lower(t);
+        }
 
-    inline std::ostream &operator<<(std::ostream &os, Instruction::Ty ty) {
-        return os << magic_enum::enum_to_string_lower(ty);
-    }
+        virtual inline std::ostream &output(std::ostream &os) const {
+            return os << ty;
+        }
+    };
 
     struct BinaryRInst : Instruction {
         explicit BinaryRInst(Ty ty, rRegister dst, rRegister src1, rRegister src2)
@@ -75,14 +77,14 @@ namespace mips {
 
         [[nodiscard]] inline rRegister src1() const { return regUse.empty() ? nullptr : regUse[0]; }
 
-        [[nodiscard]] inline rRegister src2() const { return regUse.size() > 1 ? nullptr : regUse[1]; }
+        [[nodiscard]] inline rRegister src2() const { return regUse.size() <= 1 ? nullptr : regUse[1]; }
 
         inline std::ostream &output(std::ostream &os) const override {
             bool first = true;
-            os << ty;
-            if (dst()) os << ", "[first] << dst(), first = false;
-            if (src1()) os << ", "[first] << src1(), first = false;
-            if (src2()) os << ", "[first] << src2(), first = false;
+            os << ty << "\t";
+            if (dst()) os << (first ? "" : ", ") << dst(), first = false;
+            if (src1()) os << (first ? "" : ", ") << src1(), first = false;
+            if (src2()) os << (first ? "" : ", ") << src2(), first = false;
             return os;
         }
     };
@@ -101,51 +103,55 @@ namespace mips {
         [[nodiscard]] inline rRegister src() const { return regUse.empty() ? nullptr : regUse[0]; }
 
         inline std::ostream &output(std::ostream &os) const override {
-            os << ty << " " << dst();
-            if (src()) os << "," << src();
-            os << "," << imm;
+            os << ty << "\t" << dst();
+            if (src()) os << ", " << src();
+            os << ", " << imm;
             return os;
         }
     };
 
     struct LoadInst : Instruction {
-        pLabel label;
+        rLabel label;
         pImmediate offset;
 
         explicit LoadInst(Ty ty, rRegister dst, rRegister base, int offset)
                 : Instruction{ty, {dst}, {base}}, label(nullptr), offset(new Immediate(offset)) {}
 
-        explicit LoadInst(Ty ty, rRegister dst, rRegister base, int offset, std::string label)
-                : Instruction{ty, {dst}, {base}}, label(new Label(std::move(label))), offset(new Immediate(offset)) {}
+        explicit LoadInst(Ty ty, rRegister dst, rRegister base, int offset, rLabel label)
+                : Instruction{ty, {dst}, {base}}, label(label), offset(new Immediate(offset)) {}
+
+        explicit LoadInst(Ty ty, rRegister dst, rLabel label)
+                : Instruction{ty, {dst}, {}}, label(label), offset(nullptr) {}
 
         [[nodiscard]] inline rRegister dst() const { return regDef[0]; }
 
         [[nodiscard]] inline rRegister base() const { return regUse[0]; }
 
         inline std::ostream &output(std::ostream &os) const override {
-            os << ty << " " << dst() << ",";
-            if (label) os << label << "+";
-            os << offset << "(" << base() << ")";
+            os << ty << "\t" << dst() << ", ";
+            if (label) os << label;
+            if (label && offset) os << "+";
+            if (offset) os << offset << "(" << base() << ")";
             return os;
         }
     };
 
     struct StoreInst : Instruction {
-        pLabel label;
+        rLabel label;
         pImmediate offset;
 
         explicit StoreInst(Ty ty, rRegister src, rRegister base, int offset)
                 : Instruction{ty, {}, {src, base}}, label(nullptr), offset(new Immediate(offset)) {}
 
-        explicit StoreInst(Ty ty, rRegister src, rRegister base, int offset, std::string label)
-                : Instruction{ty, {}, {src, base}}, label(new Label(std::move(label))), offset(new Immediate(offset)) {}
+        explicit StoreInst(Ty ty, rRegister src, rRegister base, int offset, rLabel label)
+                : Instruction{ty, {}, {src, base}}, label(label), offset(new Immediate(offset)) {}
 
         [[nodiscard]] inline rRegister src() const { return regUse[0]; }
 
         [[nodiscard]] inline rRegister base() const { return regUse[1]; }
 
         inline std::ostream &output(std::ostream &os) const override {
-            os << ty << " " << src() << ",";
+            os << ty << "\t" << src() << ", ";
             if (label) os << label << "+";
             os << offset << "(" << base() << ")";
             return os;
@@ -153,21 +159,21 @@ namespace mips {
     };
 
     struct BranchInst : Instruction {
-        pLabel label;
+        rLabel label;
 
-        explicit BranchInst(Ty ty, rRegister src1, rRegister src2, std::string label)
-                : Instruction{ty, {}, {src1, src2}}, label(new Label(std::move(label))) {}
+        explicit BranchInst(Ty ty, rRegister src1, rRegister src2, rLabel label)
+                : Instruction{ty, {}, {src1, src2}}, label(label) {}
 
-        explicit BranchInst(Ty ty, rRegister src1, std::string label)
-                : Instruction{ty, {}, {src1}}, label(new Label(std::move(label))) {}
+        explicit BranchInst(Ty ty, rRegister src1, rLabel label)
+                : Instruction{ty, {}, {src1}}, label(label) {}
 
         [[nodiscard]] inline rRegister src1() const { return regUse.empty() ? nullptr : regUse[0]; }
 
-        [[nodiscard]] inline rRegister src2() const { return regUse.size() > 1 ? nullptr : regUse[1]; }
+        [[nodiscard]] inline rRegister src2() const { return regUse.size() <= 1 ? nullptr : regUse[1]; }
 
         inline std::ostream &output(std::ostream &os) const override {
-            os << ty << " " << src1() << ",";
-            if (src2()) os << src2() << ",";
+            os << ty << "\t" << src1() << ", ";
+            if (src2()) os << src2() << ", ";
             os << label;
             return os;
         }
@@ -184,15 +190,15 @@ namespace mips {
         [[nodiscard]] inline rRegister src() const { return regUse.empty() ? nullptr : regUse[0]; }
 
         inline std::ostream &output(std::ostream &os) const override {
-            return os << ty << " " << (dst() ? dst() : src());
+            return os << ty << "\t" << (dst() ? dst() : src());
         }
     };
 
     struct JumpInst : Instruction {
-        pLabel label;
+        rLabel label;
 
-        explicit JumpInst(Ty ty, std::string label)
-                : Instruction{ty}, label(new Label(std::move(label))) {}
+        explicit JumpInst(Ty ty, rLabel label)
+                : Instruction{ty}, label(label) {}
 
         explicit JumpInst(Ty ty, rRegister tar)
                 : Instruction{ty, {}, {tar}}, label(nullptr) {}
@@ -202,12 +208,12 @@ namespace mips {
 
         [[nodiscard]] inline rRegister target() const { return regUse.empty() ? nullptr : regUse.back(); }
 
-        [[nodiscard]] inline rRegister ra() const { return regUse.size() > 1 ? nullptr : regUse.front(); }
+        [[nodiscard]] inline rRegister ra() const { return regUse.size() <= 1 ? nullptr : regUse.front(); }
 
         inline std::ostream &output(std::ostream &os) const override {
-            os << ty << " ";
+            os << ty << "\t";
             if (label) os << label;
-            else if (ra()) os << ra() << "," << target();
+            else if (ra()) os << ra() << ", " << target();
             else os << target();
             return os;
         }
@@ -225,7 +231,8 @@ namespace mips {
         explicit SyscallInst(SyscallId id) : Instruction{Ty::SYSCALL}, id(id) {}
 
         inline std::ostream &output(std::ostream &os) const override {
-            return os << ty << " " << static_cast<unsigned>(id);
+            os << "ori\t$v0,$zero," << static_cast<unsigned>(id) << std::endl;
+            return os << "\t" << ty;
         }
     };
 

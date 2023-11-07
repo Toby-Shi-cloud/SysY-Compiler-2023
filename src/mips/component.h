@@ -12,55 +12,81 @@
 
 namespace mips {
     struct Block {
-        std::string name;
+        pLabel label;
         rFunction parent;
         std::vector<pInstruction> instructions;
         std::vector<rBlock> predecessors, successors;
         std::unordered_set<rRegister> liveIn, liveOut;
         std::unordered_set<rRegister> use, def;
+
+        explicit Block(rFunction parent) : parent(parent) {}
+
+        explicit Block(std::string name, rFunction parent)
+                : label(std::make_unique<Label>(std::move(name))), parent(parent) {}
     };
 
     struct Function {
-        std::string name;
+        pLabel label;
+        unsigned allocaSize, argSize;
+        pBlock startB = std::make_unique<Block>(this);
+        pBlock exitB = std::make_unique<Block>("$BB." + label->name + ".end", this);
         std::vector<pBlock> blocks;
         std::unordered_set<pVirRegister> usedVirRegs;
-        unsigned allocaSize, argSize;
+
+        explicit Function(std::string name)
+                : label(std::make_unique<Label>(std::move(name))),
+                  allocaSize(0), argSize(0) {}
+
+        explicit Function(std::string name, unsigned allocaSize, unsigned argSize)
+                : label(std::make_unique<Label>(std::move(name))),
+                  allocaSize(allocaSize), argSize(argSize) {}
+
+        inline rVirRegister newVirRegister() {
+            auto reg = new VirRegister();
+            usedVirRegs.emplace(reg);
+            return reg;
+        }
     };
 
     struct GlobalVar {
-        std::string name;
+        pLabel label;
         bool isInit, isString, isConst;
         unsigned size;
         std::variant<std::string, std::vector<int>> elements;
+
+        explicit GlobalVar(std::string name, bool isInit, bool isString, bool isConst,
+                           unsigned size, std::variant<std::string, std::vector<int>> elements)
+                : label(std::make_unique<Label>(std::move(name))), isInit(isInit), isString(isString),
+                  isConst(isConst), size(size), elements(std::move(elements)) {}
     };
 
     struct Module {
+        pFunction main;
         std::vector<pFunction> functions;
         std::vector<pGlobalVar> globalVars;
-        pFunction main;
     };
 
     inline std::ostream &operator<<(std::ostream &os, const Block &block) {
-        os << block.name << ":" << std::endl;
-        for (auto &inst: block.instructions) {
-            os << "  " << *inst << std::endl;
-        }
+        if (block.label) os << block.label << ":" << std::endl;
+        for (auto &inst: block.instructions)
+            os << "\t" << *inst << std::endl;
         return os;
     }
 
     inline std::ostream &operator<<(std::ostream &os, const Function &func) {
-        os << func.name << ":" << std::endl;
-        for (auto &block: func.blocks) {
+        os << func.label << ":" << std::endl;
+        os << *func.startB;
+        for (auto &block: func.blocks)
             os << *block;
-        }
+        os << *func.exitB;
         return os;
     }
 
     inline std::ostream &operator<<(std::ostream &os, const GlobalVar &var) {
-        os << var.name << ":" << std::endl;
-        if (!var.isInit) os << "  .space " << var.size << std::endl;
+        os << var.label << ":" << std::endl;
+        if (!var.isInit) os << "\t.space\t" << var.size << std::endl;
         else if (var.isString) {
-            os << "  .asciiz \"";
+            os << "\t.asciiz\t\"";
             for (char ch: std::get<std::string>(var.elements)) {
                 if (ch == '\n') os << "\\n";
                 else os << ch;
@@ -68,20 +94,24 @@ namespace mips {
             os << "\"" << std::endl;
         } else {
             auto &elements = std::get<std::vector<int>>(var.elements);
-            for (auto ele: elements) os << "  .word " << ele << std::endl;
+            os << "\t.word" << "\t";
+            bool first = true;
+            for (auto ele: elements) os << (first ? "" : ", ") << ele, first = false;
+            os << std::endl;
         }
         return os;
     }
 
     inline std::ostream &operator<<(std::ostream &os, const Module &module) {
-        os << "  .data" << std::endl;
+        os << "\t.data" << std::endl;
         for (auto &var: module.globalVars)
             if (!var->isString) os << *var;
         for (auto &var: module.globalVars)
             if (var->isString) os << *var;
-        os << std::endl << "  .text" << std::endl;
+        os << std::endl << "\t.text" << std::endl;
         for (auto &func: module.functions)
             os << *func << std::endl;
+        os << *module.main;
         return os;
     }
 }

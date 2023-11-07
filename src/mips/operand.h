@@ -57,9 +57,19 @@ namespace mips {
 
         unsigned id;
 
-        explicit PhyRegister(unsigned id) : id(id) { assert(id >= 0 && id < 34); }
+    private:
+        static const std::array<pPhyRegister, 34> registers;
 
-        explicit PhyRegister(const std::string &name) : id(name2id.at(name)) {}
+        explicit PhyRegister(unsigned id) : id(id) {}
+
+    public:
+        [[nodiscard]] static inline rPhyRegister get(unsigned id) {
+            return registers[id].get();
+        }
+
+        [[nodiscard]] static inline rPhyRegister get(const std::string &name) {
+            return registers[name2id.at(name)].get();
+        }
 
         [[nodiscard]] inline bool isUniversal() const { return id >= 8 && id <= 25; }
 
@@ -90,6 +100,13 @@ namespace mips {
         }
     };
 
+    inline const std::array<pPhyRegister, 34> PhyRegister::registers = []() {
+        std::array<pPhyRegister, 34> registers;
+        for (unsigned i = 0; i < 34; i++)
+            pPhyRegister(new PhyRegister(i)).swap(registers[i]);
+        return registers;
+    }();
+
     struct VirRegister : Register {
         static inline unsigned counter = 0;
         unsigned id;
@@ -111,6 +128,14 @@ namespace mips {
 
     inline std::ostream &operator<<(std::ostream &os, const Operand &operand) {
         return operand.output(os);
+    }
+
+    inline std::ostream &operator<<(std::ostream &os, const Operand *operand) {
+        return operand->output(os);
+    }
+
+    inline std::ostream &operator<<(std::ostream &os, const std::unique_ptr<Operand> &operand) {
+        return operand->output(os);
     }
 }
 
