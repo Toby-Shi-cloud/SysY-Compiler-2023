@@ -5,6 +5,7 @@
 #ifndef COMPILER_MIR_MANAGER_H
 #define COMPILER_MIR_MANAGER_H
 
+#include <unordered_map>
 #include "derived_value.h"
 
 namespace mir {

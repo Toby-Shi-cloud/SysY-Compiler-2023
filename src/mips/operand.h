@@ -5,6 +5,7 @@
 #ifndef COMPILER_MIPS_OPERAND_H
 #define COMPILER_MIPS_OPERAND_H
 
+#include <array>
 #include <variant>
 #include <ostream>
 #include "alias.h"

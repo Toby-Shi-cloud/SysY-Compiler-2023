@@ -6,7 +6,7 @@
 #define COMPILER_TRANSLATOR_H
 
 #include "../mir.h"
-#include "register_alloca.h"
+#include "../mips.h"
 
 namespace backend {
     class Translator {
