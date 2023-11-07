@@ -25,6 +25,8 @@ namespace mips {
         std::vector<rRegister> regDef, regUse;
         rBlock parent = nullptr;
 
+        virtual ~Instruction() = default;
+
         explicit Instruction() : ty{Ty::NOP} {}
 
         explicit Instruction(Ty ty) : ty{ty} {}

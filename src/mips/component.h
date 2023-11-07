@@ -8,7 +8,7 @@
 #include <vector>
 #include <ostream>
 #include <unordered_set>
-#include "operand.h"
+#include "instruction.h"
 
 namespace mips {
     struct Block {
@@ -16,8 +16,8 @@ namespace mips {
         rFunction parent;
         std::vector<pInstruction> instructions;
         std::vector<rBlock> predecessors, successors;
-        std::vector<rRegister> liveIn, liveOut;
-        std::vector<rRegister> use, def;
+        std::unordered_set<rRegister> liveIn, liveOut;
+        std::unordered_set<rRegister> use, def;
     };
 
     struct Function {
@@ -39,6 +39,51 @@ namespace mips {
         std::vector<pGlobalVar> globalVars;
         pFunction main;
     };
+
+    inline std::ostream &operator<<(std::ostream &os, const Block &block) {
+        os << block.name << ":" << std::endl;
+        for (auto &inst: block.instructions) {
+            os << "  " << *inst << std::endl;
+        }
+        return os;
+    }
+
+    inline std::ostream &operator<<(std::ostream &os, const Function &func) {
+        os << func.name << ":" << std::endl;
+        for (auto &block: func.blocks) {
+            os << *block;
+        }
+        return os;
+    }
+
+    inline std::ostream &operator<<(std::ostream &os, const GlobalVar &var) {
+        os << var.name << ":" << std::endl;
+        if (!var.isInit) os << "  .space " << var.size << std::endl;
+        else if (var.isString) {
+            os << "  .asciiz \"";
+            for (char ch: std::get<std::string>(var.elements)) {
+                if (ch == '\n') os << "\\n";
+                else os << ch;
+            }
+            os << "\"" << std::endl;
+        } else {
+            auto &elements = std::get<std::vector<int>>(var.elements);
+            for (auto ele: elements) os << "  .word " << ele << std::endl;
+        }
+        return os;
+    }
+
+    inline std::ostream &operator<<(std::ostream &os, const Module &module) {
+        os << "  .data" << std::endl;
+        for (auto &var: module.globalVars)
+            if (!var->isString) os << *var;
+        for (auto &var: module.globalVars)
+            if (var->isString) os << *var;
+        os << std::endl << "  .text" << std::endl;
+        for (auto &func: module.functions)
+            os << *func << std::endl;
+        return os;
+    }
 }
 
 #endif //COMPILER_MIPS_COMPONENT_H

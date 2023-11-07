@@ -34,6 +34,8 @@ add_executable(Compiler
         src/mips/component.h
         src/mips/instruction.h
         src/mips/operand.h
+        src/backend/translator.cpp
+        src/backend/translator.h
 )
 
 if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")

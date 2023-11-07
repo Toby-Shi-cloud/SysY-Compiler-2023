@@ -3,9 +3,12 @@
 #include "frontend/parser.h"
 #include "frontend/visitor.h"
 #include "mir/manager.h"
+#include "mips/component.h"
+#include "backend/translator.h"
 
 frontend::message_queue_t message_queue;
 mir::Manager mir_manager;
+mips::Module mips_module;
 
 int main(int argc, char **argv) {
     std::ifstream fin(argc >= 2 ? argv[1] : "testfile.txt");
@@ -28,9 +31,12 @@ int main(int argc, char **argv) {
         std::cout << message << std::endl;
         ferr << message.line << " " << (char)message.code << std::endl;
     }
+    if (!message_queue.empty()) return 0;
 
-    if (message_queue.empty()) {
-        mir_manager.output(fir);
-    }
+    mir_manager.output(fir);
+
+    backend::Translator translator(&mir_manager, &mips_module);
+    translator.translate();
+    fmips << mips_module;
     return 0;
 }
