@@ -127,7 +127,7 @@ namespace mips {
         explicit VirRegister() : id(counter++) {}
 
         inline std::ostream &output(std::ostream &os) const override {
-            return os << "$(vr" << id << ")";
+            return os << "$vr" << id << "";
         }
     };
 

@@ -76,6 +76,10 @@ namespace mir {
          * Alloc names for args, bbs and instructions.
          */
         void allocName();
+
+        [[nodiscard]] inline bool isMain() const { return getName() == "@main"; }
+
+        [[nodiscard]] bool isLeaf() const;
     };
 
     /**

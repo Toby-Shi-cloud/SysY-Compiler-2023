@@ -16,8 +16,8 @@ namespace mips {
     struct Instruction {
         enum class Ty {
             NOP, ADDU, SUBU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV, SLT, SLTU, MOVN, MOVZ, MUL,
-            MULT, MULTU, MADD, MADDU, MSUB, MSUBU, DIV, DIVU, CLO, CLZ,
-            ADDIU, ANDI, ORI, XORI, SLL, SRL, SRA, SLTI, SLTIU, LUI, REM, REMU,
+            MULT, MULTU, MADD, MADDU, MSUB, MSUBU, DIV, DIVU, CLO, CLZ, MOVE,
+            ADDIU, ANDI, ORI, XORI, SLL, SRL, SRA, SLTI, SLTIU, LUI, LI, REM, REMU,
             LA, LW, LWL, LWR, LB, LH, LHU, LBU, SW, SWL, SWR, SB, SH,
             BEQ, BNE, BGEZ, BGTZ, BLEZ, BLTZ, BGEZAL, BLTZAL,
             MFHI, MFLO, MTHI, MTLO, J, JR, JAL, JALR, SYSCALL
@@ -190,6 +190,8 @@ namespace mips {
     };
 
     struct MoveInst : Instruction {
+        explicit MoveInst(rRegister dst, rRegister src) : Instruction{Ty::MOVE, {dst}, {src}} {}
+
         explicit MoveInst(Ty ty, rRegister universal) : Instruction{ty} {
             if (ty == Ty::MFHI || ty == Ty::MFLO) regDef.push_back(universal);
             else regUse.push_back(universal);
@@ -200,7 +202,11 @@ namespace mips {
         [[nodiscard]] inline rRegister src() const { return regUse.empty() ? nullptr : regUse[0]; }
 
         inline std::ostream &output(std::ostream &os) const override {
-            return os << ty << "\t" << (dst() ? dst() : src());
+            if (ty == Ty::MOVE) {
+                return os << ty << "\t" << dst() << ", " << src();
+            } else {
+                return os << ty << "\t" << (dst() ? dst() : src());
+            }
         }
     };
 
@@ -241,7 +247,7 @@ namespace mips {
         explicit SyscallInst(SyscallId id) : Instruction{Ty::SYSCALL}, id(id) {}
 
         inline std::ostream &output(std::ostream &os) const override {
-            os << "ori\t$v0, $zero, " << static_cast<unsigned>(id) << std::endl;
+            os << "li\t$v0, " << static_cast<unsigned>(id) << std::endl;
             return os << "\t" << ty;
         }
     };

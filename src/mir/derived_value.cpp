@@ -48,6 +48,14 @@ namespace mir {
         }
     }
 
+    bool Function::isLeaf() const {
+        return std::all_of(bbs.begin(), bbs.end(), [](auto bb) {
+            return std::all_of(bb->instructions.begin(), bb->instructions.end(), [](auto inst) {
+                return inst->instrTy != Instruction::CALL;
+            });
+        });
+    }
+
     GlobalVar::~GlobalVar() {
         // IntegerLiteral is owned by pool.
         if (getType()->isIntegerTy()) return;
