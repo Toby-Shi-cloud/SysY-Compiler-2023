@@ -5,6 +5,7 @@
 #ifndef COMPILER_REG_ALLOCA_H
 #define COMPILER_REG_ALLOCA_H
 
+#include <set>
 #include <variant>
 #include <unordered_map>
 #include <unordered_set>
@@ -25,8 +26,8 @@ namespace backend {
         using phy_position_t = std::variant<std::monostate, mips::rPhyRegister, int>;
         std::unordered_map<mips::rVirRegister, phy_position_t> v2p;
 
-        using vir_set_t = std::unordered_set<mips::rVirRegister>;
-        using phy_set_t = std::unordered_set<mips::rPhyRegister>;
+        using vir_set_t = std::set<mips::rVirRegister>;
+        using phy_set_t = std::set<mips::rPhyRegister>;
         std::unordered_set<mips::rVirRegister> need_color;
         std::unordered_map<mips::rVirRegister, vir_set_t> conflict;
 

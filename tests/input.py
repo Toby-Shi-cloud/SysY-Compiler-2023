@@ -1,9 +1,8 @@
 #! /usr/bin/python3
+# -*- coding: utf-8 -*-
 
-try:
-    while True:
-        L = map(int, input().split())
-        for x in L:
-            print(x)
-except EOFError:
-    pass
+lines = open("input.txt", encoding="utf-8").readlines()
+for line in lines:
+    L = map(int, line.strip().split())
+    for x in L:
+        print(x)

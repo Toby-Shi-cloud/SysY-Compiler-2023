@@ -29,7 +29,7 @@ namespace backend {
     mips::rRegister Translator::createBinaryInstHelper(mips::rRegister lhs, mir::Value *rhs) {
         auto dst = curFunc->newVirRegister();
         if (auto literal = dynamic_cast<mir::IntegerLiteral *>(rhs);
-                literal && literal->value < 1 << 16) {
+                literal && literal->value < 1 << 15 && literal->value >= -(1 << 15)) {
             // rhs is immediate
             int imm = literal->value;
             if constexpr (rTy == mips::Instruction::Ty::SUBU) imm = -imm; // use addiu instead
