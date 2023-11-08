@@ -2,6 +2,7 @@
 // Created by toby on 2023/11/8.
 //
 
+#include <algorithm>
 #include "reg_alloca.h"
 
 namespace backend {
@@ -111,6 +112,7 @@ namespace backend {
         if (need_color.empty()) return;
         // NOLINTNEXTLINE
         auto dfs = [this, &could_use](auto &&self, mips::rVirRegister reg) -> void {
+            if (!std::holds_alternative<std::monostate>(v2p[reg])) return;
             auto colors = could_use;
             for (auto v: conflict[reg])
                 if (std::holds_alternative<mips::rPhyRegister>(v2p[v]))
@@ -124,10 +126,10 @@ namespace backend {
                 v2p[reg] = color;
             }
             for (auto v: conflict[reg])
-                if (std::holds_alternative<std::monostate>(v2p[v]))
-                    self(self, v);
+                self(self, v);
         };
-        dfs(dfs, *need_color.begin());
+        for (auto reg: need_color)
+            dfs(dfs, reg);
     }
 
     void RegisterGraph::compute_registers(mips::rBlock block) {

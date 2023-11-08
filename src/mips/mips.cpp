@@ -2,6 +2,7 @@
 // Created by toby on 2023/11/8.
 //
 
+#include <algorithm>
 #include "../mips.h"
 
 namespace mips {
