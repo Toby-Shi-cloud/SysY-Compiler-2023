@@ -170,10 +170,10 @@ namespace backend {
                         // use register directly
                         auto phy = *avail.begin();
                         avail.erase(avail.begin());
-                        vir->swapDefIn(phy, inst.get());
                         v2p[vir] = phy;
                     }
-                } else if (std::holds_alternative<int>(v2p[vir])) {
+                }
+                if (std::holds_alternative<int>(v2p[vir])) {
                     // if the def reg should store to memory
                     auto temp_it = it;
                     store_at(block, ++temp_it, memory_regs[memory_regs_id], std::get<int>(v2p[vir]));
