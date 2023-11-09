@@ -132,6 +132,13 @@ namespace mips {
         }
     };
 
+    inline const std::array<pPhyRegister, 34> PhyRegister::registers = []() {
+        std::array<pPhyRegister, 34> registers;
+        for (unsigned i = 0; i < 34; i++)
+            registers[i] = pPhyRegister(new PhyRegister(i));
+        return registers;
+    }();
+
     struct VirRegister : Register {
         static inline unsigned counter = 0;
         unsigned id;

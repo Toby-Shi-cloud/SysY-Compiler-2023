@@ -6,13 +6,6 @@
 #include "../mips.h"
 
 namespace mips {
-    const std::array<pPhyRegister, 34> PhyRegister::registers = []() {
-        std::array<pPhyRegister, 34> registers;
-        for (unsigned i = 0; i < 34; i++)
-            registers[i] = pPhyRegister(new PhyRegister(i));
-        return registers;
-    }();
-
     void Register::swapDefTo(mips::rRegister other, mips::rBlock block) {
         std::unordered_set<rInstruction> temp{};
         for (auto inst: defUsers) {

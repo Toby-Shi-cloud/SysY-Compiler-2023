@@ -56,8 +56,7 @@ namespace mir {
             }
         }
 
-        void output(std::ostream &os) {
-            allocName();
+        void output(std::ostream &os) const {
             for (auto globalVar : globalVars) {
                 os << globalVar << std::endl;
             }
