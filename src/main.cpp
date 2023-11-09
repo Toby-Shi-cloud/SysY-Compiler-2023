@@ -51,6 +51,8 @@ int main(int argc, char **argv) {
 
     backend::Translator translator(&mir_manager, &mips_module);
     translator.translate();
+    translator.optimize();
+
     fmips << mips_module;
     return 0;
 }

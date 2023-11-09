@@ -13,20 +13,16 @@
 
 namespace mips {
     struct Block {
-        using inst_node_t = std::list<pInstruction>::iterator;
-        using inst_pos_t = std::list<pInstruction>::const_iterator;
-        pLabel label;
         rFunction parent;
+        block_node_t node{};
+        pLabel label = std::make_unique<Label>("");
         std::list<pInstruction> instructions;
         std::unordered_set<rBlock> predecessors, successors;
         std::unordered_set<rRegister> liveIn, liveOut;
         std::unordered_set<rRegister> use, def;
         pInstruction conditionalJump, fallthroughJump;
 
-        explicit Block(rFunction parent) : label(std::make_unique<Label>("")), parent(parent) {}
-
-        explicit Block(std::string name, rFunction parent)
-                : label(std::make_unique<Label>(std::move(name))), parent(parent) {}
+        explicit Block(rFunction parent) : parent(parent) {}
 
         inline void push_back(pInstruction &&inst) {
             auto it = instructions.insert(instructions.cend(), std::move(inst));
@@ -45,6 +41,8 @@ namespace mips {
         inline auto erase(Args ...args) -> decltype(instructions.erase(args...)) {
             return instructions.erase(args...);
         }
+
+        [[nodiscard]] rLabel nextLabel() const;
 
         template<typename Self>
         struct inst_container_t {
@@ -133,8 +131,8 @@ namespace mips {
         unsigned allocaSize, argSize;
         const bool isMain, isLeaf;
         std::unordered_set<rPhyRegister> shouldSave;
-        pBlock exitB = std::make_unique<Block>(this);
         std::list<pBlock> blocks;
+        pBlock exitB = std::make_unique<Block>(this);
         std::unordered_set<pVirRegister> usedVirRegs;
         std::unordered_set<pAddress> usedAddress;
 
@@ -170,9 +168,10 @@ namespace mips {
 
         inline void allocName() {
             size_t counter = 0;
-            for (auto &bb: blocks) {
-                if (bb->allInstructions().empty()) continue;
-                bb->label->name = "$." + label->name + "_" + std::to_string(counter++);
+            for (auto it = begin(); it != end();) {
+                auto &bb = *it;
+                if (bb->allInstructions().empty()) it = blocks.erase(it);
+                else bb->label->name = "$." + label->name + "_" + std::to_string(counter++), ++it;
             }
             exitB->label->name = "$." + label->name + ".end";
             blocks.front()->label->name = "";
@@ -200,8 +199,11 @@ namespace mips {
     inline std::ostream &operator<<(std::ostream &os, const Block &block) {
         if (block.allInstructions().empty()) return os;
         if (!block.label->name.empty()) os << block.label << ":" << std::endl;
-        for (auto &inst: block.allInstructions())
+        for (auto &inst: block.instructions)
             os << "\t" << *inst << std::endl;
+        if (block.conditionalJump) os << "\t" << *block.conditionalJump << std::endl;
+        if (block.fallthroughJump && block.fallthroughJump->getJumpLabel() != block.nextLabel())
+            os << "\t" << *block.fallthroughJump << std::endl;
         return os;
     }
 

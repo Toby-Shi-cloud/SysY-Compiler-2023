@@ -46,7 +46,14 @@ namespace mips {
 }
 
 namespace mips {
-    rBlock Block::splice(mips::Block::inst_node_t pos) {
+    rLabel Block::nextLabel() const {
+        if (node == block_node_t{}) return nullptr;
+        auto it = node;
+        if (++it == parent->end()) return parent->exitB->label.get();
+        return (*it)->label.get();
+    }
+
+    rBlock Block::splice(inst_node_t pos) {
         if (pos == instructions.end()) return nullptr;
         assert(pos->get()->isFuncCall());
         auto nxt = pos;

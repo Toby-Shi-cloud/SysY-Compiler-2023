@@ -39,7 +39,7 @@ namespace backend {
 
         void compute_registers(mips::rBlock block);
 
-        using inst_postion_t = std::list<mips::pInstruction>::const_iterator;
+        using inst_postion_t = mips::inst_pos_t;
 
         static inst_postion_t load_at(mips::rBlock block, inst_postion_t it, mips::rRegister dst, int offset);
 

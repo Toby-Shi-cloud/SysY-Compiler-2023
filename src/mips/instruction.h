@@ -14,7 +14,6 @@ namespace mips {
 
 namespace mips {
     struct Instruction {
-        using inst_node_t = std::list<pInstruction>::iterator;
         enum class Ty {
             NOP, ADDU, SUBU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV, SLT, SLTU, MOVN, MOVZ, MUL,
             MULT, MULTU, MADD, MADDU, MSUB, MSUBU, DIV, DIVU, CLO, CLZ, MOVE,
@@ -114,9 +113,20 @@ namespace mips {
         virtual inline std::ostream &output(std::ostream &os) const {
             return os << ty;
         }
+
+        [[nodiscard]] virtual inline pInstruction clone() const = 0;
     };
 
-    struct BinaryRInst : Instruction {
+    template<typename T>
+    struct InstructionImpl : virtual Instruction {
+        using Instruction::Instruction;
+
+        [[nodiscard]] inline pInstruction clone() const override {
+            return std::make_unique<T>(static_cast<const T &>(*this));
+        }
+    };
+
+    struct BinaryRInst : InstructionImpl<BinaryRInst> {
         explicit BinaryRInst(Ty ty, rRegister dst, rRegister src1, rRegister src2)
                 : Instruction{ty, {dst}, {src1, src2}} {}
 
@@ -136,13 +146,18 @@ namespace mips {
             os << ty << "\t";
             if (dst()) os << dst(), first = false;
             if (src1()) os << (first ? "" : ", ") << src1(), first = false;
-            if (src2()) os << (first ? "" : ", ") << src2(), first = false;
+            if (src2()) os << (first ? "" : ", ") << src2();
             return os;
         }
     };
 
-    struct BinaryIInst : Instruction {
+    struct BinaryIInst : InstructionImpl<BinaryIInst> {
         pImmediate imm;
+
+        BinaryIInst(const BinaryIInst &inst)
+                : Instruction(inst), imm(new Immediate(inst.imm->value)) {}
+
+        BinaryIInst(BinaryIInst &&inst) = default;
 
         explicit BinaryIInst(Ty ty, rRegister dst, rRegister src, int imm)
                 : Instruction{ty, {dst}, {src}}, imm(new Immediate(imm)) {}
@@ -162,9 +177,14 @@ namespace mips {
         }
     };
 
-    struct LoadInst : Instruction {
+    struct LoadInst : InstructionImpl<LoadInst> {
         rLabel label;
         pImmediate offset;
+
+        LoadInst(const LoadInst &inst)
+                : Instruction(inst), label(inst.label), offset(new Immediate(inst.offset->value)) {}
+
+        LoadInst(LoadInst &&inst) = default;
 
         explicit LoadInst(Ty ty, rRegister dst, rRegister base, int offset)
                 : Instruction{ty, {dst}, {base}}, label(nullptr), offset(new Immediate(offset)) {}
@@ -191,9 +211,14 @@ namespace mips {
         }
     };
 
-    struct StoreInst : Instruction {
+    struct StoreInst : InstructionImpl<StoreInst> {
         rLabel label;
         pImmediate offset;
+
+        StoreInst(const StoreInst &inst)
+                : Instruction(inst), label(inst.label), offset(new Immediate(inst.offset->value)) {}
+
+        StoreInst(StoreInst &&inst) = default;
 
         explicit StoreInst(Ty ty, rRegister src, rRegister base, int offset)
                 : Instruction{ty, {}, {src, base}}, label(nullptr), offset(new Immediate(offset)) {}
@@ -220,7 +245,7 @@ namespace mips {
         }
     };
 
-    struct BranchInst : Instruction {
+    struct BranchInst : InstructionImpl<BranchInst> {
         rLabel label;
 
         explicit BranchInst(Ty ty, rRegister src1, rRegister src2, rLabel label)
@@ -243,7 +268,7 @@ namespace mips {
         }
     };
 
-    struct MoveInst : Instruction {
+    struct MoveInst : InstructionImpl<MoveInst> {
         explicit MoveInst(rRegister dst, rRegister src) : Instruction{Ty::MOVE, {dst}, {src}} {}
 
         explicit MoveInst(Ty ty, rRegister universal) : Instruction{ty} {
@@ -264,7 +289,7 @@ namespace mips {
         }
     };
 
-    struct JumpInst : Instruction {
+    struct JumpInst : InstructionImpl<JumpInst> {
         rLabel label;
 
         explicit JumpInst(Ty ty, rLabel label)
@@ -291,7 +316,7 @@ namespace mips {
         }
     };
 
-    struct SyscallInst : Instruction {
+    struct SyscallInst : InstructionImpl<SyscallInst> {
         enum class SyscallId : unsigned {
             PrintInteger = 1,
             PrintString = 4,

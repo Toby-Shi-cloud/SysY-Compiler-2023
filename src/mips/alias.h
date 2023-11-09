@@ -5,6 +5,7 @@
 #ifndef COMPILER_MIPS_ALIAS_H
 #define COMPILER_MIPS_ALIAS_H
 
+#include <list>
 #include <memory>
 #include "../dbg.h"
 
@@ -51,10 +52,15 @@ namespace mips {
 #undef def
 
 namespace mips {
+    using inst_node_t = std::list<pInstruction>::iterator;
+    using inst_pos_t = std::list<pInstruction>::const_iterator;
+    using block_node_t = std::list<pBlock>::iterator;
+    using block_pos_t = std::list<pBlock>::const_iterator;
+
     template<typename T>
     inline std::unique_ptr<T> make_copy(const std::unique_ptr<T> &ptr) {
         if (ptr == nullptr) return nullptr;
-        return std::make_unique<T>(*ptr);
+        return ptr->clone();
     }
 }
 

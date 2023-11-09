@@ -359,8 +359,8 @@ namespace backend {
         for (auto bb: mirFunction->bbs) {
             auto block = new mips::Block(curFunc);
             bMap[bb] = block;
-            curFunc->blocks.emplace_back(block);
             lMap[block->label.get()] = block;
+            block->node = curFunc->blocks.emplace(curFunc->end(), block);
         }
 
         // arguments
@@ -391,7 +391,6 @@ namespace backend {
         spliceBlocks();
         for (auto &block: curFunc->blocks)
             compute_pre_suc(block.get());
-        // mergeBlocks();
         register_alloca(curFunc);
 
         // save registers before function & restore registers
@@ -553,7 +552,7 @@ namespace backend {
         for (auto it = curFunc->begin(); it != curFunc->end();) {
             auto &block = *it;
             auto pos = std::find_if(block->instructions.begin(), block->instructions.end(), pred_if_jal);
-            if (auto nb = block->splice(pos)) it = curFunc->blocks.emplace(++it, nb);
+            if (auto nb = block->splice(pos)) nb->node = it = curFunc->blocks.emplace(++it, nb);
             else it++;
         }
     }
@@ -562,13 +561,11 @@ namespace backend {
         //TODO
     }
 
-    void Translator::mergeBlocks() {
+    void Translator::mergeExitBlock() {
         // only merge exitB...
         for (auto pre: curFunc->exitB->predecessors)
-            pre->merge(curFunc->exitB.get());
-        curFunc->exitB->instructions.clear();
-        assert(curFunc->exitB->conditionalJump == nullptr);
-        assert(curFunc->exitB->fallthroughJump == nullptr);
+            if (pre->conditionalJump == nullptr)
+                pre->merge(curFunc->exitB.get());
     }
 
     void Translator::compute_pre_suc(mips::rBlock block) {
@@ -583,5 +580,12 @@ namespace backend {
         };
         f(block->conditionalJump);
         f(block->fallthroughJump);
+    }
+
+    void Translator::optimize(mips::rFunction func) {
+        curFunc = func;
+        mergeExitBlock();
+        relocateBlocks();
+        func->allocName();
     }
 }
