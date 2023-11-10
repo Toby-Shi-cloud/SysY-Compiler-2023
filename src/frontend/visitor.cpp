@@ -748,6 +748,11 @@ namespace frontend::visitor {
             }
             value_list list = {};
             if (node.children.size() == 3) {
+                if (function->getType()->getFunctionParamCount() != 0)
+                    message_queue.push_back(message{
+                            message::ERROR, 'd', identifier.line, identifier.column,
+                            "too few arguments for function '" + std::string(identifier.raw) + "'"
+                    });
                 auto call = new Instruction::call(function, {});
                 list.push_back(call);
                 return {call, list};
