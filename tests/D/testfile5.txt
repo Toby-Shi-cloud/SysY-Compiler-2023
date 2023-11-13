@@ -1,11 +1,11 @@
 // matrix power
 // https://www.luogu.com.cn/problem/P3390
 
-const int maxn = 100; // max size of matrix
+const int maxn = 10; // max size of matrix
 const int mod = 1000 * 1000 * 1000 + 7; // 1e9 + 7
 int n;
 
-int matrix[100][100]; // Matrix: n * n
+int matrix[10][10]; // Matrix: n * n
 int k[2]; // long long
 
 void getlong(int _long[/*2*/]) {
@@ -75,10 +75,10 @@ int _mult_mod(int x, int y, int p) {
 
 // Matrix operator*(const Matrix &x, const Matrix &y)
 void matrix_mult(
-/* in */ int m1[/*100*/][100],
-/* in */ int m2[/*100*/][100],
-/* out */ int _ret[/*100*/][100]) {
-    _memset(_ret[0], 0, 100 * 100);
+/* in */ int m1[/*maxn*/][10],
+/* in */ int m2[/*maxn*/][10],
+/* out */ int _ret[/*maxn*/][10]) {
+    _memset(_ret[0], 0, maxn * maxn);
     int i, j, k;
     for(i = 0; i < n; i = i + 1)
         for(j = 0; j < n; j = j + 1)
@@ -87,25 +87,35 @@ void matrix_mult(
     return /* _ret */;
 }
 
+void print(int m[][10]) {
+    int i, j;
+    for(i = 0; i < n; i = i + 1){
+        for(j = 0; j < n; j = j + 1)
+            if(j) printf(" %d", m[i][j]);
+            else printf("%d", m[i][j]);
+        printf("\n");
+    }
+}
+
 // Matrix ^ long
 void matrix_pow(
-/* in */ int m[/*100*/][100],
+/* in */ int m[/*maxn*/][10],
 /* in */ int e[/*2*/],
-/* out */ int _ret[/*100*/][100]) {
-    _memset(_ret[0], 0, 100 * 100);
+/* out */ int _ret[/*maxn*/][10]) {
+    _memset(_ret[0], 0, maxn * maxn);
     int i;
     for (i = 0; i < n; i = i + 1)
         _ret[i][i] = 1;
     const int _5p29 = 536870912; // 2^30 / 2
-    int _base[100][100], _temp[100][100], _exp[2];
-    _memcpy(_base[0], m[0], 100 * 100);
+    int _base[10][10], _temp[10][10], _exp[2];
+    _memcpy(_base[0], m[0], maxn * maxn);
     _memcpy(_exp, e, 2);
     for (;_exp[1] || _exp[0];) {
         if (_exp[0] % 2) {
-            _memcpy(_temp[0], _ret[0], 100 * 100);
+            _memcpy(_temp[0], _ret[0], maxn * maxn);
             matrix_mult(_temp, _base, _ret);
         }
-        _memcpy(_temp[0], _base[0], 100 * 100);
+        _memcpy(_temp[0], _base[0], maxn * maxn);
         matrix_mult(_temp, _temp, _base);
         _exp[0] = _exp[0] / 2 + _exp[1] % 2 * _5p29;
         _exp[1] = _exp[1] / 2;
@@ -121,13 +131,8 @@ int main() {
     for(i = 0; i < n; i = i + 1)
         for(j = 0; j < n; j = j + 1)
             matrix[i][j] = getint();
-    int ans[100][100];
+    int ans[10][10];
     matrix_pow(matrix, k, ans);
-    for(i = 0; i < n; i = i + 1){
-        for(j = 0; j < n; j = j + 1)
-            if(j) printf(" %d", ans[i][j]);
-            else printf("%d", ans[i][j]);
-        printf("\n");
-    }
+    print(ans);
     return 0;
 }

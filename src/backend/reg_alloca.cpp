@@ -79,23 +79,6 @@ namespace backend {
             if (std::holds_alternative<mips::rPhyRegister>(v2p[reg]))
                 reg->swapTo(std::get<mips::rPhyRegister>(v2p[reg]));
         }
-        for (auto &bb: function->blocks) {
-            // -> load / store
-            for (auto reg: bb->liveIn)
-                if (auto vir = dynamic_cast<mips::rVirRegister>(reg);
-                        vir && std::holds_alternative<int>(v2p[vir])) {
-                    auto r = function->newVirRegister();
-                    load_at(bb.get(), bb->instructions.cbegin(), r, std::get<int>(v2p[vir]));
-                    vir->swapUseTo(r, bb.get());
-                }
-            for (auto reg: bb->liveOut)
-                if (auto vir = dynamic_cast<mips::rVirRegister>(reg);
-                        vir && std::holds_alternative<int>(v2p[vir])) {
-                    auto r = function->newVirRegister();
-                    store_at(bb.get(), bb->instructions.cend(), r, std::get<int>(v2p[vir]));
-                    vir->swapDefTo(r, bb.get());
-                }
-        }
         // local
         auto backup_size = function->allocaSize;
         auto max_size = function->allocaSize;

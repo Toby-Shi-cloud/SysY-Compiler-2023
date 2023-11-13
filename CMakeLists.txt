@@ -65,7 +65,7 @@ if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
             COMMAND ./auto_test.sh mips ${CMAKE_CURRENT_BINARY_DIR}/Compiler C30
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     add_test(NAME MIPS-Test-D
-            COMMAND ./auto_test.sh mips ${CMAKE_CURRENT_BINARY_DIR}/Compiler D4
+            COMMAND ./auto_test.sh mips ${CMAKE_CURRENT_BINARY_DIR}/Compiler D6
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     set_tests_properties(LLVM-IR-Test-A LLVM-IR-Test-B LLVM-IR-Test-C LLVM-IR-Test-D
             PROPERTIES TIMEOUT 30)

@@ -552,7 +552,11 @@ namespace backend {
         for (auto it = curFunc->begin(); it != curFunc->end();) {
             auto &block = *it;
             auto pos = std::find_if(block->instructions.begin(), block->instructions.end(), pred_if_jal);
-            if (auto nb = block->splice(pos)) nb->node = it = curFunc->blocks.emplace(++it, nb);
+            if (auto nb = block->splice(pos)) {
+                nb->node = curFunc->blocks.emplace(++it, nb);
+                it = nb->node;
+                lMap[nb->label.get()] = nb;
+            }
             else it++;
         }
     }
