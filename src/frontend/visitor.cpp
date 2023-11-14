@@ -136,7 +136,7 @@ namespace frontend::visitor {
             auto [f, g] = call_table[token.type];
 
             if (f && ret_literal && literal && ret_list.empty()) {
-                ret_literal = manager.getIntegerLiteral(f(*ret_literal, *literal).value);
+                ret_literal = mir::getIntegerLiteral(f(*ret_literal, *literal).value);
                 ret_val = ret_literal;
             } else {
                 if (ret_val->getType() != mir::Type::getI32Type()) {
@@ -188,7 +188,7 @@ namespace frontend::visitor {
         auto ele_size = base->ssize() / 4;
         value_list ret = {};
         for (int i = 0; i < type->getArraySize(); i++) {
-            auto l = manager.getIntegerLiteral(i);
+            auto l = mir::getIntegerLiteral(i);
             index->push_back(l);
             auto list = storeInitValue(var, base, initVal + i * ele_size, index);
             ret.splice(ret.end(), list);
@@ -645,7 +645,7 @@ namespace frontend::visitor {
             if (pos != 0) {
                 auto s = std::string(sv.substr(0, pos));
                 if (s.size() == 1) {
-                    auto literal = manager.getIntegerLiteral(s[0]);
+                    auto literal = mir::getIntegerLiteral(s[0]);
                     list.push_back(new Instruction::call(mir::Function::putch, {literal}));
                 } else {
                     auto var = manager.getStringLiteral(s);
@@ -720,7 +720,7 @@ namespace frontend::visitor {
         // INTCON
         auto &token = node.children[0]->getToken();
         auto value = std::stoi(token.raw.data());
-        auto literal = manager.getIntegerLiteral(value);
+        auto literal = mir::getIntegerLiteral(value);
         return {literal, {}};
     }
 
@@ -788,7 +788,7 @@ namespace frontend::visitor {
             auto literal = dynamic_cast<mir::IntegerLiteral *>(value);
             assert(literal && list.empty());
             if (unary_op.type == MINU) {
-                literal = manager.getIntegerLiteral(-literal->value);
+                literal = mir::getIntegerLiteral(-literal->value);
             } else {
                 assert(unary_op.type == PLUS);
             }

@@ -10,6 +10,7 @@ frontend::message_queue_t message_queue;
 mir::Manager mir_manager;
 mips::Module mips_module;
 
+int optimize = 2;
 const char *source_file = "testfile.txt";
 const char *llvm_ir_file = "llvm_ir.txt";
 const char *mips_file = "mips.txt";
@@ -19,7 +20,9 @@ int main(int argc, char **argv) {
     decltype(source_file) *ptr = &source_file;
     for (int i = 1; i < argc; i++) {
         using namespace std::string_literals;
-        if (argv[i] == "-S"s) ptr = &mips_file;
+        if (argv[i] == "-O0"s) optimize = 0;
+        else if (argv[i] == "-O2"s) optimize = 2;
+        else if (argv[i] == "-S"s) ptr = &mips_file;
         else if (argv[i] == "-emit-llvm"s) ptr = &llvm_ir_file;
         else *ptr = argv[i], ptr = &source_file;
     }
@@ -46,12 +49,15 @@ int main(int argc, char **argv) {
     }
     if (!message_queue.empty()) return 0;
 
+    if (optimize) mir_manager.optimize();
     mir_manager.allocName();
     mir_manager.output(fir);
 
+    return 0;
+
     backend::Translator translator(&mir_manager, &mips_module);
     translator.translate();
-    translator.optimize();
+    if (optimize) translator.optimize();
 
     fmips << mips_module;
     return 0;

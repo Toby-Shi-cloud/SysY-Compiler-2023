@@ -22,9 +22,17 @@ namespace mir {
             delete instruction;
     }
 
-    void BasicBlock::push_back(mir::Instruction *instr) {
-        instructions.push_back(instr);
-        instr->parent = this;
+    void BasicBlock::insert(mir::inst_pos_t p, mir::Instruction *inst) {
+        inst->node = instructions.insert(p, inst);
+        inst->parent = this;
+    }
+
+    inst_node_t BasicBlock::erase(Instruction *inst) {
+        assert(this == inst->parent);
+        assert(!inst->isUsed());
+        auto ret = instructions.erase(inst->node);
+        delete inst;
+        return ret;
     }
 
     Argument *Function::addArgument(pType type) {
@@ -60,6 +68,13 @@ namespace mir {
         // IntegerLiteral is owned by pool.
         if (getType()->isIntegerTy()) return;
         delete init;
+    }
+
+    IntegerLiteral *getIntegerLiteral(int value) {
+        static std::unordered_map<int, IntegerLiteral *> integerPool;
+        if (integerPool[value] == nullptr)
+            integerPool[value] = new IntegerLiteral(value);
+        return integerPool[value];
     }
 
     IntegerLiteral operator+(const IntegerLiteral &lhs, const IntegerLiteral &rhs) {
@@ -130,7 +145,15 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, const BasicBlock &bb) {
-        os << bb.getName().substr(1) << ":\n";
+        if (!bb.predecessors.empty()) {
+            os << bb.getName().substr(1) << ":";
+            for (auto i = bb.getName().length(); i < 50; i++) os << " ";
+            os << "; preds = ";
+            bool first = true;
+            for (auto pred : bb.predecessors)
+                os << (first ? "" : ", ") << pred->getName(), first = false;
+            os << "\n";
+        }
         for (auto instruction : bb.instructions) {
             os << "  " << instruction << "\n";
         }

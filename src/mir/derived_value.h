@@ -6,8 +6,12 @@
 #define COMPILER_MIR_DERIVED_VALUE_H
 
 #include <any>
+#include <set>
+#include <list>
+#include <memory>
 #include <ostream>
 #include <algorithm>
+#include <unordered_set>
 #include "value.h"
 #include "../enum.h"
 
@@ -22,6 +26,9 @@ namespace mir {
     struct GlobalVar;
     struct Instruction;
     struct Literal;
+
+    using inst_node_t = std::list<Instruction *>::iterator;
+    using inst_pos_t = std::list<Instruction *>::const_iterator;
 }
 
 namespace mir {
@@ -42,13 +49,35 @@ namespace mir {
         /**
          * BasicBlock owns all instructions.
          */
-        std::vector<Instruction *> instructions;
+        std::list<Instruction *> instructions;
+        std::unordered_set<BasicBlock *> predecessors, successors;
+        std::unordered_set<BasicBlock *> df; // dominator frontier
+        std::set<BasicBlock *> dominators;
+        BasicBlock *idom = nullptr;
 
         explicit BasicBlock() : Value(Type::getLabelType()) {}
 
         ~BasicBlock() override;
 
-        void push_back(Instruction *instr);
+        void insert(inst_pos_t p, Instruction *inst);
+
+        inst_node_t erase(Instruction *inst);
+
+        inline void push_front(Instruction *inst) {
+            insert(instructions.cbegin(), inst);
+        }
+
+        inline void push_back(Instruction *inst) {
+            insert(instructions.cend(), inst);
+        }
+
+        inline void clear_info() {
+            predecessors.clear();
+            successors.clear();
+            dominators.clear();
+            df.clear();
+            idom = {};
+        }
     };
 
     /**
@@ -58,6 +87,7 @@ namespace mir {
         pType retType;
         std::vector<Argument *> args; // owns
         std::vector<BasicBlock *> bbs; // owns
+        std::unique_ptr<BasicBlock> exitBB{new BasicBlock()};
         static Function *getint;
         static Function *putint;
         static Function *putch;
@@ -76,6 +106,16 @@ namespace mir {
          * Alloc names for args, bbs and instructions.
          */
         void allocName();
+
+        /**
+         * Clear all information of basic blocks. <br>
+         */
+        void clearBBInfo();
+
+        /**
+         * Calculate predecessors and successors for each basic block. <br>
+         */
+        void calcPreSuc();
 
         [[nodiscard]] inline bool isMain() const { return getName() == "@main"; }
 
@@ -119,18 +159,13 @@ namespace mir {
             ICMP, PHI, CALL
         } instrTy;
         BasicBlock *parent = nullptr;
+        inst_node_t node{};
 
         virtual std::ostream &output(std::ostream &os) const = 0;
 
         [[nodiscard]] inline bool isTerminator() const { return instrTy == RET || instrTy == BR; }
 
         [[nodiscard]] inline bool isValue() const { return getType() != Type::getVoidType(); }
-
-        [[nodiscard]] inline bool activeAfter() const {
-            return std::any_of(use->users.begin(), use->users.end(), [this](auto user) {
-                return dynamic_cast<mir::Instruction *>(user)->parent != parent;
-            });
-        }
 
         template<typename... Args>
         explicit Instruction(pType type, InstrTy instrTy, Args ...args) : User(type, args...), instrTy(instrTy) {}
@@ -186,6 +221,8 @@ namespace mir {
                 : Literal(Type::getI32Type(), std::to_string(value)), value(value) {}
     };
 
+    IntegerLiteral *getIntegerLiteral(int value);
+
     IntegerLiteral operator+(const IntegerLiteral &lhs, const IntegerLiteral &rhs);
 
     IntegerLiteral operator-(const IntegerLiteral &lhs, const IntegerLiteral &rhs);
@@ -222,5 +259,25 @@ namespace mir {
 
     std::ostream &operator<<(std::ostream &os, Instruction::InstrTy ty);
 }
+
+#ifdef DBG_ENABLE
+namespace dbg {
+    template<>
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, mir::BasicBlock *const &value) {
+        if (value == nullptr) return pretty_print(stream, nullptr);
+        stream << value->getName();
+        return true;
+    }
+
+    template<>
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, mir::Function *const &value) {
+        if (value == nullptr) return pretty_print(stream, nullptr);
+        stream << value->getName();
+        return true;
+    }
+}
+#endif //DBG_ENABLE
 
 #endif //COMPILER_MIR_DERIVED_VALUE_H

@@ -139,13 +139,34 @@ namespace mir {
     }
 
     struct Instruction::phi : Instruction {
-        explicit phi(const std::vector<Value *> &values) : Instruction(values[0]->getType(), PHI, values) {}
+        using incominng_pair = std::pair<Value *, BasicBlock *>;
 
-        [[nodiscard]] std::pair<Value *, BasicBlock *> getIncomingValue(int i) const {
+        explicit phi(pType type) : Instruction(type, PHI) {}
+
+        explicit phi(const std::vector<incominng_pair> &values);
+
+        inline void addIncomingValue(incominng_pair pair) {
+            addOperand(pair.first);
+            addOperand(pair.second);
+        }
+
+        [[nodiscard]] incominng_pair getIncomingValue(int i) const {
             return {getOperand(i * 2), getOperand<BasicBlock>(i * 2 + 1)};
         }
 
         [[nodiscard]] size_t getNumIncomingValues() const { return getNumOperands() / 2; }
+
+        // check if instruction phi is valid. (may use under debug)
+        [[nodiscard]] bool checkValid() const {
+            auto check_set = parent->predecessors;
+            for (auto i = 0; i < getNumIncomingValues(); i++) {
+                auto [value, bb] = getIncomingValue(i);
+                if (value->getType() != getType()) return false;
+                if (check_set.count(bb)) check_set.erase(bb);
+                else return false;
+            }
+            return check_set.empty();
+        }
 
         std::ostream &output(std::ostream &os) const override;
     };

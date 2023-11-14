@@ -30,6 +30,8 @@ namespace mir {
      * Value is the base class for all mir values.
      */
     class Value {
+        friend User;
+
         /**
          * Every Value has a type. <br>
          */
@@ -48,7 +50,7 @@ namespace mir {
          */
         bool isConstant;
 
-    public:
+    protected:
         /**
          * Value owns Use. <br>
          * Value must transfer use to another Value
@@ -58,15 +60,16 @@ namespace mir {
          */
         Use *use;
 
+    public:
         explicit Value(pType type, bool isConstant) : use(new Use{this}), type(type), isConstant(isConstant) {}
 
         explicit Value(pType type) : Value(type, false) {}
 
         virtual ~Value() { delete use; }
 
-        void setConst(bool constant = true) { isConstant = constant; }
+        inline void setConst(bool constant = true) { isConstant = constant; }
 
-        void setName(std::string str) { name = std::move(str); }
+        inline void setName(std::string str) { name = std::move(str); }
 
         [[nodiscard]] inline bool hasName() const { return !name.empty(); }
 
@@ -77,16 +80,32 @@ namespace mir {
         [[nodiscard]] inline bool isUsed() const { return !use->users.empty(); }
 
         [[nodiscard]] inline bool isConst() const { return isConstant; }
+
+        inline void swap(Value *other) {
+            std::swap(use->value, other->use->value);
+            std::swap(use, other->use);
+        }
+
+        inline void moveTo(Value *other);
     };
 
     /**
      * User is the base class for all mir Value which uses other Values.
      */
     class User : public Value {
+        friend Value;
+
+    protected:
         /**
          * User does NOT own any Use. <br>
          */
         std::vector<Use *> operands;
+
+        inline void addOperand(Value *value) {
+            operands.push_back(value->use);
+            if (value != this)
+                value->use->users.insert(this);
+        }
 
     public:
         template<typename... Args>
@@ -95,8 +114,7 @@ namespace mir {
         }
 
         explicit User(pType type, const std::vector<Value *> &args) : Value(type) {
-            for (auto arg: args) operands.push_back(arg->use);
-            for (auto operand: operands) operand->users.insert(this);
+            for (auto arg: args) addOperand(arg);
         }
 
         ~User() override {
@@ -108,6 +126,16 @@ namespace mir {
 
         [[nodiscard]] auto getNumOperands() const { return operands.size(); }
     };
+
+    inline void Value::moveTo(Value *other) {
+        if (this == other) return;
+        for (auto &&user: use->users)
+            for (auto &&operand: user->operands)
+                if (operand == this->use)
+                    operand = other->use;
+        other->use->users.insert(use->users.begin(), use->users.end());
+        use->users.clear();
+    }
 
     inline std::ostream &operator<<(std::ostream &os, const Value &value) {
         if (value.getType()->isArrayTy()) os << "ptr";

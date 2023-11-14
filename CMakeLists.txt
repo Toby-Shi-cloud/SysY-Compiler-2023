@@ -7,6 +7,10 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_definitions(-D_DEBUG_)
 endif ()
 
+if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+    include_directories(/usr/local/include)
+endif ()
+
 add_executable(Compiler
         src/dbg.h
         src/enum.h
@@ -39,6 +43,9 @@ add_executable(Compiler
         src/backend/reg_alloca.h
         src/backend/translator.cpp
         src/backend/translator.h
+        src/opt/mem2reg.cpp
+        src/opt/mem2reg.h
+        src/opt/opt.cpp
 )
 
 if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")

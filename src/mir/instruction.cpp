@@ -12,6 +12,14 @@ namespace mir {
         return args;
     }
 
+    template<typename T1, typename T2>
+    static inline std::vector<Value *> flatten(const std::vector<std::pair<T1, T2>> &vec) {
+        std::vector<Value *> ret;
+        for (auto &&[x, y]: vec)
+            ret.push_back(x), ret.push_back(y);
+        return ret;
+    }
+
     std::ostream &Instruction::ret::output(std::ostream &os) const {
         if (auto value = getReturnValue()) {
             return os << "ret " << value;
@@ -56,6 +64,9 @@ namespace mir {
     std::ostream &Instruction::icmp::output(std::ostream &os) const {
         return os << getName() << " = icmp " << cond << " " << getLhs() << ", " << getRhs()->getName();
     }
+
+    Instruction::phi::phi(const std::vector<incominng_pair> &values)
+            : Instruction(values[0].first->getType(), PHI, flatten(values)) {}
 
     std::ostream &Instruction::phi::output(std::ostream &os) const {
         os << getName() << " = phi " << getType() << " ";

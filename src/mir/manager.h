@@ -5,6 +5,7 @@
 #ifndef COMPILER_MIR_MANAGER_H
 #define COMPILER_MIR_MANAGER_H
 
+#include <functional>
 #include <unordered_map>
 #include "derived_value.h"
 
@@ -12,7 +13,6 @@ namespace mir {
     struct Manager {
         std::vector<Function *> functions;
         std::vector<GlobalVar *> globalVars;
-        std::unordered_map<int, IntegerLiteral *> integerPool;
         std::unordered_map<std::string, GlobalVar *> stringPool;
 
         ~Manager() {
@@ -20,16 +20,7 @@ namespace mir {
                 delete function;
             for (auto globalVar : globalVars)
                 delete globalVar;
-            for (auto literal : integerPool)
-                delete literal.second;
             // stringPool is a subset of globalVars
-        }
-
-        IntegerLiteral *getIntegerLiteral(int value) {
-            if (integerPool.find(value) == integerPool.end()) {
-                integerPool[value] = new IntegerLiteral(value);
-            }
-            return integerPool[value];
         }
 
         GlobalVar *getStringLiteral(const std::string &value) {
@@ -56,6 +47,20 @@ namespace mir {
             }
         }
 
+        template<typename Func>
+        void for_each_func(Func &&f) {
+            for (auto func: functions)
+                std::invoke(f, func);
+        }
+
+        template<typename Func>
+        void for_each_glob(Func &&f) {
+            for (auto glob: globalVars)
+                std::invoke(f, glob);
+        }
+
+        void optimize();
+
         void output(std::ostream &os) const {
             for (auto globalVar : globalVars) {
                 os << globalVar << std::endl;
@@ -67,6 +72,7 @@ namespace mir {
             os << "declare dso_local void @putstr(i8*)" << std::endl;
             os << std::endl;
             for (auto function : functions) {
+                function->calcPreSuc();
                 os << function << std::endl;
             }
         }
