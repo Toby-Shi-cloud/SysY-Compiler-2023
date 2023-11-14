@@ -162,13 +162,36 @@ namespace mir {
     }
 
     void clearDeadInst(Function *func) {
-        for (auto bb: func->bbs) {
-            auto it = bb->instructions.begin();
-            while (it != bb->instructions.end()) {
-                auto inst = *it;
-                if (inst->isUsed() || !inst->isValue() || inst->isTerminator()) ++it;
-                else it = bb->erase(inst);
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            for (auto bb: func->bbs) {
+                auto it = bb->instructions.begin();
+                while (it != bb->instructions.end()) {
+                    auto inst = *it;
+                    if (inst->isUsed() || !inst->isValue() || inst->isTerminator() || inst->isCall()) ++it;
+                    else it = bb->erase(inst), changed = true;
+                }
             }
+        }
+    }
+
+    void clearDeadBlock(Function *func) {
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            func->calcPreSuc();
+            auto used = 1, current = 1;
+            while (current < func->bbs.size()) {
+                auto bb = func->bbs[current];
+                if (bb->isUsed()) {
+                    func->bbs[used++] = func->bbs[current++];
+                } else {
+                    delete func->bbs[current++];
+                    changed = true;
+                }
+            }
+            func->bbs.resize(used);
         }
     }
 }

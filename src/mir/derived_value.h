@@ -50,12 +50,13 @@ namespace mir {
          * BasicBlock owns all instructions.
          */
         std::list<Instruction *> instructions;
+        Function *parent;
         std::unordered_set<BasicBlock *> predecessors, successors;
         std::unordered_set<BasicBlock *> df; // dominator frontier
         std::set<BasicBlock *> dominators;
         BasicBlock *idom = nullptr;
 
-        explicit BasicBlock() : Value(Type::getLabelType()) {}
+        explicit BasicBlock(Function *parent) : Value(Type::getLabelType()), parent(parent) {}
 
         ~BasicBlock() override;
 
@@ -87,7 +88,7 @@ namespace mir {
         pType retType;
         std::vector<Argument *> args; // owns
         std::vector<BasicBlock *> bbs; // owns
-        std::unique_ptr<BasicBlock> exitBB{new BasicBlock()};
+        std::unique_ptr<BasicBlock> exitBB{new BasicBlock(this)};
         static Function *getint;
         static Function *putint;
         static Function *putch;
@@ -164,6 +165,8 @@ namespace mir {
         virtual std::ostream &output(std::ostream &os) const = 0;
 
         [[nodiscard]] inline bool isTerminator() const { return instrTy == RET || instrTy == BR; }
+
+        [[nodiscard]] inline bool isCall() const { return instrTy == CALL; }
 
         [[nodiscard]] inline bool isValue() const { return getType() != Type::getVoidType(); }
 

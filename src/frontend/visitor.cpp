@@ -241,7 +241,7 @@ namespace frontend::visitor {
                 is_terminator = false;
             } else {
                 if (is_terminator) {
-                    bb = new mir::BasicBlock();
+                    bb = new mir::BasicBlock(current_function);
                     cur = bb;
                     current_function->bbs.push_back(bb);
                     is_terminator = false;
@@ -262,7 +262,7 @@ namespace frontend::visitor {
             }
         } else {
             if (cur == nullptr) {
-                cur = new mir::BasicBlock();
+                cur = new mir::BasicBlock(current_function);
                 current_function->bbs.push_back(cur);
                 cur->push_back(new Instruction::ret());
             } else if (cur->instructions.empty() || !cur->instructions.back()->isTerminator()) {
@@ -433,7 +433,7 @@ namespace frontend::visitor {
     template<>
     SysYVisitor::return_type SysYVisitor::visit<IfStmt>(const GrammarNode &node) {
         // IFTK LPARENT cond RPARENT stmt (ELSETK stmt)?
-        cond_stack.push({new mir::BasicBlock(), new mir::BasicBlock()});
+        cond_stack.push({new mir::BasicBlock(current_function), new mir::BasicBlock(current_function)});
         auto [cond_v, cond_l] = visit(*node.children[2]);
         auto [if_v, if_l] = visit(*node.children[4]);
         value_list list = {};
@@ -442,7 +442,7 @@ namespace frontend::visitor {
         list.splice(list.end(), if_l);
         if (node.children.size() == 7) {
             auto [else_v, else_l] = visit(*node.children[6]);
-            auto end_block = new mir::BasicBlock();
+            auto end_block = new mir::BasicBlock(current_function);
             list.push_back(new Instruction::br(end_block));
             list.push_back(cond_stack.top().false_block);
             list.splice(list.end(), else_l);
@@ -460,8 +460,8 @@ namespace frontend::visitor {
         auto &cond = node.children[2];
         auto &stmt = node.children[4];
         // (br) -> (true) -> stmt -> (continue) -> cond -> (break/false)
-        loop_stack.push({new mir::BasicBlock(), new mir::BasicBlock()});
-        cond_stack.push({new mir::BasicBlock(), loop_stack.top().break_block});
+        loop_stack.push({new mir::BasicBlock(current_function), new mir::BasicBlock(current_function)});
+        cond_stack.push({new mir::BasicBlock(current_function), loop_stack.top().break_block});
         value_list list = {new Instruction::br(loop_stack.top().continue_block)};
         list.push_back(cond_stack.top().true_block);
         auto [stmt_v, stmt_l] = visit(*stmt);
@@ -491,9 +491,9 @@ namespace frontend::visitor {
         auto &forStmt2 = forStmt2_it == node.children.end() ? (const pcGrammarNode &) nullptr : *forStmt2_it;
         auto &stmt = node.children.back();
         // forStmt1 -> (br) -> (true) -> stmt -> (continue) -> forStmt2 -> (cond) -> cond -> (break/false)
-        auto cond_block = new mir::BasicBlock();
-        loop_stack.push({new mir::BasicBlock(), new mir::BasicBlock()});
-        cond_stack.push({new mir::BasicBlock(), loop_stack.top().break_block});
+        auto cond_block = new mir::BasicBlock(current_function);
+        loop_stack.push({new mir::BasicBlock(current_function), new mir::BasicBlock(current_function)});
+        cond_stack.push({new mir::BasicBlock(current_function), loop_stack.top().break_block});
         value_list list = {};
         if (forStmt1) {
             auto [v, l] = visit(*forStmt1);
@@ -844,7 +844,7 @@ namespace frontend::visitor {
         value = truncToI1(value, list);
         for (auto it = node.children.begin() + 1; it != node.children.end(); ++it) {
             if ((*it)->type == Terminal) continue;
-            auto bb = new mir::BasicBlock();
+            auto bb = new mir::BasicBlock(current_function);
             list.push_back(new Instruction::br(value, bb, cond_stack.top().false_block));
             list.push_back(bb);
             auto [v, l] = visit(**it);
@@ -863,7 +863,9 @@ namespace frontend::visitor {
         value_list list = {};
         for (int i = 0; i < count; i++) {
             auto &lAndExp = *node.children[i * 2];
-            mir::BasicBlock *false_block = i + 1 == count ? cond_stack.top().false_block : new mir::BasicBlock();
+            mir::BasicBlock *false_block =
+                    i + 1 == count ? cond_stack.top().false_block
+                                   : new mir::BasicBlock(current_function);
             cond_stack.push({cond_stack.top().true_block, false_block});
             auto [v, l] = visit(lAndExp);
             value = truncToI1(v, l);

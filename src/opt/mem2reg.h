@@ -10,8 +10,6 @@
 namespace mir {
     void reCalcBBInfo(Function *func);
 
-    void clearBBInfo(Function *func);
-
     void calcDominators(Function *func);
 
     void calcDF(Function *func);
@@ -19,6 +17,8 @@ namespace mir {
     void calcPhi(Function *func);
 
     void clearDeadInst(Function *func);
+
+    void clearDeadBlock(Function *func);
 }
 
 #endif //COMPILER_MEM2REG_H

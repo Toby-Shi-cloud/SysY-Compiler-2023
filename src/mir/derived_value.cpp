@@ -3,6 +3,7 @@
 //
 
 #include <sstream>
+#include <unordered_map>
 #include "derived_value.h"
 
 namespace mir {
@@ -145,7 +146,7 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, const BasicBlock &bb) {
-        if (!bb.predecessors.empty()) {
+        if (bb.parent->bbs[0] != &bb) {
             os << bb.getName().substr(1) << ":";
             for (auto i = bb.getName().length(); i < 50; i++) os << " ";
             os << "; preds = ";

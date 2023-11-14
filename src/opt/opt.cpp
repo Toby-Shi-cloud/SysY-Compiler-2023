@@ -5,6 +5,14 @@
 #include "mem2reg.h"
 
 namespace mir {
+    void Manager::optimize() {
+        assert((allocName(), true));
+        for_each_func(clearDeadBlock);
+        for_each_func(reCalcBBInfo);
+        for_each_func(calcPhi);
+        for_each_func(clearDeadInst);
+    }
+
     void Function::clearBBInfo() {
         for (auto bb: bbs)
             bb->clear_info();
@@ -33,13 +41,5 @@ namespace mir {
                 assert(!"The last instruction in a basic block should be 'br' or 'ret'");
             }
         }
-    }
-
-    void Manager::optimize() {
-        assert((allocName(), true));
-        for_each_func(clearDeadInst);
-        for_each_func(reCalcBBInfo);
-        for_each_func(calcPhi);
-        for_each_func(clearDeadInst);
     }
 }
