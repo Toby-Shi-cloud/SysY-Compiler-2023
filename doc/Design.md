@@ -44,7 +44,7 @@ LLVM 项目根目录下是其各个子项目目录，每个子项目大多都由
 
 ### 文件组织
 
-参考 LLVM 的设计，本编译器计划的文件结构如下：
+参考 LLVM 的设计，本编译器的文件结构如下：
 ```
 .
 ├── cmake-build-* (build directory)
@@ -55,25 +55,37 @@ LLVM 项目根目录下是其各个子项目目录，每个子项目大多都由
 │   ├── Design.md
 │   └── SysY2023.g4
 ├── src (source code directory)
+│   ├── backend
+│   │   ├── translator.h
+│   │   ├── reg_alloca.h
+│   │   └── ...
 │   ├── frontend
-│   │   ├── lexer*
-│   │   ├── parser*
-│   │   ├── visitor*
-│   │   └── main.cpp
+│   │   ├── lexer.h
+│   │   ├── parser.h
+│   │   ├── visitor.h
+│   │   └── ...
+│   ├── mips
+│   │   ├── operand.h
+│   │   ├── instruction.h
+│   │   ├── component.h
+│   │   └── ...
 │   ├── mir
+│   │   ├── type.h
+│   │   ├── value.h
+│   │   ├── derived_value.h
+│   │   ├── instruction.h
 │   │   └── ...
 │   ├── opt
 │   │   └── ...
-│   ├── backend
-│   │   └── ...
 │   ├── dbg.h
+│   ├── enum.h
 │   └── main.cpp
-├── testfiles (test files directory)
+├── tests (test files directory)
 │   └── ...
 ├── CMakeLists.txt
 ├── LICENSE
 ├── README.md
-└── zip.sh
+└── ...
 ```
 
 ## 词法分析设计
@@ -184,3 +196,70 @@ public:
     void parse(); // 解析整个程序
 };
 ```
+
+## 错误处理设计 & 中间代码生成设计
+
+- namespace `frontend::visitor`
+- namespace `mir`
+
+我的错误处理和中间代码生成均主要在 visitor 中实现。
+
+### visitor 方法设计
+
+visitor 中有如下定义：
+
+```cpp
+using value_type = mir::Value *;
+using value_list = std::list<value_type>;
+using value_vector = std::vector<value_type>;
+using return_type = std::pair<value_type, value_list>;
+
+template<grammar_type_t type>
+return_type visit(const GrammarNode &node);
+```
+
+这个函数模板针对每一个语法节点进行了一种模板特化，当然对于不需要特殊处理的语法节点，也有默认实现（访问所有子节点）。
+
+函数模板的返回值是该语法节点的值和该语法节点生成的全部中间代码，当然如果出现错误，则返回空值，并想 `message_queue` 添加编译提示信息。
+
+### 符号表设计
+
+符号表是一个栈，每个栈内拥有一个 `std::unordered_map` 是从符号名到符号信息的映射。
+> 由于 C++ 的栈不支持遍历，所以这里直接使用了 `std::deque` 来实现栈。
+
+这个符号表仅服务于 `visitor`，在 `visitor` 生成中间代码后，符号表信息将转移至 `mir::Value` 之间的相互引用关系中。
+
+### 中间代码设计
+
+中间代码采用 LLVM IR 的设计，当然对原版有所简化和改动。但其中心思想仍然是通过 `Use` 串联 `Value` 和 `User`，用 `BasicBlock` 来组织 `Instruction` 的 SSA 设计。
+
+在中间代码中，我为每个指令都建立了一个类，这样可以方便优化和访问。
+
+为了简化中间代码生成的难度，我在大多数时候使用了 LLVM IR 的 opaque pointer (模糊指针)，避免了一些不必要的 `bitcast` 或 `getelementptr` 这样的指针变换和计算指令。
+
+## 代码生成设计
+
+- namespace `backend`
+- namespace `mips`
+
+生成最终的 mips 代码的难度其实并不如想象中的那么简单，主要是 LLVM IR 的设计和 mips 的设计并非总是一一对应的，有些部分必须要进行一些转换。
+因此我设计的后端先将 LLVM IR 转换成含有虚拟寄存器的 mips 代码，随后再通过寄存器分配将虚拟寄存器转换成物理寄存器。
+
+### mips 代码设计
+
+翻译过程和 visitor 的设计类似，为不同的 ir 指令设计了不同的方法，也为不同种类的 mips 指令设计了不同的类，方便分别处理和优化。
+
+mips 相关的类设计时使用了 `std::unique_ptr` 表示所有权，避免了内存释放相关问题。对于那些不具有所有权的指针，则使用了裸指针。
+
+mips 代码主要分为 3 个部分：
+- 可以用作操作数的 `operand`
+- 保存信息和结构的 `component`
+- 代表指令的 `instruction`
+
+### 寄存器分配设计
+
+对于不开启优化的寄存器分配，我采用了简单的贪心算法：
+1. 计算 Block 的 liveIn 和 liveOut，根据此建立冲突图。（没有使用更好的定义链分析建图）
+2. 随后在图上进行 DFS 染色，遇到无法染色的节点则分配内存，可以染色则分配寄存器。（没有进行更严格的图着色的优化）
+3. 分配好跨 Block 使用的虚拟寄存器后，再进行 Block 内的寄存器分配。
+4. 局部寄存器分配方案则更加暴力，对于遍历到的暂未分配的虚拟寄存器，直接分配一个物理寄存器（如果有），否则分配内存。当然如果这是一个虚拟寄存器在 Block 中的最后一次使用，则可以释放其占有的物理寄存器资源。
