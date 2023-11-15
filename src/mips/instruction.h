@@ -24,11 +24,12 @@ namespace mips {
         } ty;
         std::vector<rRegister> regDef, regUse;
         inst_node_t node{}; // the position where the inst is. node for jump/branch inst is broken and DO NOT USE!
-        rBlock parent{};
+        rSubBlock parent{};
 
-        virtual ~Instruction() = default;
-
-        explicit Instruction() : ty{Ty::NOP} {}
+        virtual ~Instruction() {
+            for (auto reg: regDef) reg->defUsers.erase(this);
+            for (auto reg: regUse) reg->useUsers.erase(this);
+        }
 
         explicit Instruction(Ty ty) : ty{ty} {}
 
@@ -37,6 +38,10 @@ namespace mips {
             for (auto reg: this->regDef) reg->defUsers.insert(this);
             for (auto reg: this->regUse) reg->useUsers.insert(this);
         }
+
+        Instruction(const Instruction &inst) noexcept: Instruction(inst.ty, inst.regDef, inst.regUse) {}
+
+        Instruction(Instruction &&inst) noexcept = delete;
 
         inline void reg_def_push_back(rRegister reg) {
             regDef.push_back(reg);
@@ -104,6 +109,14 @@ namespace mips {
             return ty >= Ty::BEQ && ty <= Ty::JALR;
         }
 
+        [[nodiscard]] inline bool isConditionalBranch() const {
+            return ty >= Ty::BEQ && ty <= Ty::BLTZ;
+        }
+
+        [[nodiscard]] inline bool isUnconditionalJump() const {
+            return ty >= Ty::J && ty <= Ty::JR;
+        }
+
         [[nodiscard]] virtual inline rLabel getJumpLabel() const { return nullptr; }
 
         virtual inline void setJumpLabel(rLabel newLabel) {}
@@ -120,7 +133,7 @@ namespace mips {
     };
 
     template<typename T>
-    struct InstructionImpl : virtual Instruction {
+    struct InstructionImpl : Instruction {
         using Instruction::Instruction;
 
         [[nodiscard]] inline pInstruction clone() const override {
@@ -130,9 +143,9 @@ namespace mips {
 
     struct BinaryRInst : InstructionImpl<BinaryRInst> {
         explicit BinaryRInst(Ty ty, rRegister dst, rRegister src1, rRegister src2)
-                : Instruction{ty, {dst}, {src1, src2}} {}
+                : InstructionImpl{ty, {dst}, {src1, src2}} {}
 
-        explicit BinaryRInst(Ty ty, rRegister r1, rRegister r2) : Instruction{ty} {
+        explicit BinaryRInst(Ty ty, rRegister r1, rRegister r2) : InstructionImpl{ty} {
             if (ty == Ty::CLO || ty == Ty::CLZ) reg_def_push_back(r1), reg_use_push_back(r2);
             else reg_use_push_back(r1), reg_use_push_back(r2);
         }
@@ -157,15 +170,13 @@ namespace mips {
         pImmediate imm;
 
         BinaryIInst(const BinaryIInst &inst)
-                : Instruction(inst), imm(new Immediate(inst.imm->value)) {}
-
-        BinaryIInst(BinaryIInst &&inst) = default;
+                : InstructionImpl(inst), imm(new Immediate(inst.imm->value)) {}
 
         explicit BinaryIInst(Ty ty, rRegister dst, rRegister src, int imm)
-                : Instruction{ty, {dst}, {src}}, imm(new Immediate(imm)) {}
+                : InstructionImpl{ty, {dst}, {src}}, imm(new Immediate(imm)) {}
 
         explicit BinaryIInst(Ty ty, rRegister dst, int imm)
-                : Instruction{ty, {dst}, {}}, imm(new Immediate(imm)) {}
+                : InstructionImpl{ty, {dst}, {}}, imm(new Immediate(imm)) {}
 
         [[nodiscard]] inline rRegister dst() const { return regDef[0]; }
 
@@ -184,18 +195,18 @@ namespace mips {
         pImmediate offset;
 
         LoadInst(const LoadInst &inst)
-                : Instruction(inst), label(inst.label), offset(new Immediate(inst.offset->value)) {}
+                : InstructionImpl(inst), label(inst.label), offset(new Immediate(inst.offset->value)) {}
 
         LoadInst(LoadInst &&inst) = default;
 
         explicit LoadInst(Ty ty, rRegister dst, rRegister base, int offset)
-                : Instruction{ty, {dst}, {base}}, label(nullptr), offset(new Immediate(offset)) {}
+                : InstructionImpl{ty, {dst}, {base}}, label(nullptr), offset(new Immediate(offset)) {}
 
         explicit LoadInst(Ty ty, rRegister dst, rRegister base, int offset, rLabel label)
-                : Instruction{ty, {dst}, {base}}, label(label), offset(new Immediate(offset)) {}
+                : InstructionImpl{ty, {dst}, {base}}, label(label), offset(new Immediate(offset)) {}
 
         explicit LoadInst(Ty ty, rRegister dst, rLabel label)
-                : Instruction{ty, {dst}, {}}, label(label), offset(nullptr) {}
+                : InstructionImpl{ty, {dst}, {}}, label(label), offset(nullptr) {}
 
         explicit LoadInst(Ty ty, rRegister dst, rAddress address)
                 : LoadInst(ty, dst, address->base, address->offset, address->label) {}
@@ -218,18 +229,18 @@ namespace mips {
         pImmediate offset;
 
         StoreInst(const StoreInst &inst)
-                : Instruction(inst), label(inst.label), offset(new Immediate(inst.offset->value)) {}
+                : InstructionImpl(inst), label(inst.label), offset(new Immediate(inst.offset->value)) {}
 
         StoreInst(StoreInst &&inst) = default;
 
         explicit StoreInst(Ty ty, rRegister src, rRegister base, int offset)
-                : Instruction{ty, {}, {src, base}}, label(nullptr), offset(new Immediate(offset)) {}
+                : InstructionImpl{ty, {}, {src, base}}, label(nullptr), offset(new Immediate(offset)) {}
 
         explicit StoreInst(Ty ty, rRegister src, rRegister base, int offset, rLabel label)
-                : Instruction{ty, {}, {src, base}}, label(label), offset(new Immediate(offset)) {}
+                : InstructionImpl{ty, {}, {src, base}}, label(label), offset(new Immediate(offset)) {}
 
         explicit StoreInst(Ty ty, rRegister src, rLabel label)
-                : Instruction{ty, {}, {src}}, label(label), offset(nullptr) {}
+                : InstructionImpl{ty, {}, {src}}, label(label), offset(nullptr) {}
 
         explicit StoreInst(Ty ty, rRegister src, rAddress address)
                 : StoreInst(ty, src, address->base, address->offset, address->label) {}
@@ -251,10 +262,10 @@ namespace mips {
         rLabel label;
 
         explicit BranchInst(Ty ty, rRegister src1, rRegister src2, rLabel label)
-                : Instruction{ty, {}, {src1, src2}}, label(label) {}
+                : InstructionImpl{ty, {}, {src1, src2}}, label(label) {}
 
         explicit BranchInst(Ty ty, rRegister src1, rLabel label)
-                : Instruction{ty, {}, {src1}}, label(label) {}
+                : InstructionImpl{ty, {}, {src1}}, label(label) {}
 
         [[nodiscard]] inline rRegister src1() const { return regUse.empty() ? nullptr : regUse[0]; }
 
@@ -273,9 +284,9 @@ namespace mips {
     };
 
     struct MoveInst : InstructionImpl<MoveInst> {
-        explicit MoveInst(rRegister dst, rRegister src) : Instruction{Ty::MOVE, {dst}, {src}} {}
+        explicit MoveInst(rRegister dst, rRegister src) : InstructionImpl{Ty::MOVE, {dst}, {src}} {}
 
-        explicit MoveInst(Ty ty, rRegister universal) : Instruction{ty} {
+        explicit MoveInst(Ty ty, rRegister universal) : InstructionImpl{ty} {
             if (ty == Ty::MFHI || ty == Ty::MFLO) reg_def_push_back(universal);
             else reg_use_push_back(universal);
         }
@@ -297,13 +308,13 @@ namespace mips {
         rLabel label;
 
         explicit JumpInst(Ty ty, rLabel label)
-                : Instruction{ty}, label(label) {}
+                : InstructionImpl{ty}, label(label) {}
 
         explicit JumpInst(Ty ty, rRegister tar)
-                : Instruction{ty, {}, {tar}}, label(nullptr) {}
+                : InstructionImpl{ty, {}, {tar}}, label(nullptr) {}
 
         explicit JumpInst(Ty ty, rRegister ra, rRegister tar)
-                : Instruction{ty, {}, {ra, tar}}, label(nullptr) {}
+                : InstructionImpl{ty, {}, {ra, tar}}, label(nullptr) {}
 
         [[nodiscard]] inline rRegister target() const { return regUse.empty() ? nullptr : regUse.back(); }
 
@@ -329,14 +340,29 @@ namespace mips {
             ReadInteger = 5,
             ExitProc = 10,
             PrintCharacter = 11,
-        } id;
+        };
 
-        explicit SyscallInst(SyscallId id) : Instruction{Ty::SYSCALL}, id(id) {}
-
-        inline std::ostream &output(std::ostream &os) const override {
-            os << "li\t$v0, " << static_cast<unsigned>(id) << std::endl;
-            return os << "\t" << ty;
+        static inline std::pair<pBinaryIInst, pSyscallInst> syscall(SyscallId id) {
+            pBinaryIInst bin{new BinaryIInst(Ty::LI, PhyRegister::get("$v0"), static_cast<int>(id))};
+            pSyscallInst sys{new SyscallInst()};
+            sys->reg_use_push_back(PhyRegister::get("$v0"));
+            switch (id) {
+                case SyscallId::PrintInteger:
+                case SyscallId::PrintString:
+                case SyscallId::PrintCharacter:
+                    sys->reg_use_push_back(PhyRegister::get("$a0"));
+                    break;
+                case SyscallId::ReadInteger:
+                    sys->reg_def_push_back(PhyRegister::get("$v0"));
+                    break;
+                case SyscallId::ExitProc:
+                    break;
+            }
+            return {std::move(bin), std::move(sys)};
         }
+
+    private:
+        explicit SyscallInst() : InstructionImpl{Ty::SYSCALL} {}
     };
 
     inline std::ostream &operator<<(std::ostream &os, const Instruction &inst) {
@@ -346,25 +372,29 @@ namespace mips {
 
 #ifdef DBG_ENABLE
 namespace dbg {
-    template<typename T>
-    [[maybe_unused]]
-    inline std::enable_if_t<std::is_same_v<T, mips::rInstruction>
-                            || std::is_same_v<T, mips::pInstruction>, bool>
-    pretty_print_impl(std::ostream &stream, const T &value) {
-        if (value == nullptr) return pretty_print(stream, nullptr);
-        return pretty_print(stream, *value);
+    inline std::string instruction_to_string(const mips::Instruction &value) {
+        std::stringstream ss;
+        ss << value;
+        auto s = ss.str();
+        for (auto &ch: s)
+            if (ch == '\t') ch = ' ';
+        return '"' + s + '"';
     }
 
     template<>
     [[maybe_unused]]
     inline bool pretty_print(std::ostream &stream, const mips::rInstruction &value) {
-        return pretty_print_impl(stream, value);
+        if (value == nullptr) return pretty_print(stream, nullptr);
+        stream << instruction_to_string(*value);
+        return true;
     }
 
     template<>
     [[maybe_unused]]
     inline bool pretty_print(std::ostream &stream, const mips::pInstruction &value) {
-        return pretty_print_impl(stream, value);
+        if (value == nullptr) return pretty_print(stream, nullptr);
+        stream << instruction_to_string(*value);
+        return true;
     }
 }
 #endif //DBG_ENABLE

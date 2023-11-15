@@ -8,11 +8,6 @@
 namespace backend {
     void register_alloca(mips::rFunction function) {
         compute_blocks_info(function);
-        if (function->label->name == "foo") {
-            function->allocName();
-            for (auto &bb: *function)
-                dbg(bb, bb->predecessors, bb->successors, bb->def, bb->use, bb->liveIn, bb->liveOut);
-        }
         // 3. alloca registers
         RegisterGraph graph(function);
         graph.compute_conflict();
@@ -21,18 +16,18 @@ namespace backend {
 
     void compute_blocks_info(mips::rFunction function) {
         // 1. compute use and def
-        for (auto &block: function->blocks)
-            compute_use_def(block.get());
+        for (auto &block: all_sub_blocks(function))
+            compute_use_def(block);
         // 2. compute liveIn and liveOut
-        for (auto &block: function->blocks) {
+        for (auto &block: all_sub_blocks(function)) {
             block->liveIn.insert(block->use.begin(), block->use.end());
             block->liveIn.erase(mips::PhyRegister::get(0));
         }
         while (compute_liveIn_liveOut(function));
     }
 
-    void compute_use_def(mips::rBlock block) {
-        for (auto &inst: block->allInstructions()) {
+    void compute_use_def(mips::rSubBlock block) {
+        for (auto &inst: *block) {
             for (auto reg: inst->regUse)
                 if (block->def.count(reg) == 0)
                     block->use.insert(reg);
@@ -44,8 +39,9 @@ namespace backend {
 
     bool compute_liveIn_liveOut(mips::rFunction function) {
         bool changed = false;
-        for (auto it = function->blocks.rbegin(); it != function->blocks.rend(); it++) {
-            auto block = it->get();
+        auto vec = all_sub_blocks(function);
+        for (auto it = vec.rbegin(); it != vec.rend(); it++) {
+            auto block = *it;
             auto s1 = block->liveIn.size();
             auto s2 = block->liveOut.size();
             for (auto suc: block->successors)
@@ -60,7 +56,7 @@ namespace backend {
     }
 
     void RegisterGraph::compute_conflict() {
-        for (auto &bb: function->blocks) {
+        for (auto &bb: all_sub_blocks(function)) {
             vir_set_t temp{};
             auto f = [&temp](auto reg) {
                 if (auto vir = dynamic_cast<mips::rVirRegister>(reg))
@@ -87,10 +83,10 @@ namespace backend {
         // local
         auto backup_size = function->allocaSize;
         auto max_size = function->allocaSize;
-        for (auto &bb: function->blocks) {
+        for (auto &block: all_sub_blocks(function)) {
             // the memory can be used by the next block
             function->allocaSize = backup_size;
-            compute_registers(bb.get());
+            compute_registers(block);
             max_size = std::max(max_size, function->allocaSize);
         }
         function->allocaSize = max_size;
@@ -120,19 +116,18 @@ namespace backend {
             dfs(dfs, reg);
     }
 
-    void RegisterGraph::compute_registers(mips::rBlock block) {
+    void RegisterGraph::compute_registers(mips::rSubBlock block) {
         std::unordered_map<mips::rVirRegister, inst_postion_t> last_use;
-        for (auto &inst: block->allInstructions())
+        for (auto &inst: *block)
             inst->for_each_use_vreg([&](auto r) { last_use[r] = inst->node; });
         phy_set_t avail = temp_regs;
         mips::rPhyRegister memory_regs[] = {mips::PhyRegister::get("$t8"), mips::PhyRegister::get("$t9")};
         int memory_regs_id = 0;
-        for (auto &inst: block->allInstructions()) {
-            auto it = inst->isJumpBranch() ? block->instructions.end() : inst->node;
+        for (auto &inst: *block) {
             inst->for_each_use_vreg([&, this](mips::rVirRegister vir) {
                 if (std::holds_alternative<int>(v2p[vir])) {
                     // if the use reg should load from memory
-                    load_at(block, it, memory_regs[memory_regs_id], std::get<int>(v2p[vir]));
+                    load_at(block, inst->node, memory_regs[memory_regs_id], std::get<int>(v2p[vir]));
                     vir->swapUseIn(memory_regs[memory_regs_id], inst.get());
                     // use $t8 and $t9 alternatively
                     memory_regs_id ^= 1;
@@ -141,7 +136,7 @@ namespace backend {
                     // should be safe here
                     auto phy = std::get<mips::rPhyRegister>(v2p[vir]);
                     vir->swapUseIn(phy, inst.get());
-                    if (last_use[vir] == it) {
+                    if (last_use[vir] == inst->node) {
                         // the last use of the virtual register
                         avail.insert(phy);
                     }
@@ -163,7 +158,7 @@ namespace backend {
                 }
                 if (std::holds_alternative<int>(v2p[vir])) {
                     // if the def reg should store to memory
-                    auto temp_it = it;
+                    auto temp_it = inst->node;
                     store_at(block, ++temp_it, memory_regs[memory_regs_id], std::get<int>(v2p[vir]));
                     vir->swapDefIn(memory_regs[memory_regs_id], inst.get());
                     // use $t8 and $t9 alternatively
@@ -179,13 +174,13 @@ namespace backend {
     }
 
     RegisterGraph::inst_postion_t
-    RegisterGraph::load_at(mips::rBlock block, inst_postion_t it, mips::rRegister dst, int offset) {
+    RegisterGraph::load_at(mips::rSubBlock block, inst_postion_t it, mips::rRegister dst, int offset) {
         return block->insert(it, std::make_unique<mips::LoadInst>(
                 mips::Instruction::Ty::LW, dst, mips::PhyRegister::get("$fp"), offset));
     }
 
     RegisterGraph::inst_postion_t
-    RegisterGraph::store_at(mips::rBlock block, inst_postion_t it, mips::rRegister src, int offset) {
+    RegisterGraph::store_at(mips::rSubBlock block, inst_postion_t it, mips::rRegister src, int offset) {
         return block->insert(it, std::make_unique<mips::StoreInst>(
                 mips::Instruction::Ty::SW, src, mips::PhyRegister::get("$fp"), offset));
     }

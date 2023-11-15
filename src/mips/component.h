@@ -12,134 +12,100 @@
 #include "instruction.h"
 
 namespace mips {
-    struct Block {
-        rFunction parent;
-        block_node_t node{};
-        pLabel label = std::make_unique<Label>("", this);
+    /**
+     * SubBlock is the unit to allocate registers. <br>
+     * SubBlocks have no label. There is one and only one jump instruction
+     * (conditional jump to other block or unconditional jump to function)
+     * at the end of every sub-block. Unconditional jump to other block or
+     * function return jump is only allowed and must existed when then
+     * sub-block is the last sub-block of all blocks. <br>
+     * SubBlocks will be linked together by Blocks. One sub-block may be
+     * linked by multiply blocks. SubBlocks can also be cloned to support
+     * (trade-off between code size and efficiency). <br>
+     */
+    struct SubBlock {
         std::list<pInstruction> instructions;
-        std::unordered_set<rBlock> predecessors, successors;
+        std::unordered_set<rSubBlock> predecessors, successors;
         std::unordered_set<rRegister> liveIn, liveOut;
         std::unordered_set<rRegister> use, def;
-        pInstruction conditionalJump, fallthroughJump;
 
-        explicit Block(rFunction parent) : parent(parent) {}
-
-        inline void push_back(pInstruction &&inst) {
-            inst->parent = this;
-            if (inst->ty == Instruction::Ty::J) {
-                assert(fallthroughJump == nullptr);
-                fallthroughJump = std::move(inst);
-            } else if (inst->isJumpBranch() && !inst->isFuncCall()) {
-                assert(conditionalJump == nullptr);
-                conditionalJump = std::move(inst);
-            } else {
-                auto it = instructions.insert(instructions.cend(), std::move(inst));
-                it->get()->node = it;
-            }
+        // Only clone the instructions.
+        [[nodiscard]] inline SubBlock clone() const {
+            SubBlock subBlock{};
+            for (auto &inst: instructions)
+                subBlock.instructions.emplace_back(inst->clone());
+            return subBlock;
         }
 
-        inline inst_node_t insert(inst_pos_t pos, pInstruction &&inst) {
-            auto it = instructions.insert(pos, std::move(inst));
-            it->get()->node = it;
-            it->get()->parent = this;
-            return it;
+        [[nodiscard]] inline bool empty() const { return instructions.empty(); }
+
+        [[nodiscard]] inline auto back() { return instructions.back().get(); }
+
+        [[nodiscard]] inline auto begin() const { return instructions.begin(); }
+
+        [[nodiscard]] inline auto end() const { return instructions.end(); }
+
+        [[nodiscard]] inline auto begin() { return instructions.begin(); }
+
+        [[nodiscard]] inline auto end() { return instructions.end(); }
+
+        inline inst_node_t insert(inst_pos_t p, pInstruction &&inst) {
+            auto self = inst.get();
+            auto node = instructions.insert(p, std::move(inst));
+            self->parent = this;
+            self->node = node;
+            return node;
+        }
+
+        inline inst_node_t emplace(inst_pos_t p, rInstruction inst) {
+            return insert(p, pInstruction{inst});
         }
 
         template<typename ...Args>
-        inline auto erase(Args ...args) -> decltype(instructions.erase(args...)) {
+        inline auto erase(Args ...args) {
             return instructions.erase(args...);
+        }
+
+        inline std::ostream &output(std::ostream &os, bool sharp_last = false) const {
+            for (auto &inst: instructions)
+                os << "\t" << (sharp_last && &inst == &instructions.back() ? "# " : "")
+                   << *inst << "\n";
+            return os;
+        }
+    };
+
+    struct Block {
+        rFunction parent;
+        block_node_t node{};
+        std::list<sSubBlock> subBlocks;
+        pLabel label{new Label("<unnamed block>", this)};
+
+        explicit Block(rFunction parent) : parent(parent), subBlocks{std::make_shared<SubBlock>()} {}
+
+        [[nodiscard]] inline bool empty() const { return subBlocks.size() == 1 && frontBlock()->empty(); }
+
+        [[nodiscard]] inline rSubBlock frontBlock() const { return subBlocks.front().get(); }
+
+        [[nodiscard]] inline rSubBlock backBlock() const { return subBlocks.back().get(); }
+
+        [[nodiscard]] inline rInstruction frontInst() const { return frontBlock()->instructions.front().get(); }
+
+        [[nodiscard]] inline rInstruction backInst() const { return backBlock()->instructions.back().get(); }
+
+        inline void push_back(pInstruction &&inst) {
+            if (!empty() && backInst()->isJumpBranch())
+                subBlocks.emplace_back(new SubBlock());
+            subBlocks.back()->insert(subBlocks.back()->end(), std::move(inst));
+        }
+
+        inline void push_back(std::pair<pInstruction, pInstruction> &&pair) {
+            push_back(std::move(pair.first));
+            push_back(std::move(pair.second));
         }
 
         [[nodiscard]] rLabel nextLabel() const;
 
-        template<typename Self>
-        struct inst_container_t {
-            Self self;
-
-            class block_iterator {
-                using It = decltype(self->instructions.begin());
-                Self self;
-                It list_it;
-                unsigned current;
-
-            public:
-                block_iterator(Self self, It list_it, unsigned current)
-                        : self(self), list_it(list_it), current(current) {
-                    if (self->instructions.empty()) ++*this;
-                }
-
-                inline block_iterator &operator++() {
-                    if (list_it != self->instructions.end()) ++list_it;
-                    if (list_it != self->instructions.end()) return *this;
-                    if (current == 0) {
-                        current = 1;
-                        if (self->conditionalJump != nullptr) return *this;
-                    }
-                    if (current == 1) {
-                        current = 2;
-                        if (self->fallthroughJump != nullptr) return *this;
-                    }
-                    current = 3;
-                    return *this;
-                }
-
-                inline block_iterator operator++(int) {
-                    auto ret = *this;
-                    ++*this;
-                    return ret;
-                }
-
-                inline auto operator*() -> decltype(*list_it) {
-                    if (list_it != self->instructions.end()) return *list_it;
-                    if (current == 1) return self->conditionalJump;
-                    if (current == 2) return self->fallthroughJump;
-                    return *list_it;
-                }
-
-                inline auto operator->() -> decltype(list_it.operator->()) {
-                    return &**this;
-                }
-
-                inline bool operator==(const block_iterator &it) const {
-                    return self == it.self && list_it == it.list_it && current == it.current;
-                }
-
-                inline bool operator!=(const block_iterator &it) const {
-                    return !(*this == it);
-                }
-            };
-
-            [[nodiscard]] inline auto begin() const { return block_iterator{self, self->instructions.begin(), 0}; }
-
-            [[nodiscard]] inline auto end() const { return block_iterator{self, self->instructions.end(), 3}; }
-
-            [[nodiscard]] inline bool empty() const { return begin() == end(); }
-        };
-
-        [[nodiscard]] inst_container_t<Block *> allInstructions() { return {this}; }
-
-        [[nodiscard]] inst_container_t<const Block *> allInstructions() const { return {this}; }
-
-        /**
-         * Splice the block into two blocks. <br>
-         * Move pos (jal) to conditional Jump.
-         * @param pos: position of jal (function call inst)
-         * @return the new block (nullptr if pos is the last instruction)
-         */
-        [[nodiscard]] rBlock spliceFuncCall(inst_node_t pos);
-
-        /**
-         * Splice the block into two blocks.
-         * @param pos: position where the next block begin.
-         * @return the new block (Won't be nullptr)
-         */
-        [[nodiscard]] rBlock spliceAt(inst_pos_t pos);
-
-        /**
-         * merge another block to the end. the block won't release after merge.
-         * @param block the block to merge.
-         */
-        void merge(Block *block);
+        void computePreSuc() const;
     };
 
     struct Function {
@@ -183,11 +149,8 @@ namespace mips {
 
         inline void allocName() {
             size_t counter = 0;
-            for (auto it = begin(); it != end();) {
-                auto &bb = *it;
-                if (bb->allInstructions().empty()) it = blocks.erase(it);
-                else bb->label->name = "$." + label->name + "_" + std::to_string(counter++), ++it;
-            }
+            for (auto &bb: *this)
+                bb->label->name = "$." + label->name + "_" + std::to_string(counter++);
             exitB->label->name = "$." + label->name + ".end";
             blocks.front()->label->name = "";
         }
@@ -211,19 +174,20 @@ namespace mips {
         std::vector<pGlobalVar> globalVars;
     };
 
+    inline std::ostream &operator<<(std::ostream &os, const SubBlock &block) {
+        return block.output(os);
+    }
+
     inline std::ostream &operator<<(std::ostream &os, const Block &block) {
-        if (block.allInstructions().empty()) return os;
-        if (!block.label->name.empty()) os << block.label << ":" << std::endl;
-        for (auto &inst: block.instructions)
-            os << "\t" << *inst << std::endl;
-        if (block.conditionalJump) os << "\t" << *block.conditionalJump << std::endl;
-        if (block.fallthroughJump && block.fallthroughJump->getJumpLabel() != block.nextLabel())
-            os << "\t" << *block.fallthroughJump << std::endl;
+        if (!block.label->name.empty()) os << block.label << ":" << "\n";
+        for (auto &sub: block.subBlocks)
+            sub->output(os, &sub == &block.subBlocks.back() && block.nextLabel()
+                            && block.backInst()->getJumpLabel() == block.nextLabel());
         return os;
     }
 
     inline std::ostream &operator<<(std::ostream &os, const Function &func) {
-        os << func.label << ":" << std::endl;
+        os << func.label << ":" << "\n";
         for (auto &block: func)
             os << *block;
         os << *func.exitB;
@@ -231,8 +195,8 @@ namespace mips {
     }
 
     inline std::ostream &operator<<(std::ostream &os, const GlobalVar &var) {
-        os << var.label << ":" << std::endl;
-        if (!var.isInit) os << "\t.space\t" << var.size << std::endl;
+        os << var.label << ":" << "\n";
+        if (!var.isInit) os << "\t.space\t" << var.size << "\n";
         else if (var.isString) {
             os << "\t.asciiz\t\"";
             for (char ch: std::get<std::string>(var.elements)) {
@@ -251,12 +215,12 @@ namespace mips {
     }
 
     inline std::ostream &operator<<(std::ostream &os, const Module &module) {
-        os << "\t.data" << std::endl;
+        os << "\t.data" << "\n";
         for (auto &var: module.globalVars)
             if (!var->isString) os << *var;
         for (auto &var: module.globalVars)
             if (var->isString) os << *var;
-        os << std::endl << "\t.text" << std::endl;
+        os << "\n" << "\t.text" << "\n";
         os << *module.main;
         for (auto &func: module.functions)
             os << std::endl << *func;
@@ -266,40 +230,55 @@ namespace mips {
 
 #ifdef DBG_ENABLE
 namespace dbg {
-    template<typename T>
+    template<>
     [[maybe_unused]]
-    inline std::enable_if_t<
-            std::is_same_v<T, mips::rBlock>
-            || std::is_same_v<T, mips::pBlock>
-            || std::is_same_v<T, mips::rFunction>
-            || std::is_same_v<T, mips::pFunction>, bool>
-    pretty_print_impl(std::ostream &stream, const T &value) {
+    inline bool pretty_print(std::ostream &stream, const mips::rBlock &value) {
+        if (value == nullptr) return pretty_print(stream, nullptr);
+        stream << "(" << value->label << ")" << " ";
+        return pretty_print(stream, value->subBlocks);
+    }
+
+    template<>
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, const mips::pBlock &value) {
+        if (value == nullptr) return pretty_print(stream, nullptr);
+        stream << "(" << value->label << ")" << " ";
+        return pretty_print(stream, value->subBlocks);
+    }
+
+    template<>
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, const mips::rFunction &value) {
         if (value == nullptr) return pretty_print(stream, nullptr);
         return pretty_print(stream, value->label);
     }
 
     template<>
     [[maybe_unused]]
-    inline bool pretty_print(std::ostream &stream, const mips::rBlock &value) {
-        return pretty_print_impl(stream, value);
-    }
-
-    template<>
-    [[maybe_unused]]
-    inline bool pretty_print(std::ostream &stream, const mips::pBlock &value) {
-        return pretty_print_impl(stream, value);
-    }
-
-    template<>
-    [[maybe_unused]]
-    inline bool pretty_print(std::ostream &stream, const mips::rFunction &value) {
-        return pretty_print_impl(stream, value);
-    }
-
-    template<>
-    [[maybe_unused]]
     inline bool pretty_print(std::ostream &stream, const mips::pFunction &value) {
-        return pretty_print_impl(stream, value);
+        if (value == nullptr) return pretty_print(stream, nullptr);
+        return pretty_print(stream, value->label);
+    }
+
+    template<>
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, const mips::rSubBlock &value) {
+        if (value == nullptr) return pretty_print(stream, nullptr);
+        return pretty_print(stream, value->instructions);
+    }
+
+    template<>
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, const mips::sSubBlock &value) {
+        if (value == nullptr) return pretty_print(stream, nullptr);
+        return pretty_print(stream, value->instructions);
+    }
+
+    template<>
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, const mips::pSubBlock &value) {
+        if (value == nullptr) return pretty_print(stream, nullptr);
+        return pretty_print(stream, value->instructions);
     }
 }
 #endif //DBG_ENABLE

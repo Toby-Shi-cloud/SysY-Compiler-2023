@@ -56,11 +56,11 @@ namespace mips {
         std::unordered_set<rInstruction> defUsers;
         std::unordered_set<rInstruction> useUsers;
 
-        void swapDefTo(rRegister other, rBlock block = nullptr);
+        void swapDefTo(rRegister other, rSubBlock block = nullptr);
 
-        void swapUseTo(rRegister other, rBlock block = nullptr);
+        void swapUseTo(rRegister other, rSubBlock block = nullptr);
 
-        inline void swapTo(rRegister other, rBlock block = nullptr) {
+        inline void swapTo(rRegister other, rSubBlock block = nullptr) {
             swapDefTo(other, block);
             swapUseTo(other, block);
         }

@@ -106,17 +106,6 @@ namespace backend {
         void compute_func_start();
 
         void compute_func_exit();
-
-        void spliceBlocks();
-
-        void mergeExitBlock();
-
-        void relocateBlocks();
-
-        void compute_pre_suc(mips::rBlock block);
-
-        void optimize(mips::rFunction func);
-
     public:
         explicit Translator(mir::Manager *mirManager, mips::rModule mipsModule)
                 : mirManager(mirManager), mipsModule(mipsModule) {}
@@ -124,12 +113,6 @@ namespace backend {
         inline void translate() {
             translateGlobalVars();
             translateFunctions();
-        }
-
-        inline void optimize() {
-            for (auto &func: mipsModule->functions)
-                optimize(func.get());
-            optimize(mipsModule->main.get());
         }
     };
 }

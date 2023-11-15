@@ -30,10 +30,12 @@ namespace mips {
 
 // component.h
 namespace mips {
+    def(SubBlock);
     def(Block);
     def(Function);
     def(GlobalVar);
     def(Module);
+    using sSubBlock = std::shared_ptr<SubBlock>;
 }
 
 // instruction.h

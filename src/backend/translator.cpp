@@ -287,7 +287,7 @@ namespace backend {
         auto func = callInst->getFunction();
         if (func == mir::Function::getint) {
             auto dst = curFunc->newVirRegister();
-            curBlock->push_back(std::make_unique<mips::SyscallInst>(
+            curBlock->push_back(mips::SyscallInst::syscall(
                     mips::SyscallInst::SyscallId::ReadInteger));
             curBlock->push_back(std::make_unique<mips::MoveInst>(
                     dst, mips::PhyRegister::get("$v0")));
@@ -296,13 +296,13 @@ namespace backend {
             auto src = getRegister(callInst->getArg(0));
             curBlock->push_back(std::make_unique<mips::MoveInst>(
                     mips::PhyRegister::get("$a0"), src));
-            curBlock->push_back(std::make_unique<mips::SyscallInst>(
+            curBlock->push_back(mips::SyscallInst::syscall(
                     mips::SyscallInst::SyscallId::PrintInteger));
         } else if (func == mir::Function::putch) {
             auto src = getRegister(callInst->getArg(0));
             curBlock->push_back(std::make_unique<mips::MoveInst>(
                     mips::PhyRegister::get("$a0"), src));
-            curBlock->push_back(std::make_unique<mips::SyscallInst>(
+            curBlock->push_back(mips::SyscallInst::syscall(
                     mips::SyscallInst::SyscallId::PrintCharacter));
         } else if (func == mir::Function::putstr) {
             if (auto src = getRegister(callInst->getArg(0))) {
@@ -315,7 +315,7 @@ namespace backend {
             } else {
                 assert(false);
             }
-            curBlock->push_back(std::make_unique<mips::SyscallInst>(
+            curBlock->push_back(mips::SyscallInst::syscall(
                     mips::SyscallInst::SyscallId::PrintString));
         } else {
             auto callee = fMap[func];
@@ -388,18 +388,15 @@ namespace backend {
         assert(curFunc->argSize % 4 == 0);
 
         // reformat blocks & alloca registers
-        spliceBlocks();
-        for (auto &block: curFunc->blocks)
-            compute_pre_suc(block.get());
+        curFunc->allocName();
+        for (auto &block: *curFunc)
+            block->computePreSuc();
         register_alloca(curFunc);
 
         // save registers before function & restore registers
         if (isMain) curFunc->shouldSave.clear(); // save nothing
         compute_func_start();
-        if (isMain)
-            curFunc->exitB->push_back(std::make_unique<mips::SyscallInst>(
-                    mips::SyscallInst::SyscallId::ExitProc));
-        else compute_func_exit();
+        compute_func_exit();
 
         curFunc->allocName();
     }
@@ -504,18 +501,25 @@ namespace backend {
     }
 
     void Translator::compute_phi(mir::Function *mirFunction) {
-        using parallel_copy_t = std::vector<std::pair<mips::rRegister, mips::rRegister>>;
+        using parallel_copy_t = std::vector<std::pair<mips::rRegister, std::variant<mips::rRegister, int>>>;
         const auto phi2move = [this](const parallel_copy_t &pc) {
             using move_t = mips::MoveInst;
             std::vector<mips::pInstruction> instructions;
             std::unordered_map<mips::rRegister, size_t> inDegree;
             std::unordered_map<mips::rRegister, mips::rRegister> map;
             std::unordered_map<mips::rRegister, std::vector<mips::rRegister>> edges;
+            std::unordered_map<mips::rRegister, int> loadImm;
             for (auto &[dst, src]: pc) {
-                edges[dst].push_back(src);
-                inDegree[dst]; // make sure dst in inDegree
-                inDegree[src]++;
-                map[src] = src;
+                if (std::holds_alternative<int>(src)) {
+                    auto imm = std::get<int>(src);
+                    loadImm[dst] = imm;
+                } else {
+                    auto src_reg = std::get<mips::rRegister>(src);
+                    edges[dst].push_back(src_reg);
+                    inDegree[dst]; // make sure dst in inDegree
+                    inDegree[src_reg]++;
+                    map[src_reg] = src_reg;
+                }
             }
             std::queue<mips::rRegister> queue;
             for (auto &[r, d]: inDegree)
@@ -540,6 +544,9 @@ namespace backend {
                 map[reg] = vir;
                 queue.push(reg);
             }
+            for (auto &[dst, imm]: loadImm)
+                instructions.emplace_back(new mips::BinaryIInst(
+                        mips::Instruction::Ty::LI, dst, imm));
             return instructions;
         };
 
@@ -554,9 +561,10 @@ namespace backend {
                 auto dst = getRegister(phi);
                 for (int i = 0; i < phi->getNumIncomingValues(); ++i) {
                     auto [value, block] = phi->getIncomingValue(i);
-                    curBlock = bMap[block];
-                    auto src = getRegister(value);
-                    pcs[block].emplace_back(dst, src);
+                    if (auto imm = dynamic_cast<mir::IntegerLiteral *>(value))
+                        pcs[block].emplace_back(dst, imm->value);
+                    else
+                        pcs[block].emplace_back(dst, getRegister(value));
                 }
             }
             for (auto &pre: bb->predecessors) {
@@ -567,93 +575,55 @@ namespace backend {
                     newBlock->node = curFunc->blocks.emplace(++it, newBlock);
                     newBlock->push_back(std::make_unique<mips::JumpInst>(
                             mips::Instruction::Ty::J, label));
-                    if (block->fallthroughJump && block->fallthroughJump->getJumpLabel() == label)
-                        block->fallthroughJump->setJumpLabel(newBlock->label.get());
-                    if (block->conditionalJump && block->conditionalJump->getJumpLabel() == label)
-                        block->conditionalJump->setJumpLabel(newBlock->label.get());
+                    for (auto &sub: block->subBlocks)
+                        if (sub->back()->getJumpLabel() == label)
+                            sub->back()->setJumpLabel(newBlock->label.get());
                     block = newBlock;
                 }
                 for (auto &inst: phi2move(pcs[pre]))
-                    block->push_back(std::move(inst));
+                    block->backBlock()->insert(block->backInst()->node, std::move(inst));
             }
         }
     }
 
     void Translator::compute_func_start() {
         int cnt = 0;
-        auto it = curFunc->blocks.front()->instructions.begin();
+        auto &first_block = curFunc->blocks.front();
+        auto startB = new mips::Block(curFunc);
+        startB->node = curFunc->blocks.emplace(curFunc->blocks.begin(), startB);
         for (auto reg: curFunc->shouldSave) {
-            curFunc->blocks.front()->insert(it, std::make_unique<mips::StoreInst>(
+            startB->push_back(std::make_unique<mips::StoreInst>(
                     mips::Instruction::Ty::SW, reg,
                     mips::PhyRegister::get("$sp"), -curFunc->allocaSize - ++cnt * 4));
         }
         // move $fp, $sp
-        curFunc->blocks.front()->insert(it, std::make_unique<mips::MoveInst>(
+        startB->push_back(std::make_unique<mips::MoveInst>(
                 mips::PhyRegister::get("$fp"), mips::PhyRegister::get("$sp")));
         // addiu $sp, $sp, -(allocaSize+argSize)
         if (-curFunc->allocaSize - curFunc->argSize - cnt * 4 != 0)
-            curFunc->blocks.front()->insert(it, std::make_unique<mips::BinaryIInst>(
+            startB->push_back(std::make_unique<mips::BinaryIInst>(
                     mips::Instruction::Ty::ADDIU, mips::PhyRegister::get("$sp"),
                     mips::PhyRegister::get("$sp"), -curFunc->allocaSize - curFunc->argSize - cnt * 4));
+        startB->push_back(std::make_unique<mips::JumpInst>(
+                mips::Instruction::Ty::J, first_block->label.get()));
     }
 
     void Translator::compute_func_exit() {
-        // move $sp, $fp
-        curFunc->exitB->push_back(std::make_unique<mips::MoveInst>(
-                mips::PhyRegister::get("$sp"), mips::PhyRegister::get("$fp")));
-        int cnt = 0;
-        for (auto reg: curFunc->shouldSave) {
-            curFunc->exitB->push_back(std::make_unique<mips::LoadInst>(
-                    mips::Instruction::Ty::LW, reg,
-                    mips::PhyRegister::get("$sp"), -curFunc->allocaSize - ++cnt * 4));
+        if (curFunc->isMain) {
+            curFunc->exitB->push_back(mips::SyscallInst::syscall(
+                    mips::SyscallInst::SyscallId::ExitProc));
+        } else {
+            // move $sp, $fp
+            curFunc->exitB->push_back(std::make_unique<mips::MoveInst>(
+                    mips::PhyRegister::get("$sp"), mips::PhyRegister::get("$fp")));
+            int cnt = 0;
+            for (auto reg: curFunc->shouldSave)
+                curFunc->exitB->push_back(std::make_unique<mips::LoadInst>(
+                        mips::Instruction::Ty::LW, reg,
+                        mips::PhyRegister::get("$sp"), -curFunc->allocaSize - ++cnt * 4));
+            // jr $ra
+            curFunc->exitB->push_back(std::make_unique<mips::JumpInst>(
+                    mips::Instruction::Ty::JR, mips::PhyRegister::get("$ra")));
         }
-        // jr $ra
-        curFunc->exitB->push_back(std::make_unique<mips::JumpInst>(
-                mips::Instruction::Ty::JR, mips::PhyRegister::get("$ra")));
-    }
-
-    void Translator::spliceBlocks() {
-        constexpr auto pred_if_jal = [](auto &&inst) { return inst->isFuncCall(); };
-        for (auto it = curFunc->begin(); it != curFunc->end();) {
-            auto &block = *it;
-            auto pos = std::find_if(block->instructions.begin(), block->instructions.end(), pred_if_jal);
-            if (auto nb = block->spliceFuncCall(pos)) {
-                nb->node = curFunc->blocks.emplace(++it, nb);
-                it = nb->node;
-            } else it++;
-        }
-    }
-
-    void Translator::relocateBlocks() {
-        //TODO
-    }
-
-    void Translator::mergeExitBlock() {
-        // only merge exitB...
-        for (auto pre: curFunc->exitB->predecessors)
-            if (pre->conditionalJump == nullptr)
-                pre->merge(curFunc->exitB.get());
-    }
-
-    void Translator::compute_pre_suc(mips::rBlock block) {
-        auto f = [&, this](auto &&inst) {
-            if (!inst) return;
-            auto label = inst->getJumpLabel();
-            assert(label);
-            if (std::holds_alternative<mips::rBlock>(label->parent)) {
-                auto suc = std::get<mips::rBlock>(label->parent);
-                block->successors.insert(suc);
-                suc->predecessors.insert(block);
-            }
-        };
-        f(block->conditionalJump);
-        f(block->fallthroughJump);
-    }
-
-    void Translator::optimize(mips::rFunction func) {
-        curFunc = func;
-        mergeExitBlock();
-        relocateBlocks();
-        func->allocName();
     }
 }

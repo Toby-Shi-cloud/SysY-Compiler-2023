@@ -12,11 +12,19 @@
 #include "../mips.h"
 
 namespace backend {
+    [[nodiscard]] inline auto all_sub_blocks(mips::rFunction function) {
+        std::vector<mips::rSubBlock> ret{};
+        for (auto &block: *function)
+            for (auto &sub: block->subBlocks)
+                ret.push_back(sub.get());
+        return ret;
+    }
+
     void register_alloca(mips::rFunction function);
 
     void compute_blocks_info(mips::rFunction function);
 
-    void compute_use_def(mips::rBlock block);
+    void compute_use_def(mips::rSubBlock block);
 
     bool compute_liveIn_liveOut(mips::rFunction function);
 
@@ -37,13 +45,13 @@ namespace backend {
 
         void color_registers(const phy_set_t &could_use);
 
-        void compute_registers(mips::rBlock block);
+        void compute_registers(mips::rSubBlock block);
 
         using inst_postion_t = mips::inst_pos_t;
 
-        static inst_postion_t load_at(mips::rBlock block, inst_postion_t it, mips::rRegister dst, int offset);
+        static inst_postion_t load_at(mips::rSubBlock block, inst_postion_t it, mips::rRegister dst, int offset);
 
-        static inst_postion_t store_at(mips::rBlock block, inst_postion_t it, mips::rRegister src, int offset);
+        static inst_postion_t store_at(mips::rSubBlock block, inst_postion_t it, mips::rRegister src, int offset);
 
     public:
         explicit RegisterGraph(mips::rFunction function) : function(function) {}
