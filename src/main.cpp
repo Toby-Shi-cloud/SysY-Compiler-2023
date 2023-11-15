@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
 
     if (no_mips) return 0;
 
-    backend::Translator translator(&mir_manager, &mips_module);
+    backend::Translator translator(&mir_manager, &mips_module, optimize);
     translator.translate();
 
     fmips << mips_module;

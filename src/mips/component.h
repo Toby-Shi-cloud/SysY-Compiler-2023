@@ -72,6 +72,15 @@ namespace mips {
                    << *inst << "\n";
             return os;
         }
+
+        inline void clearInfo() {
+            predecessors.clear();
+            successors.clear();
+            liveIn.clear();
+            liveOut.clear();
+            use.clear();
+            def.clear();
+        }
     };
 
     struct Block {
@@ -104,6 +113,8 @@ namespace mips {
         }
 
         [[nodiscard]] rLabel nextLabel() const;
+
+        void clearBlockInfo() const;
 
         void computePreSuc() const;
     };
@@ -147,7 +158,12 @@ namespace mips {
 
         [[nodiscard]] inline auto end() { return blocks.end(); }
 
-        inline void allocName() {
+        inline void calcBlockPreSuc() const {
+            for (auto &block: *this)
+                block->computePreSuc();
+        }
+
+        inline void allocName() const {
             size_t counter = 0;
             for (auto &bb: *this)
                 bb->label->name = "$." + label->name + "_" + std::to_string(counter++);

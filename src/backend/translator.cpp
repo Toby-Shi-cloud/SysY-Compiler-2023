@@ -5,6 +5,7 @@
 #include <queue>
 #include "reg_alloca.h"
 #include "translator.h"
+#include "backend_opt.h"
 
 namespace backend {
     static inline void flatten(mir::Literal *literal, std::vector<int> &result) {
@@ -389,8 +390,7 @@ namespace backend {
 
         // reformat blocks & alloca registers
         curFunc->allocName();
-        for (auto &block: *curFunc)
-            block->computePreSuc();
+        optimize();
         register_alloca(curFunc);
 
         // save registers before function & restore registers
@@ -625,5 +625,10 @@ namespace backend {
             curFunc->exitB->push_back(std::make_unique<mips::JumpInst>(
                     mips::Instruction::Ty::JR, mips::PhyRegister::get("$ra")));
         }
+    }
+
+    void Translator::optimize() {
+        if (optimizeLevel == 0) return;
+        clearDeadCode(curFunc);
     }
 }

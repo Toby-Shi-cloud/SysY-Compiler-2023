@@ -10,6 +10,7 @@
 
 namespace backend {
     class Translator {
+        int optimizeLevel;
         mir::Manager *mirManager;
         mips::rModule mipsModule;
         std::unordered_map<mir::Function *, mips::rFunction> fMap;
@@ -106,9 +107,11 @@ namespace backend {
         void compute_func_start();
 
         void compute_func_exit();
+
+        void optimize();
     public:
-        explicit Translator(mir::Manager *mirManager, mips::rModule mipsModule)
-                : mirManager(mirManager), mipsModule(mipsModule) {}
+        explicit Translator(mir::Manager *mirManager, mips::rModule mipsModule, int optimizeLevel = 2)
+                : optimizeLevel(optimizeLevel), mirManager(mirManager), mipsModule(mipsModule) {}
 
         inline void translate() {
             translateGlobalVars();

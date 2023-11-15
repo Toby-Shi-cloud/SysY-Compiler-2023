@@ -51,7 +51,13 @@ namespace mips {
         return (*it)->label.get();
     }
 
+    void Block::clearBlockInfo() const {
+        for (auto &sub: subBlocks)
+            sub->clearInfo();
+    }
+
     void Block::computePreSuc() const {
+        clearBlockInfo();
         constexpr auto link = [](auto &&x, auto &&y) {
             x->successors.insert(y);
             y->predecessors.insert(x);

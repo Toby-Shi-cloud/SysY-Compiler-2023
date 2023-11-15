@@ -31,7 +31,7 @@ namespace mips {
             for (auto reg: regUse) reg->useUsers.erase(this);
         }
 
-        explicit Instruction(Ty ty) : ty{ty} {}
+        explicit Instruction(Ty ty) : Instruction(ty, {}, {}) {}
 
         explicit Instruction(Ty ty, std::vector<rRegister> regDef, std::vector<rRegister> regUse)
                 : ty{ty}, regDef{std::move(regDef)}, regUse{std::move(regUse)} {
@@ -115,6 +115,18 @@ namespace mips {
 
         [[nodiscard]] inline bool isUnconditionalJump() const {
             return ty >= Ty::J && ty <= Ty::JR;
+        }
+
+        [[nodiscard]] inline bool isSyscall() const {
+            return ty == Ty::SYSCALL;
+        }
+
+        [[nodiscard]] inline bool isStore() const {
+            return ty >= Ty::SW && ty <= Ty::SH;
+        }
+
+        [[nodiscard]] inline bool isLoad() const {
+            return ty >= Ty::LA && ty <= Ty::LBU;
         }
 
         [[nodiscard]] virtual inline rLabel getJumpLabel() const { return nullptr; }

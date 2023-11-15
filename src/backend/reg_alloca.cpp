@@ -8,17 +8,18 @@
 namespace backend {
     void register_alloca(mips::rFunction function) {
         compute_blocks_info(function);
-        // 3. alloca registers
         RegisterGraph graph(function);
         graph.compute_conflict();
         graph.compute_registers();
     }
 
     void compute_blocks_info(mips::rFunction function) {
-        // 1. compute use and def
+        // 1. compute pre and suc
+        function->calcBlockPreSuc();
+        // 2. compute use and def
         for (auto &block: all_sub_blocks(function))
             compute_use_def(block);
-        // 2. compute liveIn and liveOut
+        // 3. compute liveIn and liveOut
         for (auto &block: all_sub_blocks(function)) {
             block->liveIn.insert(block->use.begin(), block->use.end());
             block->liveIn.erase(mips::PhyRegister::get(0));
