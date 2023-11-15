@@ -536,7 +536,7 @@ namespace backend {
                 }
                 if (inDegree.empty()) break;
                 auto &[reg, _] = *std::min_element(inDegree.begin(), inDegree.end(),
-                                           [](auto &&x, auto &&y) { return x.second < y.second; });
+                                                   [](auto &&x, auto &&y) { return x.second < y.second; });
                 auto vir = curFunc->newVirRegister();
                 instructions.emplace_back(new move_t{vir, reg});
                 map[reg] = vir;
@@ -546,6 +546,7 @@ namespace backend {
         };
 
         for (auto &bb: mirFunction->bbs) {
+            auto label = bMap[bb]->label.get();
             auto end = bb->phi_end();
             if (bb->instructions.begin() == end) continue;
             std::unordered_map<mir::BasicBlock *, parallel_copy_t> pcs;
@@ -563,10 +564,16 @@ namespace backend {
             for (auto &pre: bb->predecessors) {
                 auto block = bMap[pre];
                 if (pre->successors.size() > 1) {
-                    auto newBlock = block->spliceAt(block->instructions.end());
+                    auto newBlock = new mips::Block(block->parent);
                     auto it = block->node;
                     newBlock->node = curFunc->blocks.emplace(++it, newBlock);
                     lMap[newBlock->label.get()] = newBlock;
+                    newBlock->push_back(std::make_unique<mips::JumpInst>(
+                            mips::Instruction::Ty::J, label));
+                    if (block->fallthroughJump && block->fallthroughJump->getJumpLabel() == label)
+                        block->fallthroughJump->setJumpLabel(newBlock->label.get());
+                    if (block->conditionalJump && block->conditionalJump->getJumpLabel() == label)
+                        block->conditionalJump->setJumpLabel(newBlock->label.get());
                     block = newBlock;
                 }
                 for (auto &inst: phi2move(pcs[pre]))

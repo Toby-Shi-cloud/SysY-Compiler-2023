@@ -106,6 +106,8 @@ namespace mips {
 
         [[nodiscard]] virtual inline rLabel getJumpLabel() const { return nullptr; }
 
+        virtual inline void setJumpLabel(rLabel newLabel) {}
+
         friend inline std::ostream &operator<<(std::ostream &os, Instruction::Ty t) {
             return os << magic_enum::enum_to_string_lower(t);
         }
@@ -260,6 +262,8 @@ namespace mips {
 
         [[nodiscard]] inline rLabel getJumpLabel() const override { return label; }
 
+        inline void setJumpLabel(rLabel newLabel) override { this->label = newLabel; }
+
         inline std::ostream &output(std::ostream &os) const override {
             os << ty << "\t" << src1() << ", ";
             if (src2()) os << src2() << ", ";
@@ -306,6 +310,8 @@ namespace mips {
         [[nodiscard]] inline rRegister ra() const { return regUse.size() <= 1 ? nullptr : regUse.front(); }
 
         [[nodiscard]] inline rLabel getJumpLabel() const override { return label; }
+
+        inline void setJumpLabel(rLabel newLabel) override { this->label = newLabel; }
 
         inline std::ostream &output(std::ostream &os) const override {
             os << ty << "\t";
