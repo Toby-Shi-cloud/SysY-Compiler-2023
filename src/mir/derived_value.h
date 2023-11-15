@@ -91,7 +91,7 @@ namespace mir {
     struct Function : Value {
         pType retType;
         std::vector<Argument *> args; // owns
-        std::vector<BasicBlock *> bbs; // owns
+        std::list<BasicBlock *> bbs; // owns
         std::unique_ptr<BasicBlock> exitBB{new BasicBlock(this)};
         static Function *getint;
         static Function *putint;

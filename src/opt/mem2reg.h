@@ -19,6 +19,8 @@ namespace mir {
     void clearDeadInst(Function *func);
 
     void clearDeadBlock(Function *func);
+
+    void mergeEmptyBlock(Function *func);
 }
 
 #endif //COMPILER_MEM2REG_H

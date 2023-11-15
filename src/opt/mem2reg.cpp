@@ -153,7 +153,7 @@ namespace mir {
     }
 
     void calcPhi(Function *func) {
-        for (auto inst: func->bbs[0]->instructions) {
+        for (auto inst: func->bbs.front()->instructions) {
             if (auto alloc = dynamic_cast<Instruction::alloca_ *>(inst)) {
                 if (alloc->getType() != Type::getI32Type()) continue;
                 calcPhi(func, alloc);
@@ -181,17 +181,45 @@ namespace mir {
         while (changed) {
             changed = false;
             func->calcPreSuc();
-            auto used = 1, current = 1;
-            while (current < func->bbs.size()) {
-                auto bb = func->bbs[current];
+            auto it = ++func->bbs.begin();
+            while (it != func->bbs.end()) {
+                auto bb = *it;
                 if (bb->isUsed()) {
-                    func->bbs[used++] = func->bbs[current++];
+                    ++it;
                 } else {
-                    delete func->bbs[current++];
+                    delete bb;
                     changed = true;
+                    it = func->bbs.erase(it);
                 }
             }
-            func->bbs.resize(used);
+        }
+    }
+
+    void mergeEmptyBlock(Function *func) {
+        auto it = func->bbs.begin();
+        while (it != func->bbs.end()) {
+            auto bb = *it;
+            if (bb->instructions.size() > 1) { ++it; continue; }
+            auto inst = bb->instructions.front();
+            auto br = dynamic_cast<Instruction::br *>(inst);
+            if (!br || br->hasCondition()) { ++it; continue; }
+            // this block only contains a 'br %label' instruction
+            bb->moveTo(br->getTarget());
+            it = func->bbs.erase(it);
+            delete bb;
+        }
+        // after block merging, some br instructions may become:
+        // br i1 %cond, %same_label, %same_label
+        for (auto &bb: func->bbs) {
+            auto inst = bb->instructions.back();
+            auto br = dynamic_cast<Instruction::br *>(inst);
+            if (!br || !br->hasCondition()) continue;
+            if (br->getIfTrue() != br->getIfFalse()) continue;
+            auto label = br->getIfTrue();
+            bb->instructions.pop_back();
+            delete br;
+            br = new Instruction::br(label);
+            bb->instructions.push_back(br);
         }
     }
 }

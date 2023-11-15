@@ -156,12 +156,15 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, const BasicBlock &bb) {
-        if (bb.parent->bbs[0] != &bb) {
+        if (bb.parent->bbs.front() != &bb) {
             os << bb.getName().substr(1) << ":";
             for (auto i = bb.getName().length(); i < 50; i++) os << " ";
             os << "; preds = ";
+            std::vector<BasicBlock *> predecessors{bb.predecessors.begin(), bb.predecessors.end()};
+            std::sort(predecessors.begin(), predecessors.end(),
+                      [](auto &&x, auto &&y) { return x->getId() < y->getId(); });
             bool first = true;
-            for (auto pred: bb.predecessors)
+            for (auto pred: predecessors)
                 os << (first ? "" : ", ") << pred->getName(), first = false;
             os << "\n";
         }

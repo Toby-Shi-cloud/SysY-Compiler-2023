@@ -8,6 +8,7 @@ namespace mir {
     void Manager::optimize() {
         assert((allocName(), true));
         for_each_func(clearDeadBlock);
+        for_each_func(mergeEmptyBlock);
         for_each_func(reCalcBBInfo);
         for_each_func(calcPhi);
         for_each_func(clearDeadInst);

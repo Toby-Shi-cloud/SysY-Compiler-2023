@@ -78,6 +78,8 @@ namespace mir {
 
         [[nodiscard]] inline bool isConst() const { return isConstant; }
 
+        [[nodiscard]] inline long getId() const { return std::strtol(getName().c_str() + 1, nullptr, 0); }
+
         inline void swap(Value *other) {
             std::swap(use->value, other->use->value);
             std::swap(use, other->use);
