@@ -19,8 +19,10 @@ namespace mips {
 
     struct Label : Operand {
         std::string name;
+        std::variant<rBlock, rFunction, rGlobalVar> parent;
 
-        explicit Label(std::string name) : name(std::move(name)) {}
+        template<typename T>
+        explicit Label(std::string name, T parent) : name(std::move(name)), parent(parent) {}
 
         inline std::ostream &output(std::ostream &os) const override {
             return os << name;

@@ -356,11 +356,9 @@ namespace backend {
         else mipsModule->functions.emplace_back(curFunc);
 
         // blocks
-        lMap[curFunc->exitB->label.get()] = curFunc->exitB.get();
         for (auto bb: mirFunction->bbs) {
             auto block = new mips::Block(curFunc);
             bMap[bb] = block;
-            lMap[block->label.get()] = block;
             block->node = curFunc->blocks.emplace(curFunc->end(), block);
         }
 
@@ -567,7 +565,6 @@ namespace backend {
                     auto newBlock = new mips::Block(block->parent);
                     auto it = block->node;
                     newBlock->node = curFunc->blocks.emplace(++it, newBlock);
-                    lMap[newBlock->label.get()] = newBlock;
                     newBlock->push_back(std::make_unique<mips::JumpInst>(
                             mips::Instruction::Ty::J, label));
                     if (block->fallthroughJump && block->fallthroughJump->getJumpLabel() == label)
@@ -623,7 +620,6 @@ namespace backend {
             if (auto nb = block->spliceFuncCall(pos)) {
                 nb->node = curFunc->blocks.emplace(++it, nb);
                 it = nb->node;
-                lMap[nb->label.get()] = nb;
             } else it++;
         }
     }
@@ -644,7 +640,8 @@ namespace backend {
             if (!inst) return;
             auto label = inst->getJumpLabel();
             assert(label);
-            if (auto suc = lMap[label]) {
+            if (std::holds_alternative<mips::rBlock>(label->parent)) {
+                auto suc = std::get<mips::rBlock>(label->parent);
                 block->successors.insert(suc);
                 suc->predecessors.insert(block);
             }

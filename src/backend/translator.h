@@ -17,7 +17,6 @@ namespace backend {
         std::unordered_map<mir::GlobalVar *, mips::rGlobalVar> gMap;
         std::unordered_map<mir::Value *, mips::rOperand> oMap;
         std::unordered_map<mips::rOperand, mir::Value *> rMap;
-        std::unordered_map<mips::rLabel, mips::rBlock> lMap;
         mips::rFunction curFunc = nullptr;
         mips::rBlock curBlock = nullptr;
 

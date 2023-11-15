@@ -15,7 +15,7 @@ namespace mips {
     struct Block {
         rFunction parent;
         block_node_t node{};
-        pLabel label = std::make_unique<Label>("");
+        pLabel label = std::make_unique<Label>("", this);
         std::list<pInstruction> instructions;
         std::unordered_set<rBlock> predecessors, successors;
         std::unordered_set<rRegister> liveIn, liveOut;
@@ -153,11 +153,10 @@ namespace mips {
         std::unordered_set<pAddress> usedAddress;
 
         explicit Function(std::string name, bool isMain, bool isLeaf)
-                : label(std::make_unique<Label>(std::move(name))),
-                  allocaSize(0), argSize(0), isMain(isMain), isLeaf(isLeaf) {}
+                : Function(std::move(name), 0, 0, isMain, isLeaf) {}
 
         explicit Function(std::string name, unsigned allocaSize, unsigned argSize, bool isMain, bool isLeaf)
-                : label(std::make_unique<Label>(std::move(name))),
+                : label(std::make_unique<Label>(std::move(name), this)),
                   allocaSize(allocaSize), argSize(argSize),
                   isMain(isMain), isLeaf(isLeaf) {}
 
@@ -202,7 +201,7 @@ namespace mips {
 
         explicit GlobalVar(std::string name, bool isInit, bool isString, bool isConst,
                            unsigned size, std::variant<std::string, std::vector<int>> elements)
-                : label(std::make_unique<Label>(std::move(name))), isInit(isInit), isString(isString),
+                : label(std::make_unique<Label>(std::move(name), this)), isInit(isInit), isString(isString),
                   isConst(isConst), size(size), elements(std::move(elements)) {}
     };
 
