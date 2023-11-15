@@ -9,6 +9,8 @@
 
 namespace backend {
     void clearDeadCode(mips::rFunction function);
+
+    void relocateBlock(mips::rFunction function);
 }
 
 #endif //COMPILER_BACKEND_OPT_H

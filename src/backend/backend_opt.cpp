@@ -2,6 +2,7 @@
 // Created by toby on 2023/11/16.
 //
 
+#include <algorithm>
 #include "reg_alloca.h"
 #include "backend_opt.h"
 
@@ -24,7 +25,6 @@ namespace backend {
                                                 return used.count(reg) || dynamic_cast<mips::rPhyRegister>(reg);
                                             });
                     if (live) { addUsed(inst); continue; }
-                    dbg(inst);
                     dead.insert(inst.get());
                     changed = true;
                 }
@@ -32,5 +32,33 @@ namespace backend {
                     block->erase(inst->node);
             }
         }
+    }
+
+    void relocateBlock(mips::rFunction function) {
+        constexpr auto next = [](auto &&block) -> mips::rBlock {
+            if (auto label = block->backInst()->getJumpLabel();
+                    label && std::holds_alternative<mips::rBlock>(label->parent))
+                return std::get<mips::rBlock>(label->parent);
+            return nullptr;
+        };
+
+        std::unordered_set<mips::rBlock> unordered, ordered;
+        for (auto &block: *function)
+            unordered.insert(block.get());
+        for (auto &block: *function)
+            unordered.erase(next(block));
+        ordered.insert(function->exitB.get());
+
+        std::list<mips::pBlock> result;
+        for (auto current = function->begin()->get(); !unordered.empty();
+             current = unordered.empty() ? nullptr : *unordered.begin()) {
+            unordered.erase(current);
+            while (current && !ordered.count(current)) {
+                ordered.insert(current);
+                current->node = result.insert(result.cend(), std::move(*current->node));
+                current = next(current);
+            }
+        }
+        function->blocks = std::move(result);
     }
 }

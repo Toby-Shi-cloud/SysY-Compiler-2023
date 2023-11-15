@@ -630,5 +630,6 @@ namespace backend {
     void Translator::optimize() {
         if (optimizeLevel == 0) return;
         clearDeadCode(curFunc);
+        relocateBlock(curFunc);
     }
 }
