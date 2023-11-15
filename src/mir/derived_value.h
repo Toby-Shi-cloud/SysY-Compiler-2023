@@ -64,6 +64,10 @@ namespace mir {
 
         inst_node_t erase(Instruction *inst);
 
+        inst_node_t phi_end();
+
+        inst_pos_t phi_end() const;
+
         inline void push_front(Instruction *inst) {
             insert(instructions.cbegin(), inst);
         }

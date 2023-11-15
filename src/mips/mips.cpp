@@ -53,24 +53,26 @@ namespace mips {
         return (*it)->label.get();
     }
 
-    rBlock Block::splice(inst_node_t pos) {
+    rBlock Block::spliceFuncCall(inst_node_t pos) {
         if (pos == instructions.end()) return nullptr;
         assert(pos->get()->isFuncCall());
         auto nxt = pos;
-        if (++nxt == instructions.end() && !conditionalJump) {
-            conditionalJump = std::move(*pos);
-            instructions.erase(pos);
-            return nullptr;
-        }
-        auto nBlock = new Block(parent);
-        nBlock->instructions.splice(nBlock->instructions.begin(), instructions, nxt, instructions.end());
-        nBlock->conditionalJump = std::move(conditionalJump);
-        nBlock->fallthroughJump = std::move(fallthroughJump);
-        for (auto &inst: nBlock->instructions) inst->parent = nBlock;
+        auto newBlock = spliceAt(++nxt);
         conditionalJump = std::move(*pos);
         instructions.erase(pos);
-        fallthroughJump = std::make_unique<JumpInst>(Instruction::Ty::J, nBlock->label.get());
-        return nBlock;
+        return newBlock;
+    }
+
+    rBlock Block::spliceAt(mips::inst_pos_t pos) {
+        assert(pos->get()->parent == this);
+        auto newBlock = new Block(parent);
+        newBlock->instructions.splice(newBlock->instructions.begin(), instructions, pos, instructions.end());
+        newBlock->conditionalJump = std::move(conditionalJump);
+        newBlock->fallthroughJump = std::move(fallthroughJump);
+        for (auto &inst: newBlock->instructions) inst->parent = newBlock;
+        conditionalJump = nullptr;
+        fallthroughJump = std::make_unique<JumpInst>(Instruction::Ty::J, newBlock->label.get());
+        return newBlock;
     }
 
     void Block::merge(mips::Block *block) {

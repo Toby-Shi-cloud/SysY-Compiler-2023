@@ -22,6 +22,13 @@ namespace backend {
         mips::rBlock curBlock = nullptr;
 
         inline void put(mir::Value *value, mips::rOperand operand) {
+            if (oMap.count(value)) {
+                auto old = dynamic_cast<mips::rRegister>(oMap[value]);
+                auto reg = dynamic_cast<mips::rRegister>(operand);
+                assert(old && reg);
+                old->swapTo(reg);
+                rMap.erase(old);
+            }
             oMap[value] = operand;
             rMap[operand] = value;
         }
@@ -94,6 +101,8 @@ namespace backend {
                 translateGlobalVar(var);
             }
         }
+
+        void compute_phi(mir::Function *mirFunction);
 
         void compute_func_start();
 

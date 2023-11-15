@@ -338,4 +338,29 @@ namespace mips {
     }
 }
 
+#ifdef DBG_ENABLE
+namespace dbg {
+    template<typename T>
+    [[maybe_unused]]
+    inline std::enable_if_t<std::is_same_v<T, mips::rInstruction>
+                            || std::is_same_v<T, mips::pInstruction>, bool>
+    pretty_print_impl(std::ostream &stream, const T &value) {
+        if (value == nullptr) return pretty_print(stream, nullptr);
+        return pretty_print(stream, *value);
+    }
+
+    template<>
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, const mips::rInstruction &value) {
+        return pretty_print_impl(stream, value);
+    }
+
+    template<>
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, const mips::pInstruction &value) {
+        return pretty_print_impl(stream, value);
+    }
+}
+#endif //DBG_ENABLE
+
 #endif //COMPILER_MIPS_INSTRUCTION_H

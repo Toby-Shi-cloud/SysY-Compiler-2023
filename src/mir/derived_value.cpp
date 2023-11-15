@@ -36,6 +36,16 @@ namespace mir {
         return ret;
     }
 
+    inst_node_t BasicBlock::phi_end() {
+        return std::find_if(instructions.begin(), instructions.end(),
+                            [](auto &&inst) { return inst->instrTy != Instruction::PHI; });
+    }
+
+    inst_pos_t BasicBlock::phi_end() const {
+        return std::find_if(instructions.begin(), instructions.end(),
+                            [](auto &&inst) { return inst->instrTy != Instruction::PHI; });
+    }
+
     Argument *Function::addArgument(pType type) {
         auto arg = new Argument(type, this);
         args.push_back(arg);
@@ -44,13 +54,13 @@ namespace mir {
 
     void Function::allocName() {
         size_t counter = 0;
-        for (auto arg : args) {
+        for (auto arg: args) {
             arg->setName("%" + std::to_string(counter++));
         }
-        for (auto bb : bbs) {
+        for (auto bb: bbs) {
             if (bb->instructions.empty()) continue;
             bb->setName("%" + std::to_string(counter++));
-            for (auto instruction : bb->instructions) {
+            for (auto instruction: bb->instructions) {
                 if (!instruction->isValue()) continue;
                 instruction->setName("%" + std::to_string(counter++));
             }
@@ -151,11 +161,11 @@ namespace mir {
             for (auto i = bb.getName().length(); i < 50; i++) os << " ";
             os << "; preds = ";
             bool first = true;
-            for (auto pred : bb.predecessors)
+            for (auto pred: bb.predecessors)
                 os << (first ? "" : ", ") << pred->getName(), first = false;
             os << "\n";
         }
-        for (auto instruction : bb.instructions) {
+        for (auto instruction: bb.instructions) {
             os << "  " << instruction << "\n";
         }
         return os;
@@ -168,7 +178,7 @@ namespace mir {
             os << func.args[i];
         }
         os << ") {\n";
-        for (auto bb : func.bbs) {
+        for (auto bb: func.bbs) {
             os << bb;
         }
         os << "}\n";

@@ -8,6 +8,11 @@
 namespace backend {
     void register_alloca(mips::rFunction function) {
         compute_blocks_info(function);
+        if (function->label->name == "foo") {
+            function->allocName();
+            for (auto &bb: *function)
+                dbg(bb, bb->predecessors, bb->successors, bb->def, bb->use, bb->liveIn, bb->liveOut);
+        }
         // 3. alloca registers
         RegisterGraph graph(function);
         graph.compute_conflict();

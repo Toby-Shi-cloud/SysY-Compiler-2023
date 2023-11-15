@@ -5,6 +5,7 @@
 #ifndef COMPILER_MIR_VALUE_H
 #define COMPILER_MIR_VALUE_H
 
+#include <memory>
 #include <string>
 #include <ostream>
 #include <unordered_set>
@@ -13,6 +14,7 @@
 // Use List
 namespace mir {
     class Value;
+
     class User;
 
     /**
@@ -50,22 +52,17 @@ namespace mir {
          */
         bool isConstant;
 
-    protected:
         /**
-         * Value owns Use. <br>
-         * Value must transfer use to another Value
-         * when it is deleted, or delete the use itself. <br>
-         * To mark the use is transferred, set use to nullptr. <br>
-         * To mark the value is never used, set use to empty vector.
+         * Use shared pointer here to avoid 'use after delete'. <br>
          */
-        Use *use;
+        std::shared_ptr<Use> use;
 
     public:
         explicit Value(pType type, bool isConstant) : use(new Use{this}), type(type), isConstant(isConstant) {}
 
         explicit Value(pType type) : Value(type, false) {}
 
-        virtual ~Value() { delete use; }
+        virtual ~Value() = default;
 
         inline void setConst(bool constant = true) { isConstant = constant; }
 
@@ -95,11 +92,11 @@ namespace mir {
     class User : public Value {
         friend Value;
 
-    protected:
         /**
-         * User does NOT own any Use. <br>
+         * Use shared pointer here to avoid 'use after delete'. <br>
          */
-        std::vector<Use *> operands;
+        std::vector<std::shared_ptr<Use>> operands;
+    protected:
 
         inline void addOperand(Value *value) {
             operands.push_back(value->use);
@@ -110,7 +107,7 @@ namespace mir {
     public:
         template<typename... Args>
         explicit User(pType type, Args... args) : Value(type), operands{(args->use)...} {
-            for (auto operand: operands) operand->users.insert(this);
+            for (auto &operand: operands) operand->users.insert(this);
         }
 
         explicit User(pType type, const std::vector<Value *> &args) : Value(type) {
@@ -118,7 +115,8 @@ namespace mir {
         }
 
         ~User() override {
-            for (auto operand: operands) operand->users.erase(this);
+            for (auto &operand: operands)
+                operand->users.erase(this);
         }
 
         template<typename R = Value>

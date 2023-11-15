@@ -25,9 +25,17 @@ namespace mips {
         explicit Block(rFunction parent) : parent(parent) {}
 
         inline void push_back(pInstruction &&inst) {
-            auto it = instructions.insert(instructions.cend(), std::move(inst));
-            it->get()->node = it;
-            it->get()->parent = this;
+            inst->parent = this;
+            if (inst->ty == Instruction::Ty::J) {
+                assert(fallthroughJump == nullptr);
+                fallthroughJump = std::move(inst);
+            } else if (inst->isJumpBranch() && !inst->isFuncCall()) {
+                assert(conditionalJump == nullptr);
+                conditionalJump = std::move(inst);
+            } else {
+                auto it = instructions.insert(instructions.cend(), std::move(inst));
+                it->get()->node = it;
+            }
         }
 
         inline inst_node_t insert(inst_pos_t pos, pInstruction &&inst) {
@@ -113,11 +121,19 @@ namespace mips {
         [[nodiscard]] inst_container_t<const Block *> allInstructions() const { return {this}; }
 
         /**
-         * splice the block into two blocks.
+         * Splice the block into two blocks. <br>
+         * Move pos (jal) to conditional Jump.
          * @param pos: position of jal (function call inst)
          * @return the new block (nullptr if pos is the last instruction)
          */
-        [[nodiscard]] rBlock splice(inst_node_t pos);
+        [[nodiscard]] rBlock spliceFuncCall(inst_node_t pos);
+
+        /**
+         * Splice the block into two blocks.
+         * @param pos: position where the next block begin.
+         * @return the new block (Won't be nullptr)
+         */
+        [[nodiscard]] rBlock spliceAt(inst_pos_t pos);
 
         /**
          * merge another block to the end. the block won't release after merge.
@@ -248,5 +264,45 @@ namespace mips {
         return os;
     }
 }
+
+#ifdef DBG_ENABLE
+namespace dbg {
+    template<typename T>
+    [[maybe_unused]]
+    inline std::enable_if_t<
+            std::is_same_v<T, mips::rBlock>
+            || std::is_same_v<T, mips::pBlock>
+            || std::is_same_v<T, mips::rFunction>
+            || std::is_same_v<T, mips::pFunction>, bool>
+    pretty_print_impl(std::ostream &stream, const T &value) {
+        if (value == nullptr) return pretty_print(stream, nullptr);
+        return pretty_print(stream, value->label);
+    }
+
+    template<>
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, const mips::rBlock &value) {
+        return pretty_print_impl(stream, value);
+    }
+
+    template<>
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, const mips::pBlock &value) {
+        return pretty_print_impl(stream, value);
+    }
+
+    template<>
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, const mips::rFunction &value) {
+        return pretty_print_impl(stream, value);
+    }
+
+    template<>
+    [[maybe_unused]]
+    inline bool pretty_print(std::ostream &stream, const mips::pFunction &value) {
+        return pretty_print_impl(stream, value);
+    }
+}
+#endif //DBG_ENABLE
 
 #endif //COMPILER_MIPS_COMPONENT_H

@@ -2,6 +2,7 @@
 // Created by toby on 2023/11/5.
 //
 
+#include <queue>
 #include "reg_alloca.h"
 #include "translator.h"
 
@@ -276,10 +277,10 @@ namespace backend {
     }
 
     void Translator::translatePhiInst(mir::Instruction::phi *phiInst) {
-        //TODO
-        dbg(this);
-        dbg(phiInst);
-        assert(false);
+        // Put a new virtual register to indicate the phi instruction,
+        // and we will translate it later.
+        if (oMap.count(phiInst)) return;
+        put(phiInst, curFunc->newVirRegister());
     }
 
     void Translator::translateCallInst(mir::Instruction::call *callInst) {
@@ -364,7 +365,7 @@ namespace backend {
         }
 
         // arguments
-        assert(!mirFunction->bbs[0]->isUsed());
+        assert(mirFunction->bbs.front()->predecessors.empty());
         for (int i = 0; i < mirFunction->args.size(); ++i) {
             auto reg = curFunc->newVirRegister();
             if (i < 4) {
@@ -383,6 +384,7 @@ namespace backend {
         // translate
         for (auto bb: mirFunction->bbs)
             translateBasicBlock(bb);
+        compute_phi(mirFunction);
         assert(curFunc != nullptr);
         assert(curFunc->allocaSize % 4 == 0);
         assert(curFunc->argSize % 4 == 0);
@@ -498,9 +500,78 @@ namespace backend {
         } else if (auto func = dynamic_cast<mir::Function *>(mirValue)) {
             return fMap[func]->label.get();
         } else {
-            dbg(dynamic_cast<mir::Instruction *>(mirValue));
-            assert(false);
-            return nullptr;
+            put(mirValue, curFunc->newVirRegister());
+            return oMap[mirValue];
+        }
+    }
+
+    void Translator::compute_phi(mir::Function *mirFunction) {
+        using parallel_copy_t = std::vector<std::pair<mips::rRegister, mips::rRegister>>;
+        const auto phi2move = [this](const parallel_copy_t &pc) {
+            using move_t = mips::MoveInst;
+            std::vector<mips::pInstruction> instructions;
+            std::unordered_map<mips::rRegister, size_t> inDegree;
+            std::unordered_map<mips::rRegister, mips::rRegister> map;
+            std::unordered_map<mips::rRegister, std::vector<mips::rRegister>> edges;
+            for (auto &[dst, src]: pc) {
+                edges[dst].push_back(src);
+                inDegree[dst]; // make sure dst in inDegree
+                inDegree[src]++;
+                map[src] = src;
+            }
+            std::queue<mips::rRegister> queue;
+            for (auto &[r, d]: inDegree)
+                if (d == 0) queue.push(r);
+            while (!inDegree.empty()) {
+                while (!queue.empty()) {
+                    auto reg = queue.front();
+                    queue.pop(), inDegree.erase(reg);
+                    for (auto &v: edges[reg]) {
+                        instructions.emplace_back(new move_t{reg, map[v]});
+                        if (map[v] == v) {
+                            inDegree[v]--;
+                            if (inDegree[v] == 0) queue.push(v);
+                        }
+                    }
+                }
+                if (inDegree.empty()) break;
+                auto &[reg, _] = *std::min_element(inDegree.begin(), inDegree.end(),
+                                           [](auto &&x, auto &&y) { return x.second < y.second; });
+                auto vir = curFunc->newVirRegister();
+                instructions.emplace_back(new move_t{vir, reg});
+                map[reg] = vir;
+                queue.push(reg);
+            }
+            return instructions;
+        };
+
+        for (auto &bb: mirFunction->bbs) {
+            auto end = bb->phi_end();
+            if (bb->instructions.begin() == end) continue;
+            std::unordered_map<mir::BasicBlock *, parallel_copy_t> pcs;
+            for (auto it = bb->instructions.begin(); it != end; ++it) {
+                auto phi = dynamic_cast<mir::Instruction::phi *>(*it);
+                assert(phi);
+                auto dst = getRegister(phi);
+                for (int i = 0; i < phi->getNumIncomingValues(); ++i) {
+                    auto [value, block] = phi->getIncomingValue(i);
+                    curBlock = bMap[block];
+                    auto src = getRegister(value);
+                    pcs[block].emplace_back(dst, src);
+                }
+            }
+            for (auto &pre: bb->predecessors) {
+                auto block = bMap[pre];
+                if (pre->successors.size() > 1) {
+                    auto newBlock = block->spliceAt(block->instructions.end());
+                    auto it = block->node;
+                    newBlock->node = curFunc->blocks.emplace(++it, newBlock);
+                    lMap[newBlock->label.get()] = newBlock;
+                    block = newBlock;
+                }
+                for (auto &inst: phi2move(pcs[pre]))
+                    block->push_back(std::move(inst));
+            }
         }
     }
 
@@ -538,26 +609,15 @@ namespace backend {
     }
 
     void Translator::spliceBlocks() {
-        for (auto &block: *curFunc) {
-            assert(!block->instructions.empty());
-            assert(block->instructions.back()->ty == mips::Instruction::Ty::J);
-            block->fallthroughJump = std::move(block->instructions.back());
-            block->instructions.pop_back();
-            if (!block->instructions.empty() && block->instructions.back()->isJumpBranch()) {
-                block->conditionalJump = std::move(block->instructions.back());
-                block->instructions.pop_back();
-            }
-        }
         constexpr auto pred_if_jal = [](auto &&inst) { return inst->isFuncCall(); };
         for (auto it = curFunc->begin(); it != curFunc->end();) {
             auto &block = *it;
             auto pos = std::find_if(block->instructions.begin(), block->instructions.end(), pred_if_jal);
-            if (auto nb = block->splice(pos)) {
+            if (auto nb = block->spliceFuncCall(pos)) {
                 nb->node = curFunc->blocks.emplace(++it, nb);
                 it = nb->node;
                 lMap[nb->label.get()] = nb;
-            }
-            else it++;
+            } else it++;
         }
     }
 
