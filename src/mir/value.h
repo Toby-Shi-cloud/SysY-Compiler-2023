@@ -64,28 +64,28 @@ namespace mir {
 
         virtual ~Value() = default;
 
-        inline void setConst(bool constant = true) { isConstant = constant; }
+        void setConst(bool constant = true) { isConstant = constant; }
 
-        inline void setName(std::string str) { name = std::move(str); }
+        void setName(std::string str) { name = std::move(str); }
 
-        [[nodiscard]] inline bool hasName() const { return !name.empty(); }
+        [[nodiscard]] bool hasName() const { return !name.empty(); }
 
-        [[nodiscard]] inline const std::string &getName() const { return hasName() ? name : anonymous; }
+        [[nodiscard]] const std::string &getName() const { return hasName() ? name : anonymous; }
 
-        [[nodiscard]] inline pType getType() const { return type; }
+        [[nodiscard]] pType getType() const { return type; }
 
-        [[nodiscard]] inline bool isUsed() const { return !use->users.empty(); }
+        [[nodiscard]] bool isUsed() const { return !use->users.empty(); }
 
-        [[nodiscard]] inline bool isConst() const { return isConstant; }
+        [[nodiscard]] bool isConst() const { return isConstant; }
 
-        [[nodiscard]] inline long getId() const { return std::strtol(getName().c_str() + 1, nullptr, 0); }
+        [[nodiscard]] long getId() const { return std::strtol(getName().c_str() + 1, nullptr, 0); }
 
-        inline void swap(Value *other) {
+        void swap(Value *other) {
             std::swap(use->value, other->use->value);
             std::swap(use, other->use);
         }
 
-        inline void moveTo(Value *other);
+        inline void moveTo(const Value *other) const;
     };
 
     /**
@@ -98,9 +98,9 @@ namespace mir {
          * Use shared pointer here to avoid 'use after delete'. <br>
          */
         std::vector<std::shared_ptr<Use>> operands;
-    protected:
 
-        inline void addOperand(Value *value) {
+    protected:
+        void addOperand(const Value *value) {
             operands.push_back(value->use);
             if (value != this)
                 value->use->users.insert(this);
@@ -108,7 +108,7 @@ namespace mir {
 
     public:
         template<typename... Args>
-        explicit User(pType type, Args... args) : Value(type), operands{(args->use)...} {
+        explicit User(pType type, Args... args) : Value(type), operands{args->use...} {
             for (auto &operand: operands) operand->users.insert(this);
         }
 
@@ -127,7 +127,7 @@ namespace mir {
         [[nodiscard]] auto getNumOperands() const { return operands.size(); }
     };
 
-    inline void Value::moveTo(Value *other) {
+    inline void Value::moveTo(const Value *other) const {
         if (this == other) return;
         for (auto &&user: use->users)
             for (auto &&operand: user->operands)
@@ -144,7 +144,7 @@ namespace mir {
     }
 
     template<typename T>
-    inline std::enable_if_t<std::is_base_of_v<Value, T>, std::ostream> &
+    std::enable_if_t<std::is_base_of_v<Value, T>, std::ostream> &
     operator<<(std::ostream &os, const T *value) {
         return os << *value;
     }

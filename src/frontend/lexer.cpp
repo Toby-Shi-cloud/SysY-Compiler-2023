@@ -7,7 +7,7 @@
 
 namespace frontend::lexer {
     token_opt Lexer::next_token_impl() {
-        while (next_token_skip_comment());
+        while (next_token_skip_comment()) {}
         next_token_skip_whitespaces();
         if (current.empty()) return std::nullopt;
         if (auto _ret = next_token_try_word()) return _ret;
@@ -50,13 +50,13 @@ namespace frontend::lexer {
     }
 
     token_opt Lexer::next_token_try_word() {
-        for (auto &p: token_type::words) {
-            if (current.length() >= p.first.size() && current.substr(0, p.first.size()) == p.first) {
-                auto temp = current.substr(p.first.size());
-                if (std::isalpha(p.first[0]) && (temp.empty() || temp[0] == '_' || std::isalnum(temp[0]))) continue;
+        for (auto &[raw, ty]: token_type::words) {
+            if (current.length() >= raw.size() && current.substr(0, raw.size()) == raw) {
+                auto temp = current.substr(raw.size());
+                if (std::isalpha(raw[0]) && (temp.empty() || temp[0] == '_' || std::isalnum(temp[0]))) continue;
                 auto _column = column();
                 current = temp;
-                return Token{p.second, p.first, _line, _column};
+                return Token{ty, raw, _line, _column};
             }
         }
         return std::nullopt;

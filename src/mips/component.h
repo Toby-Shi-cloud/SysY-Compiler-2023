@@ -30,50 +30,49 @@ namespace mips {
         std::unordered_set<rRegister> use, def;
 
         // Only clone the instructions.
-        [[nodiscard]] inline SubBlock clone() const {
+        [[nodiscard]] SubBlock clone() const {
             SubBlock subBlock{};
             for (auto &inst: instructions)
                 subBlock.instructions.emplace_back(inst->clone());
             return subBlock;
         }
 
-        [[nodiscard]] inline bool empty() const { return instructions.empty(); }
+        [[nodiscard]] bool empty() const { return instructions.empty(); }
 
-        [[nodiscard]] inline auto back() { return instructions.back().get(); }
+        [[nodiscard]] auto back() const { return instructions.back().get(); }
 
-        [[nodiscard]] inline auto begin() const { return instructions.begin(); }
+        [[nodiscard]] auto begin() const { return instructions.begin(); }
 
-        [[nodiscard]] inline auto end() const { return instructions.end(); }
+        [[nodiscard]] auto end() const { return instructions.end(); }
 
-        [[nodiscard]] inline auto begin() { return instructions.begin(); }
+        [[nodiscard]] auto begin() { return instructions.begin(); }
 
-        [[nodiscard]] inline auto end() { return instructions.end(); }
+        [[nodiscard]] auto end() { return instructions.end(); }
 
-        inline inst_node_t insert(inst_pos_t p, pInstruction &&inst) {
+        inst_node_t insert(inst_pos_t p, pInstruction &&inst) {
             auto self = inst.get();
             auto node = instructions.insert(p, std::move(inst));
             self->parent = this;
-            self->node = node;
-            return node;
+            return self->node = node;
         }
 
-        inline inst_node_t emplace(inst_pos_t p, rInstruction inst) {
+        inst_node_t emplace(inst_pos_t p, rInstruction inst) {
             return insert(p, pInstruction{inst});
         }
 
-        template<typename ...Args>
-        inline auto erase(Args ...args) {
+        template<typename... Args>
+        auto erase(Args... args) {
             return instructions.erase(args...);
         }
 
-        inline std::ostream &output(std::ostream &os, bool sharp_last = false) const {
+        std::ostream &output(std::ostream &os, bool sharp_last = false) const {
             for (auto &inst: instructions)
                 os << "\t" << (sharp_last && &inst == &instructions.back() ? "# " : "")
-                   << *inst << "\n";
+                        << *inst << "\n";
             return os;
         }
 
-        inline void clearInfo() {
+        void clearInfo() {
             predecessors.clear();
             successors.clear();
             liveIn.clear();
@@ -91,23 +90,23 @@ namespace mips {
 
         explicit Block(rFunction parent) : parent(parent), subBlocks{std::make_shared<SubBlock>()} {}
 
-        [[nodiscard]] inline bool empty() const { return subBlocks.size() == 1 && frontBlock()->empty(); }
+        [[nodiscard]] bool empty() const { return subBlocks.size() == 1 && frontBlock()->empty(); }
 
-        [[nodiscard]] inline rSubBlock frontBlock() const { return subBlocks.front().get(); }
+        [[nodiscard]] rSubBlock frontBlock() const { return subBlocks.front().get(); }
 
-        [[nodiscard]] inline rSubBlock backBlock() const { return subBlocks.back().get(); }
+        [[nodiscard]] rSubBlock backBlock() const { return subBlocks.back().get(); }
 
-        [[nodiscard]] inline rInstruction frontInst() const { return frontBlock()->instructions.front().get(); }
+        [[nodiscard]] rInstruction frontInst() const { return frontBlock()->instructions.front().get(); }
 
-        [[nodiscard]] inline rInstruction backInst() const { return backBlock()->instructions.back().get(); }
+        [[nodiscard]] rInstruction backInst() const { return backBlock()->instructions.back().get(); }
 
-        inline void push_back(pInstruction &&inst) {
+        void push_back(pInstruction &&inst) {
             if (!empty() && backInst()->isJumpBranch())
                 subBlocks.emplace_back(new SubBlock());
             subBlocks.back()->insert(subBlocks.back()->end(), std::move(inst));
         }
 
-        inline void push_back(std::pair<pInstruction, pInstruction> &&pair) {
+        void push_back(std::pair<pInstruction, pInstruction> &&pair) {
             push_back(std::move(pair.first));
             push_back(std::move(pair.second));
         }
@@ -130,40 +129,40 @@ namespace mips {
         std::unordered_set<pAddress> usedAddress;
 
         explicit Function(std::string name, bool isMain, bool isLeaf)
-                : Function(std::move(name), 0, 0, isMain, isLeaf) {}
+            : Function(std::move(name), 0, 0, isMain, isLeaf) {}
 
         explicit Function(std::string name, unsigned allocaSize, unsigned argSize, bool isMain, bool isLeaf)
-                : label(std::make_unique<Label>(std::move(name), this)),
-                  allocaSize(allocaSize), argSize(argSize),
-                  isMain(isMain), isLeaf(isLeaf) {}
+            : label(std::make_unique<Label>(std::move(name), this)),
+              allocaSize(allocaSize), argSize(argSize),
+              isMain(isMain), isLeaf(isLeaf) {}
 
-        inline rVirRegister newVirRegister() {
+        rVirRegister newVirRegister() {
             auto reg = new VirRegister();
             usedVirRegs.emplace(reg);
             return reg;
         }
 
-        template<typename ...Args>
-        inline rAddress newAddress(Args ...args) {
+        template<typename... Args>
+        rAddress newAddress(Args... args) {
             auto addr = new Address(args...);
             usedAddress.emplace(addr);
             return addr;
         }
 
-        [[nodiscard]] inline auto begin() const { return blocks.begin(); }
+        [[nodiscard]] auto begin() const { return blocks.begin(); }
 
-        [[nodiscard]] inline auto begin() { return blocks.begin(); }
+        [[nodiscard]] auto begin() { return blocks.begin(); }
 
-        [[nodiscard]] inline auto end() const { return blocks.end(); }
+        [[nodiscard]] auto end() const { return blocks.end(); }
 
-        [[nodiscard]] inline auto end() { return blocks.end(); }
+        [[nodiscard]] auto end() { return blocks.end(); }
 
-        inline void calcBlockPreSuc() const {
+        void calcBlockPreSuc() const {
             for (auto &block: *this)
                 block->computePreSuc();
         }
 
-        inline void allocName() const {
+        void allocName() const {
             size_t counter = 0;
             for (auto &bb: *this)
                 bb->label->name = "$." + label->name + "_" + std::to_string(counter++);
@@ -180,8 +179,8 @@ namespace mips {
 
         explicit GlobalVar(std::string name, bool isInit, bool isString, bool isConst,
                            unsigned size, std::variant<std::string, std::vector<int>> elements)
-                : label(std::make_unique<Label>(std::move(name), this)), isInit(isInit), isString(isString),
-                  isConst(isConst), size(size), elements(std::move(elements)) {}
+            : label(std::make_unique<Label>(std::move(name), this)), isInit(isInit), isString(isString),
+              isConst(isConst), size(size), elements(std::move(elements)) {}
     };
 
     struct Module {

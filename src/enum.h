@@ -31,7 +31,7 @@ namespace magic_enum::detail {
         }
 
         template<typename Func>
-        explicit constexpr static_string(static_string<N> ss, Func f) noexcept {
+        explicit constexpr static_string(static_string ss, Func f) noexcept {
             for (size_t i = 0; i < N; i++) data[i] = f(ss[i]);
             data[N] = '\0';
         }
@@ -42,9 +42,9 @@ namespace magic_enum::detail {
 
         constexpr explicit operator std::string_view() const noexcept { return data; }
 
-        [[nodiscard]] constexpr bool empty() const noexcept { return N == 0; }
+        [[nodiscard]] static constexpr bool empty() noexcept { return N == 0; }
 
-        [[nodiscard]] constexpr size_t length() const noexcept { return N; }
+        [[nodiscard]] static constexpr size_t length() noexcept { return N; }
     };
 
     constexpr int tolower(int ch) {
@@ -101,13 +101,13 @@ namespace magic_enum::detail {
 
     template<typename Enum, underlying_type_t<Enum> e, int,
             typename = std::enable_if_t<enum_value<Enum, (Enum) e>.empty()>>
-    static inline constexpr std::string_view enum_to_string_impl(underlying_type_t<Enum> v) noexcept {
+    static constexpr std::string_view enum_to_string_impl(underlying_type_t<Enum>) noexcept {
         return "Unknown";
     }
 
     template<typename Enum, underlying_type_t<Enum> e, int ty,
             typename = std::enable_if_t<!enum_value<Enum, (Enum) e>.empty()>>
-    static inline constexpr auto enum_to_string_impl(underlying_type_t<Enum> v) noexcept {
+    static constexpr auto enum_to_string_impl(underlying_type_t<Enum> v) noexcept {
         static_assert(ty >= 0 && ty <= 2, "ty must be 0, 1 or 2.");
         if (v == e) {
             if constexpr (ty == 0) return std::string_view(enum_value<Enum, (Enum) e>);
@@ -120,32 +120,32 @@ namespace magic_enum::detail {
 
 namespace magic_enum {
     template<typename Enum, int ty = 0>
-    static inline constexpr auto enum_to_string(underlying_type_t<Enum> v) noexcept {
+    static constexpr auto enum_to_string(underlying_type_t<Enum> v) noexcept {
         return detail::enum_to_string_impl<Enum, 0, ty>(v);
     }
 
     template<typename Enum, int ty = 0>
-    static inline constexpr auto enum_to_string(Enum v) noexcept {
+    static constexpr auto enum_to_string(Enum v) noexcept {
         return detail::enum_to_string_impl<Enum, 0, ty>((underlying_type_t<Enum>) v);
     }
 
     template<typename Enum>
-    static inline constexpr auto enum_to_string_lower(underlying_type_t<Enum> v) noexcept {
+    static constexpr auto enum_to_string_lower(underlying_type_t<Enum> v) noexcept {
         return enum_to_string<Enum, 1>(v);
     }
 
     template<typename Enum>
-    static inline constexpr auto enum_to_string_lower(Enum v) noexcept {
+    static constexpr auto enum_to_string_lower(Enum v) noexcept {
         return enum_to_string<Enum, 1>(v);
     }
 
     template<typename Enum>
-    static inline constexpr auto enum_to_string_upper(underlying_type_t<Enum> v) noexcept {
+    static constexpr auto enum_to_string_upper(underlying_type_t<Enum> v) noexcept {
         return enum_to_string<Enum, 2>(v);
     }
 
     template<typename Enum>
-    static inline constexpr auto enum_to_string_upper(Enum v) noexcept {
+    static constexpr auto enum_to_string_upper(Enum v) noexcept {
         return enum_to_string<Enum, 2>(v);
     }
 

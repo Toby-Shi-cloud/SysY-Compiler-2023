@@ -48,7 +48,7 @@ namespace frontend::grammar {
         [[nodiscard]] inline const token::Token &getToken() const;
 
         template<typename T>
-        inline void push_all(T c) { for (auto &child : c) children.push_back(std::move(child)); }
+        void push_all(T c) { for (auto &child: c) children.push_back(std::move(child)); }
     };
 
     struct TerminalNode : GrammarNode {
@@ -78,13 +78,11 @@ namespace dbg {
     template<>
     [[maybe_unused]]
     inline bool pretty_print(std::ostream &stream, const frontend::grammar::GrammarNode &value) {
-        if (value.type == frontend::grammar::grammar_type::Terminal) {
-            // NOLINTNEXTLINE
+        if (value.type == frontend::grammar::grammar_type::Terminal) // NOLINTNEXTLINE
             return pretty_print(stream, static_cast<const frontend::grammar::TerminalNode &>(value));
-        }
         stream << value.type << " { ";
         bool first = true;
-        for (const auto &child : value.children) {
+        for (const auto &child: value.children) {
             if (first) first = false;
             else stream << ", ";
             stream << child->type;

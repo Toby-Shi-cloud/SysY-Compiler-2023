@@ -98,29 +98,28 @@ namespace mir {
     }
 
     ssize_t Type::ssize() const {
-        if (isIntegerTy()) {
+        if (isIntegerTy())
             return (getIntegerBits() + 7) / 8;
-        } else if (isPointerTy() || isFunctionTy()) {
+        if (isPointerTy() || isFunctionTy())
             return 4;
-        } else if (isArrayTy()) {
+        if (isArrayTy())
             return getArraySize() * getArrayBase()->ssize();
-        }
         return 0;
     }
 
     std::string Type::to_string() const {
         using namespace std::string_literals;
-        if (isLabelTy()) {
+        if (isLabelTy())
             return "<label>"s;
-        } else if (isVoidTy()) {
+        if (isVoidTy())
             return "void"s;
-        } else if (isIntegerTy()) {
+        if (isIntegerTy())
             return "i" + std::to_string(getIntegerBits());
-        } else if (isPointerTy()) {
+        if (isPointerTy())
             return getPointerBase()->to_string() + "*";
-        } else if (isArrayTy()) {
+        if (isArrayTy())
             return "[" + std::to_string(getArraySize()) + " x " + getArrayBase()->to_string() + "]";
-        } else if (isFunctionTy()) {
+        if (isFunctionTy()) {
             std::string ret = getFunctionRet()->to_string();
             std::string params;
             for (auto param: getFunctionParams()) {
@@ -128,9 +127,8 @@ namespace mir {
             }
             if (!params.empty()) params.pop_back(), params.pop_back();
             return ret + " (" + params + ")";
-        } else {
-            return "<unknown>"s;
         }
+        return "<unknown>"s;
     }
 }
 
@@ -152,7 +150,7 @@ struct [[maybe_unused]] std::hash<std::pair<mir::pType, Second>> {
 
 template<>
 struct [[maybe_unused]] std::hash<std::vector<mir::pType>> {
-    size_t operator()(const std::vector<mir::pType> &v) const {
+    size_t operator()(const std::vector<mir::pType> &v) const noexcept {
         size_t ret = 0;
         for (const auto &e: v) {
             ret = ret * 10007 + std::hash<mir::pType>()(e);
@@ -184,7 +182,7 @@ namespace mir {
 
     pArrayType ArrayType::getArrayType(int size, pType base) {
         static map<std::pair<int, pType>, pArrayType> cache;
-        std::pair<int, pType> key{size, base};
+        std::pair key{size, base};
         if (cache.find(key) == cache.end()) {
             cache[key] = new ArrayType(size, base);
         }
@@ -193,7 +191,7 @@ namespace mir {
 
     pFunctionType FunctionType::getFunctionType(pType ret, std::vector<pType> &&params) {
         static map<std::pair<pType, std::vector<pType>>, pFunctionType> cache;
-        std::pair<pType, std::vector<pType>> key{ret, params};
+        std::pair key{ret, params};
         if (cache.find(key) == cache.end()) {
             cache[key] = new FunctionType(ret, std::move(params));
         }

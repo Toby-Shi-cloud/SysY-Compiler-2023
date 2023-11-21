@@ -5,6 +5,7 @@
 #ifndef COMPILER_MIPS_H
 #define COMPILER_MIPS_H
 
+#include "dbg.h"
 #include "mips/operand.h"
 #include "mips/component.h"
 #include "mips/instruction.h"

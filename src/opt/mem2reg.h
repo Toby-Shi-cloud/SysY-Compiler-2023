@@ -12,11 +12,11 @@ namespace mir {
 
     void calcDominators(Function *func);
 
-    void calcDF(Function *func);
+    void calcDF(const Function *func);
 
-    void calcPhi(Function *func);
+    void calcPhi(const Function *func);
 
-    void clearDeadInst(Function *func);
+    void clearDeadInst(const Function *func);
 
     void clearDeadBlock(Function *func);
 

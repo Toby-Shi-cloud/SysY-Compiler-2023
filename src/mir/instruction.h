@@ -6,6 +6,7 @@
 #define COMPILER_MIR_INSTRUCTION_H
 
 #include <sstream>
+#include "../enum.h"
 #include "derived_value.h"
 
 namespace mir {
@@ -145,7 +146,7 @@ namespace mir {
 
         explicit phi(const std::vector<incominng_pair> &values);
 
-        inline void addIncomingValue(incominng_pair pair) {
+        void addIncomingValue(const incominng_pair &pair) {
             addOperand(pair.first);
             addOperand(pair.second);
         }

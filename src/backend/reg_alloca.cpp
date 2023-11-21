@@ -41,7 +41,7 @@ namespace backend {
     bool compute_liveIn_liveOut(mips::rFunction function) {
         bool changed = false;
         auto vec = all_sub_blocks(function);
-        for (auto it = vec.rbegin(); it != vec.rend(); it++) {
+        for (auto it = vec.rbegin(); it != vec.rend(); ++it) {
             auto block = *it;
             auto s1 = block->liveIn.size();
             auto s2 = block->liveOut.size();
@@ -177,16 +177,16 @@ namespace backend {
     RegisterGraph::inst_postion_t
     RegisterGraph::load_at(mips::rSubBlock block, inst_postion_t it, mips::rRegister dst, int offset) {
         return block->insert(it, std::make_unique<mips::LoadInst>(
-                mips::Instruction::Ty::LW, dst, mips::PhyRegister::get("$fp"), offset));
+                                 mips::Instruction::Ty::LW, dst, mips::PhyRegister::get("$fp"), offset));
     }
 
     RegisterGraph::inst_postion_t
     RegisterGraph::store_at(mips::rSubBlock block, inst_postion_t it, mips::rRegister src, int offset) {
         return block->insert(it, std::make_unique<mips::StoreInst>(
-                mips::Instruction::Ty::SW, src, mips::PhyRegister::get("$fp"), offset));
+                                 mips::Instruction::Ty::SW, src, mips::PhyRegister::get("$fp"), offset));
     }
 
-    const RegisterGraph::phy_set_t RegisterGraph::saved_regs = []() {
+    const RegisterGraph::phy_set_t RegisterGraph::saved_regs = [] {
         phy_set_t could_use{};
         for (int i = 0; i < 8; i++)
             could_use.insert(mips::PhyRegister::get("$s" + std::to_string(i)));
@@ -194,7 +194,7 @@ namespace backend {
         return could_use;
     }();
 
-    const RegisterGraph::phy_set_t RegisterGraph::temp_regs = []() {
+    const RegisterGraph::phy_set_t RegisterGraph::temp_regs = [] {
         phy_set_t could_use{};
         for (int i = 0; i < 8; i++)
             could_use.insert(mips::PhyRegister::get("$t" + std::to_string(i)));

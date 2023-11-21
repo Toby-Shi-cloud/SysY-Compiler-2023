@@ -4,17 +4,18 @@
 
 #include <sstream>
 #include <unordered_map>
+#include "../enum.h"
 #include "derived_value.h"
 
 namespace mir {
     Function *Function::getint = new Function(
-            FunctionType::getFunctionType(Type::getI32Type(), {}), "getint");
+        FunctionType::getFunctionType(Type::getI32Type(), {}), "getint");
     Function *Function::putint = new Function(
-            FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type()}), "putint");
+        FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type()}), "putint");
     Function *Function::putch = new Function(
-            FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type()}), "putch");
+        FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type()}), "putch");
     Function *Function::putstr = new Function(
-            FunctionType::getFunctionType(Type::getVoidType(), {Type::getStringType()}), "putstr");
+        FunctionType::getFunctionType(Type::getVoidType(), {Type::getStringType()}), "putstr");
 }
 
 namespace mir {
@@ -23,15 +24,15 @@ namespace mir {
             delete instruction;
     }
 
-    void BasicBlock::insert(mir::inst_pos_t p, mir::Instruction *inst) {
+    void BasicBlock::insert(inst_pos_t p, Instruction *inst) {
         inst->node = instructions.insert(p, inst);
         inst->parent = this;
     }
 
-    inst_node_t BasicBlock::erase(Instruction *inst) {
+    inst_node_t BasicBlock::erase(const Instruction *inst) {
         assert(this == inst->parent);
         assert(!inst->isUsed());
-        auto ret = instructions.erase(inst->node);
+        auto &&ret = instructions.erase(inst->node);
         delete inst;
         return ret;
     }
@@ -52,7 +53,7 @@ namespace mir {
         return arg;
     }
 
-    void Function::allocName() {
+    void Function::allocName() const {
         size_t counter = 0;
         for (auto arg: args) {
             arg->setName("%" + std::to_string(counter++));
@@ -108,14 +109,14 @@ namespace mir {
         return IntegerLiteral(lhs.value % rhs.value);
     }
 
-    static inline char hex(int x) {
+    static char hex(int x) {
         assert(0 <= x && x < 16);
         if (x < 10) return static_cast<char>('0' + x);
-        else return static_cast<char>('A' + x - 10);
+        return static_cast<char>('A' + x - 10);
     }
 
     StringLiteral::StringLiteral(std::string value)
-            : Literal(Type::getStringType((int) value.length() + 1)), value(std::move(value)) {
+        : Literal(Type::getStringType(value.length() + 1)), value(std::move(value)) {
         std::string s = R"(c")";
         for (char c: this->value) {
             if (c < 0x20) {
@@ -135,8 +136,8 @@ namespace mir {
     }
 
     ArrayLiteral::ArrayLiteral(std::vector<Literal *> values)
-            : Literal(ArrayType::getArrayType((int) values.size(), values[0]->getType())),
-              values(std::move(values)) {
+        : Literal(ArrayType::getArrayType(values.size(), values[0]->getType())),
+          values(std::move(values)) {
         std::string s = "[";
         for (size_t i = 0; i < this->values.size(); i++) {
             if (i) s += ", ";

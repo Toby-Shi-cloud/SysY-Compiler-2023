@@ -25,5 +25,6 @@
 #endif
 
 #include <cassert>
+#include <iostream>
 
 #endif //COMPILER_DBG_H

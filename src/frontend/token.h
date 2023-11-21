@@ -30,21 +30,21 @@ namespace frontend::token::token_type {
     }
 
     constexpr const char *raw[] = {
-            "<ERROR>",
-            "<int>", "<char []>",
-            "main", "const", "int", "void", "break", "continue",
-            "if", "else", "while", "for", "getint", "printf", "return",
-            "!", "&&", "||", "+", "-", "*", "/", "%",
-            "<", "<=", ">", ">=", "==", "!=", "=", ";", ",",
-            "(", ")", "[", "]", "{", "}",
-            "<identifier>"
+        "<ERROR>",
+        "<int>", "<char []>",
+        "main", "const", "int", "void", "break", "continue",
+        "if", "else", "while", "for", "getint", "printf", "return",
+        "!", "&&", "||", "+", "-", "*", "/", "%",
+        "<", "<=", ">", ">=", "==", "!=", "=", ";", ",",
+        "(", ")", "[", "]", "{", "}",
+        "<identifier>"
     };
 
     const auto words = []() noexcept {
-        std::array<std::pair<std::string_view, _token_type>, sizeof(raw) / sizeof(raw[0])> words{};
+        std::array<std::pair<std::string_view, _token_type>, std::size(raw)> words{};
         for (size_t i = 0; i < words.size(); ++i) {
             words[i].first = raw[i];
-            words[i].second = (_token_type) i;
+            words[i].second = static_cast<_token_type>(i);
         }
         std::sort(words.begin(), words.end(), [](const auto &a, const auto &b) {
             return a.first.size() > b.first.size();
@@ -76,11 +76,11 @@ namespace dbg {
     [[maybe_unused]]
     inline bool pretty_print(std::ostream &stream, const frontend::token::Token &value) {
         stream << "{ "
-               << "type: " << value.type << ", "
-               << "raw: " << value.raw << ", "
-               << "line: " << value.line << ", "
-               << "column: " << value.column
-               << " }";
+                << "type: " << value.type << ", "
+                << "raw: " << value.raw << ", "
+                << "line: " << value.line << ", "
+                << "column: " << value.column
+                << " }";
         return true;
     }
 }

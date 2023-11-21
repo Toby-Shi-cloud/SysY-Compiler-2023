@@ -5,7 +5,6 @@
 #ifndef COMPILER_LEXER_H
 #define COMPILER_LEXER_H
 
-#include <ostream>
 #include "token.h"
 
 namespace frontend::lexer {
@@ -22,17 +21,17 @@ namespace frontend::lexer {
             Lexer *self;
             token_opt current;
         public:
-            inline explicit Iterator(Lexer *self, token_opt token) : self(self), current(token) {}
+            explicit Iterator(Lexer *self, const token_opt &token) : self(self), current(token) {}
 
-            inline Token operator*() const { return current.value(); }
+            Token operator*() const { return current.value(); }
 
-            inline bool operator==(const Iterator &other) const {
+            bool operator==(const Iterator &other) const {
                 return self == other.self && !current && !other.current;
             }
 
-            inline bool operator!=(const Iterator &other) const { return !(*this == other); }
+            bool operator!=(const Iterator &other) const { return !(*this == other); }
 
-            inline Iterator &operator++() {
+            Iterator &operator++() {
                 current = self->next_token();
                 return *this;
             }
@@ -50,7 +49,7 @@ namespace frontend::lexer {
 
         [[nodiscard]] Iterator end() { return Iterator(this, std::nullopt); }
 
-        inline token_opt next_token() { return next_token_impl(); }
+        token_opt next_token() { return next_token_impl(); }
 
     private:
         token_opt next_token_impl();

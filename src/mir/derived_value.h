@@ -5,15 +5,12 @@
 #ifndef COMPILER_MIR_DERIVED_VALUE_H
 #define COMPILER_MIR_DERIVED_VALUE_H
 
-#include <any>
 #include <set>
 #include <list>
 #include <memory>
-#include <ostream>
 #include <algorithm>
 #include <unordered_set>
 #include "value.h"
-#include "../enum.h"
 
 /**
  * Derived Values <br>
@@ -62,21 +59,21 @@ namespace mir {
 
         void insert(inst_pos_t p, Instruction *inst);
 
-        inst_node_t erase(Instruction *inst);
+        inst_node_t erase(const Instruction *inst);
 
         inst_node_t phi_end();
 
         inst_pos_t phi_end() const;
 
-        inline void push_front(Instruction *inst) {
+        void push_front(Instruction *inst) {
             insert(instructions.cbegin(), inst);
         }
 
-        inline void push_back(Instruction *inst) {
+        void push_back(Instruction *inst) {
             insert(instructions.cend(), inst);
         }
 
-        inline void clear_info() {
+        void clear_info() {
             predecessors.clear();
             successors.clear();
             dominators.clear();
@@ -110,19 +107,19 @@ namespace mir {
         /**
          * Alloc names for args, bbs and instructions.
          */
-        void allocName();
+        void allocName() const;
 
         /**
          * Clear all information of basic blocks. <br>
          */
-        void clearBBInfo();
+        void clearBBInfo() const;
 
         /**
          * Calculate predecessors and successors for each basic block. <br>
          */
-        void calcPreSuc();
+        void calcPreSuc() const;
 
-        [[nodiscard]] inline bool isMain() const { return getName() == "@main"; }
+        [[nodiscard]] bool isMain() const { return getName() == "@main"; }
 
         [[nodiscard]] bool isLeaf() const;
     };
@@ -135,12 +132,12 @@ namespace mir {
         const bool unnamed;
 
         explicit GlobalVar(pType type, std::string name, Literal *init, bool isConstant)
-                : Value(type, isConstant), init(init), unnamed(false) {
+            : Value(type, isConstant), init(init), unnamed(false) {
             setName("@" + std::move(name));
         }
 
         explicit GlobalVar(pType type, Literal *init, bool isConstant)
-                : Value(type, isConstant), init(init), unnamed(true) {}
+            : Value(type, isConstant), init(init), unnamed(true) {}
 
         ~GlobalVar() override;
     };
@@ -163,25 +160,28 @@ namespace mir {
             // Other Operations
             ICMP, PHI, CALL
         } instrTy;
+
         BasicBlock *parent = nullptr;
         inst_node_t node{};
 
         virtual std::ostream &output(std::ostream &os) const = 0;
 
-        [[nodiscard]] inline bool isTerminator() const { return instrTy == RET || instrTy == BR; }
+        [[nodiscard]] bool isTerminator() const { return instrTy == RET || instrTy == BR; }
 
-        [[nodiscard]] inline bool isCall() const { return instrTy == CALL; }
+        [[nodiscard]] bool isCall() const { return instrTy == CALL; }
 
-        [[nodiscard]] inline bool isValue() const { return getType() != Type::getVoidType(); }
+        [[nodiscard]] bool isValue() const { return getType() != Type::getVoidType(); }
 
         template<typename... Args>
-        explicit Instruction(pType type, InstrTy instrTy, Args ...args) : User(type, args...), instrTy(instrTy) {}
+        explicit Instruction(pType type, InstrTy instrTy, Args... args) : User(type, args...), instrTy(instrTy) {}
 
         explicit Instruction(pType type, InstrTy instrTy, const std::vector<Value *> &args) :
-                User(type, args), instrTy(instrTy) {}
+            User(type, args), instrTy(instrTy) {}
 
-        template<InstrTy ty> struct _binary_instruction;
-        template<InstrTy ty> struct _conversion_instruction;
+        template<InstrTy ty>
+        struct _binary_instruction;
+        template<InstrTy ty>
+        struct _conversion_instruction;
 
         struct ret;
         struct br;
@@ -225,7 +225,7 @@ namespace mir {
         const int value;
 
         explicit IntegerLiteral(int value)
-                : Literal(Type::getI32Type(), std::to_string(value)), value(value) {}
+            : Literal(Type::getI32Type(), std::to_string(value)), value(value) {}
     };
 
     IntegerLiteral *getIntegerLiteral(int value);

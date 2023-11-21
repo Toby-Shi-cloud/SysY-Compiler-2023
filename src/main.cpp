@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     frontend::visitor::SysYVisitor visitor(mir_manager, message_queue);
     visitor.visit(parser.comp_unit());
 
-    frontend::sort_by_line(message_queue);
+    sort_by_line(message_queue);
     for (auto &message: message_queue) {
         std::cout << message << std::endl;
         ferr << message.line << " " << (char)message.code << std::endl;

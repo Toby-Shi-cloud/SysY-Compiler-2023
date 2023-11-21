@@ -22,6 +22,7 @@ namespace frontend::parser {
     enum class _option {
         OPTION
     };
+
     enum class _many {
         MANY
     };
@@ -48,41 +49,38 @@ namespace frontend::parser {
         friend generator_t operator+(const generator_t &, const generator_t &);
 
         template<token::token_type_t type>
-        inline static auto generator(int error_code = 0) -> generator_t {
+        static auto generator(int error_code = 0) -> generator_t {
             return [error_code](SysYParser *self) -> optGrammarNodeList {
                 if (auto node = self->need_terminal(type, error_code)) {
                     pGrammarNodeList result{};
                     result.push_back(std::move(node));
                     return result;
-                } else {
-                    return std::nullopt;
                 }
+                return std::nullopt;
             };
         }
 
         template<grammar_type_t type>
-        inline static auto generator() -> generator_t {
+        static auto generator() -> generator_t {
             return [](SysYParser *self) -> optGrammarNodeList {
                 if (auto node = self->parse_impl<type>()) {
                     pGrammarNodeList result{};
                     result.push_back(std::move(node));
                     return result;
-                } else {
-                    return std::nullopt;
                 }
+                return std::nullopt;
             };
         }
 
         pTerminalNode need_terminal(token::token_type_t type, int error_code);
 
-        inline pGrammarNode grammarNode(grammar_type_t type, const generator_t &gen) {
+        pGrammarNode grammarNode(grammar_type_t type, const generator_t &gen) {
             if (auto list = gen(this)) {
                 pGrammarNode ret{new GrammarNode(type)};
                 ret->push_all(std::move(list.value()));
                 return ret;
-            } else {
-                return nullptr;
             }
+            return nullptr;
         }
 
         template<grammar_type_t>
@@ -96,7 +94,7 @@ namespace frontend::parser {
             current = tokens.begin();
         }
 
-        [[nodiscard]] const GrammarNode &comp_unit() { return *_comp_unit; }
+        [[nodiscard]] const GrammarNode &comp_unit() const { return *_comp_unit; }
 
         void parse();
     };

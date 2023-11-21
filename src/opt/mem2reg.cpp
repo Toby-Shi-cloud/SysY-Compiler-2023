@@ -54,7 +54,7 @@ namespace mir {
         calc_idom(func->exitBB.get());
     }
 
-    void calcDF(Function *func) {
+    void calcDF(const Function *func) {
         constexpr auto calc = [](auto x, auto y) {
             while (x != y->idom) {
                 x->df.insert(y);
@@ -63,20 +63,19 @@ namespace mir {
         };
 
         std::unordered_set<BasicBlock *> vis{};
-        // NOLINTNEXTLINE
-        auto dfs = [&vis](BasicBlock *bb, auto &&func, auto &&self) -> void {
+        auto dfs = [&vis](BasicBlock *bb, auto &&f, auto &&self) -> void {
             vis.insert(bb);
             for (auto suc: bb->successors) {
-                func(bb, suc);
+                f(bb, suc);
                 if (vis.count(suc)) continue;
-                self(suc, func, self);
+                self(suc, f, self);
             }
         };
 
         dfs(func->bbs.front(), calc, dfs);
     }
 
-    void calcPhi(Function *func, Instruction::alloca_ *alloc) {
+    void calcPhi(const Function *func, const Instruction::alloca_ *alloc) {
         assert(alloc->getType() == Type::getI32Type());
         std::unordered_map<BasicBlock *, Value *> liveInV; // live in value
         std::unordered_map<BasicBlock *, Value *> defs; // def value (live out value)
@@ -86,7 +85,7 @@ namespace mir {
         for (auto bb: func->bbs) {
             for (auto it = bb->instructions.rbegin(); it != bb->instructions.rend(); ++it) {
                 if (auto store = dynamic_cast<Instruction::store *>(*it);
-                        store && store->getDest() == alloc) {
+                    store && store->getDest() == alloc) {
                     defs[bb] = store->getSrc();
                     W.push(bb);
                     break;
@@ -112,7 +111,7 @@ namespace mir {
 
         // Step 3. create phi
         // NOLINTNEXTLINE
-        const auto find_d = [&liveInV, &defs](BasicBlock *bb, auto &&self) -> Value * {
+        const auto find_d = [&liveInV, &defs](BasicBlock *bb, auto &&self) -> Value *{
             if (defs.count(bb)) return defs[bb];
             if (liveInV.count(bb)) return defs[bb] = liveInV[bb];
             if (bb->idom == nullptr) return defs[bb] = getIntegerLiteral(0);
@@ -127,7 +126,7 @@ namespace mir {
 
         // Step 4. convert load & store
         // NOLINTNEXTLINE
-        const auto find_v = [&liveInV, &defs](BasicBlock *bb, auto &&self) -> Value * {
+        const auto find_v = [&liveInV, &defs](BasicBlock *bb, auto &&self) -> Value *{
             if (liveInV.count(bb)) return liveInV[bb];
             if (bb->idom == nullptr) return liveInV[bb] = getIntegerLiteral(0);
             if (defs.count(bb->idom)) return liveInV[bb] = defs[bb->idom];
@@ -139,11 +138,11 @@ namespace mir {
             while (it != bb->instructions.end()) {
                 auto &inst = *it;
                 if (auto store = dynamic_cast<Instruction::store *>(inst);
-                        store && store->getDest() == alloc) {
+                    store && store->getDest() == alloc) {
                     last_store = store->getSrc();
                     it = bb->erase(store);
                 } else if (auto load = dynamic_cast<Instruction::load *>(inst);
-                        load && load->getPointerOperand() == alloc) {
+                    load && load->getPointerOperand() == alloc) {
                     assert(last_store);
                     load->moveTo(last_store);
                     it = bb->erase(load);
@@ -152,7 +151,7 @@ namespace mir {
         }
     }
 
-    void calcPhi(Function *func) {
+    void calcPhi(const Function *func) {
         for (auto inst: func->bbs.front()->instructions) {
             if (auto alloc = dynamic_cast<Instruction::alloca_ *>(inst)) {
                 if (alloc->getType() != Type::getI32Type()) continue;
@@ -161,15 +160,16 @@ namespace mir {
         }
     }
 
-    void clearDeadInst(Function *func) {
+    void clearDeadInst(const Function *func) {
         bool changed = true;
         while (changed) {
             changed = false;
             for (auto bb: func->bbs) {
                 auto it = bb->instructions.begin();
                 while (it != bb->instructions.end()) {
-                    auto inst = *it;
-                    if (inst->isUsed() || !inst->isValue() || inst->isTerminator() || inst->isCall()) ++it;
+                    if (auto inst = *it;
+                        inst->isUsed() || !inst->isValue() || inst->isTerminator() || inst->isCall())
+                        ++it;
                     else it = bb->erase(inst), changed = true;
                 }
             }
@@ -183,8 +183,7 @@ namespace mir {
             func->calcPreSuc();
             auto it = ++func->bbs.begin();
             while (it != func->bbs.end()) {
-                auto bb = *it;
-                if (bb->isUsed()) {
+                if (auto bb = *it; bb->isUsed()) {
                     ++it;
                 } else {
                     delete bb;
@@ -199,10 +198,16 @@ namespace mir {
         auto it = func->bbs.begin();
         while (it != func->bbs.end()) {
             auto bb = *it;
-            if (bb->instructions.size() > 1) { ++it; continue; }
+            if (bb->instructions.size() > 1) {
+                ++it;
+                continue;
+            }
             auto inst = bb->instructions.front();
             auto br = dynamic_cast<Instruction::br *>(inst);
-            if (!br || br->hasCondition()) { ++it; continue; }
+            if (!br || br->hasCondition()) {
+                ++it;
+                continue;
+            }
             // this block only contains a 'br %label' instruction
             bb->moveTo(br->getTarget());
             it = func->bbs.erase(it);

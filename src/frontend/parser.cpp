@@ -141,7 +141,7 @@ namespace frontend::parser {
 
     template<>
     pGrammarNode SysYParser::parse_impl<ExpStmt>() {
-        auto gen = generator<SEMICN>() | (generator<Exp>() + generator<SEMICN>('i'));
+        auto gen = generator<SEMICN>() | generator<Exp>() + generator<SEMICN>('i');
         return grammarNode(ExpStmt, gen);
     }
 
@@ -320,9 +320,10 @@ namespace frontend::parser {
             auto line = last_token->line;
             auto column = last_token->column + last_token->raw.size();
             message_queue.push_back(
-                    {message::ERROR, error_code, line, column,
-                     "missing token '"s + lexer::token_type::raw[type] + "'"
-                    });
+                {
+                    message::ERROR, error_code, line, column,
+                    "missing token '"s + raw[type] + "'"
+                });
             return std::make_unique<TerminalNode>(lexer::Token{type, ""sv, line, column});
         }
         return nullptr;
@@ -330,7 +331,7 @@ namespace frontend::parser {
 
     void SysYParser::parse() {
         if (_comp_unit) return;
-        _comp_unit = parse_impl<grammar::grammar_type::CompUnit>();
+        _comp_unit = parse_impl<CompUnit>();
     }
 }
 
@@ -360,11 +361,9 @@ namespace frontend::parser {
 
     generator_t operator*(const generator_t &gen, _option) {
         return [gen](SysYParser *self) -> optGrammarNodeList {
-            if (auto result = gen(self)) {
+            if (auto result = gen(self))
                 return result;
-            } else {
-                return pGrammarNodeList{};
-            }
+            return pGrammarNodeList{};
         };
     }
 

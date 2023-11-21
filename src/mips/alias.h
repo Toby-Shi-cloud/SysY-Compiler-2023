@@ -7,7 +7,6 @@
 
 #include <list>
 #include <memory>
-#include "../dbg.h"
 
 /**
  * @brief Define alias for pointer and reference of a type. <br>
@@ -60,7 +59,7 @@ namespace mips {
     using block_pos_t = std::list<pBlock>::const_iterator;
 
     template<typename T>
-    inline std::unique_ptr<T> make_copy(const std::unique_ptr<T> &ptr) {
+    std::unique_ptr<T> make_copy(const std::unique_ptr<T> &ptr) {
         if (ptr == nullptr) return nullptr;
         return ptr->clone();
     }

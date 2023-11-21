@@ -14,13 +14,13 @@ namespace mir {
         for_each_func(clearDeadInst);
     }
 
-    void Function::clearBBInfo() {
+    void Function::clearBBInfo() const {
         for (auto bb: bbs)
             bb->clear_info();
         exitBB->clear_info();
     }
 
-    void Function::calcPreSuc() {
+    void Function::calcPreSuc() const {
         constexpr auto link = [](auto pre, auto suc) {
             pre->successors.insert(suc);
             suc->predecessors.insert(pre);
@@ -28,8 +28,8 @@ namespace mir {
 
         clearBBInfo();
         for (auto bb: bbs) {
-            auto inst = *bb->instructions.crbegin();
-            if (inst->instrTy == Instruction::RET) {
+            if (auto inst = *bb->instructions.crbegin();
+                inst->instrTy == Instruction::RET) {
                 link(bb, exitBB.get());
             } else if (auto br = dynamic_cast<Instruction::br *>(inst)) {
                 if (br->hasCondition()) {

@@ -6,7 +6,7 @@
 #include "../mips.h"
 
 namespace mips {
-    void Register::swapDefTo(mips::rRegister other, mips::rSubBlock block) {
+    void Register::swapDefTo(rRegister other, rSubBlock block) {
         std::unordered_set<rInstruction> temp{};
         for (auto inst: defUsers) {
             if (block && inst->parent != block) continue;
@@ -17,7 +17,7 @@ namespace mips {
         std::for_each(temp.begin(), temp.end(), [this](auto &&x) { defUsers.erase(x); });
     }
 
-    void Register::swapUseTo(mips::rRegister other, mips::rSubBlock block) {
+    void Register::swapUseTo(rRegister other, rSubBlock block) {
         std::unordered_set<rInstruction> temp{};
         for (auto inst: useUsers) {
             if (block && inst->parent != block) continue;
@@ -28,7 +28,7 @@ namespace mips {
         std::for_each(temp.begin(), temp.end(), [this](auto &&x) { useUsers.erase(x); });
     }
 
-    void Register::swapDefIn(mips::rRegister other, mips::rInstruction inst) {
+    void Register::swapDefIn(rRegister other, rInstruction inst) {
         if (defUsers.count(inst) == 0) return;
         for (auto &r: inst->regDef)
             if (r == this) r = other;
@@ -36,7 +36,7 @@ namespace mips {
         other->defUsers.insert(inst);
     }
 
-    void Register::swapUseIn(mips::rRegister other, mips::rInstruction inst) {
+    void Register::swapUseIn(rRegister other, rInstruction inst) {
         if (useUsers.count(inst) == 0) return;
         for (auto &r: inst->regUse)
             if (r == this) r = other;
@@ -67,8 +67,8 @@ namespace mips {
         for (auto &sub: subBlocks) {
             auto lbl = sub->back()->getJumpLabel();
             if (lbl == nullptr) continue;
-            if (std::holds_alternative<mips::rBlock>(lbl->parent)) {
-                auto suc = std::get<mips::rBlock>(lbl->parent);
+            if (std::holds_alternative<rBlock>(lbl->parent)) {
+                auto suc = std::get<rBlock>(lbl->parent);
                 link(sub.get(), suc->frontBlock());
             }
             if (lst) link(lst, sub.get());

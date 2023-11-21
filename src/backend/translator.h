@@ -21,7 +21,7 @@ namespace backend {
         mips::rFunction curFunc = nullptr;
         mips::rBlock curBlock = nullptr;
 
-        inline void put(mir::Value *value, mips::rOperand operand) {
+        void put(mir::Value *value, mips::rOperand operand) {
             if (oMap.count(value)) {
                 auto old = dynamic_cast<mips::rRegister>(oMap[value]);
                 auto reg = dynamic_cast<mips::rRegister>(operand);
@@ -39,7 +39,7 @@ namespace backend {
         template<mir::Instruction::InstrTy ty>
         mips::rRegister translateBinaryInstHelper(mips::rRegister lhs, mir::Value *rhs);
 
-        mips::rRegister addressCompute(mips::rAddress addr);
+        mips::rRegister addressCompute(mips::rAddress addr) const;
 
         void translateRetInst(mir::Instruction::ret *retInst);
 
@@ -75,11 +75,11 @@ namespace backend {
 
         mips::rOperand translateOperand(mir::Value *mirValue);
 
-        inline mips::rRegister getRegister(mir::Value *mirValue) {
+        mips::rRegister getRegister(mir::Value *mirValue) {
             return dynamic_cast<mips::rRegister>(translateOperand(mirValue));
         }
 
-        inline mips::rAddress getAddress(mir::Value *mirValue) {
+        mips::rAddress getAddress(mir::Value *mirValue) {
             auto ptr = translateOperand(mirValue);
             if (auto addr = dynamic_cast<mips::rAddress>(ptr))
                 return addr;
@@ -90,13 +90,13 @@ namespace backend {
             return nullptr;
         }
 
-        inline void translateFunctions() {
+        void translateFunctions() {
             for (auto func: mirManager->functions) {
                 translateFunction(func);
             }
         }
 
-        inline void translateGlobalVars() {
+        void translateGlobalVars() {
             for (auto var: mirManager->globalVars) {
                 translateGlobalVar(var);
             }
@@ -104,16 +104,17 @@ namespace backend {
 
         void compute_phi(mir::Function *mirFunction);
 
-        void compute_func_start();
+        void compute_func_start() const;
 
-        void compute_func_exit();
+        void compute_func_exit() const;
 
-        void optimize();
+        void optimize() const;
+
     public:
         explicit Translator(mir::Manager *mirManager, mips::rModule mipsModule, int optimizeLevel = 2)
-                : optimizeLevel(optimizeLevel), mirManager(mirManager), mipsModule(mipsModule) {}
+            : optimizeLevel(optimizeLevel), mirManager(mirManager), mipsModule(mipsModule) {}
 
-        inline void translate() {
+        void translate() {
             translateGlobalVars();
             translateFunctions();
         }

@@ -5,15 +5,15 @@
 #include "instruction.h"
 
 namespace mir {
-    static inline std::vector<Value *>
+    static std::vector<Value *>
     merge(Value *ptr, std::vector<Value *>::const_iterator cbegin, std::vector<Value *>::const_iterator cend) {
-        std::vector<Value *> args = {ptr};
+        std::vector args = {ptr};
         args.insert(args.end(), cbegin, cend);
         return args;
     }
 
     template<typename T1, typename T2>
-    static inline std::vector<Value *> flatten(const std::vector<std::pair<T1, T2>> &vec) {
+    static std::vector<Value *> flatten(const std::vector<std::pair<T1, T2>> &vec) {
         std::vector<Value *> ret;
         for (auto &&[x, y]: vec)
             ret.push_back(x), ret.push_back(y);
@@ -21,20 +21,20 @@ namespace mir {
     }
 
     std::ostream &Instruction::ret::output(std::ostream &os) const {
-        if (auto value = getReturnValue()) {
+        if (auto value = getReturnValue())
             return os << "ret " << value;
-        } else {
-            return os << "ret void";
-        }
+
+        return os << "ret void";
     }
 
     std::ostream &Instruction::br::output(std::ostream &os) const {
         if (hasCondition()) {
             assert(getCondition()->getType() == (pType) Type::getI1Type());
-            return os << "br " << getCondition() << ", label " << getIfTrue()->getName() << ", label " << getIfFalse()->getName();
-        } else {
-            return os << "br label " << getTarget()->getName();
+            return os << "br " << getCondition()
+                   << ", label " << getIfTrue()->getName()
+                   << ", label " << getIfFalse()->getName();
         }
+        return os << "br label " << getTarget()->getName();
     }
 
     std::ostream &Instruction::alloca_::output(std::ostream &os) const {
@@ -50,11 +50,11 @@ namespace mir {
     }
 
     Instruction::getelementptr::getelementptr(pType type, Value *ptr, const std::vector<Value *> &idxs)
-            : Instruction(type, GETELEMENTPTR, merge(ptr, idxs.begin() + ptr->getType()->isPointerTy(), idxs.end())) {}
+        : Instruction(type, GETELEMENTPTR, merge(ptr, idxs.begin() + ptr->getType()->isPointerTy(), idxs.end())) {}
 
     std::ostream &Instruction::getelementptr::output(std::ostream &os) const {
         os << getName() << " = getelementptr " << getIndexTy()
-           << ", ptr " << getPointerOperand()->getName();
+                << ", ptr " << getPointerOperand()->getName();
         for (int i = 0; i < getNumIndices(); i++) {
             os << ", " << getIndexOperand(i);
         }
@@ -66,7 +66,7 @@ namespace mir {
     }
 
     Instruction::phi::phi(const std::vector<incominng_pair> &values)
-            : Instruction(values[0].first->getType(), PHI, flatten(values)) {}
+        : Instruction(values[0].first->getType(), PHI, flatten(values)) {}
 
     std::ostream &Instruction::phi::output(std::ostream &os) const {
         os << getName() << " = phi " << getType() << " ";
@@ -79,7 +79,7 @@ namespace mir {
     }
 
     Instruction::call::call(Function *func, const std::vector<Value *> &args)
-            : Instruction(func->getType()->getFunctionRet(), CALL, merge(func, args.begin(), args.end())) {}
+        : Instruction(func->getType()->getFunctionRet(), CALL, merge(func, args.begin(), args.end())) {}
 
     std::ostream &Instruction::call::output(std::ostream &os) const {
         if (getFunction()->retType != Type::getVoidType())

@@ -6,7 +6,6 @@
 #define COMPILER_MIR_TYPE_H
 
 #include <vector>
-#include <ostream>
 #include "../dbg.h"
 
 namespace mir {

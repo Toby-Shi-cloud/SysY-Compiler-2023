@@ -15,6 +15,7 @@ namespace frontend {
         enum type_t {
             INFO, WARNING, ERROR
         } type;
+
         int code;
         size_t line;
         size_t column;

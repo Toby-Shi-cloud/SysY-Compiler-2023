@@ -10,7 +10,6 @@
 #include <unordered_map>
 #include "message.h"
 #include "grammar.h"
-#include "message.h"
 #include "../mir.h"
 
 namespace frontend::visitor {
@@ -33,11 +32,11 @@ namespace frontend::visitor {
     public:
         explicit SymbolTable() { stack.emplace_back(); }
 
-        inline void enter_cache_block() { _cached ? (0) : (_cached = true, stack.emplace_back(), 0); }
+        void enter_cache_block() { _cached ? 0 : (_cached = true, stack.emplace_back(), 0); }
 
-        inline void enter_block() { _cached ? (_cached = false, 0) : (stack.emplace_back(), 0); }
+        void enter_block() { _cached ? (_cached = false, 0) : (stack.emplace_back(), 0); }
 
-        inline void exit_block() { stack.pop_back(); }
+        void exit_block() { stack.pop_back(); }
 
         /**
          * @brief Insert a new symbol into the current block.
@@ -46,7 +45,7 @@ namespace frontend::visitor {
          * @param token the token where the symbol is defined.
          * @return a message if the symbol already exists, or nullopt if the symbol is inserted successfully.
          */
-        std::optional<message> insert(std::string_view name, store_type_t value, const Token &token);
+        std::optional<message> insert(std::string_view name, const store_type_t &value, const Token &token);
 
         /**
          * @brief Lookup a symbol in the current block.
@@ -151,12 +150,12 @@ namespace frontend::visitor {
         /**
          * A helper method to convert a list of values to bbs, and add to current function.
          */
-        void listToBB(value_list &list, const Token &end_token);
+        void listToBB(value_list &list, const Token &end_token) const;
 
         /**
          * A helper method to convert a value to I1.
          */
-        value_type truncToI1(value_type value, value_list &list);
+        value_type truncToI1(value_type value, value_list &list) const;
     };
 }
 
