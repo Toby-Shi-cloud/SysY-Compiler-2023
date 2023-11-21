@@ -13,15 +13,15 @@ namespace backend {
         int optimizeLevel;
         mir::Manager *mirManager;
         mips::rModule mipsModule;
-        std::unordered_map<mir::Function *, mips::rFunction> fMap;
-        std::unordered_map<mir::BasicBlock *, mips::rBlock> bMap;
-        std::unordered_map<mir::GlobalVar *, mips::rGlobalVar> gMap;
-        std::unordered_map<mir::Value *, mips::rOperand> oMap;
-        std::unordered_map<mips::rOperand, mir::Value *> rMap;
+        std::unordered_map<const mir::Function *, mips::rFunction> fMap;
+        std::unordered_map<const mir::BasicBlock *, mips::rBlock> bMap;
+        std::unordered_map<const mir::GlobalVar *, mips::rGlobalVar> gMap;
+        std::unordered_map<const mir::Value *, mips::rOperand> oMap;
+        std::unordered_map<mips::rOperand, const mir::Value *> rMap;
         mips::rFunction curFunc = nullptr;
         mips::rBlock curBlock = nullptr;
 
-        void put(mir::Value *value, mips::rOperand operand) {
+        void put(const mir::Value *value, mips::rOperand operand) {
             if (oMap.count(value)) {
                 auto old = dynamic_cast<mips::rRegister>(oMap[value]);
                 auto reg = dynamic_cast<mips::rRegister>(operand);
@@ -41,45 +41,45 @@ namespace backend {
 
         mips::rRegister addressCompute(mips::rAddress addr) const;
 
-        void translateRetInst(mir::Instruction::ret *retInst);
+        void translateRetInst(const mir::Instruction::ret *retInst);
 
-        void translateBranchInst(mir::Instruction::br *brInst);
-
-        template<mir::Instruction::InstrTy ty>
-        void translateBinaryInst(mir::Instruction::_binary_instruction<ty> *binInst);
-
-        void translateAllocaInst(mir::Instruction::alloca_ *allocaInst);
-
-        void translateLoadInst(mir::Instruction::load *loadInst);
-
-        void translateStoreInst(mir::Instruction::store *storeInst);
-
-        void translateGetPtrInst(mir::Instruction::getelementptr *getPtrInst);
+        void translateBranchInst(const mir::Instruction::br *brInst);
 
         template<mir::Instruction::InstrTy ty>
-        void translateConversionInst(mir::Instruction::_conversion_instruction<ty> *convInst);
+        void translateBinaryInst(const mir::Instruction::_binary_instruction<ty> *binInst);
 
-        void translateIcmpInst(mir::Instruction::icmp *icmpInst);
+        void translateAllocaInst(const mir::Instruction::alloca_ *allocaInst);
 
-        void translatePhiInst(mir::Instruction::phi *phiInst);
+        void translateLoadInst(const mir::Instruction::load *loadInst);
 
-        void translateCallInst(mir::Instruction::call *callInst);
+        void translateStoreInst(const mir::Instruction::store *storeInst);
 
-        void translateFunction(mir::Function *mirFunction);
+        void translateGetPtrInst(const mir::Instruction::getelementptr *getPtrInst);
 
-        void translateBasicBlock(mir::BasicBlock *mirBlock);
+        template<mir::Instruction::InstrTy ty>
+        void translateConversionInst(const mir::Instruction::_conversion_instruction<ty> *convInst);
 
-        void translateInstruction(mir::Instruction *mirInst);
+        void translateIcmpInst(const mir::Instruction::icmp *icmpInst);
 
-        void translateGlobalVar(mir::GlobalVar *mirVar);
+        void translatePhiInst(const mir::Instruction::phi *phiInst);
 
-        mips::rOperand translateOperand(mir::Value *mirValue);
+        void translateCallInst(const mir::Instruction::call *callInst);
 
-        mips::rRegister getRegister(mir::Value *mirValue) {
+        void translateFunction(const mir::Function *mirFunction);
+
+        void translateBasicBlock(const mir::BasicBlock *mirBlock);
+
+        void translateInstruction(const mir::Instruction *mirInst);
+
+        void translateGlobalVar(const mir::GlobalVar *mirVar);
+
+        mips::rOperand translateOperand(const mir::Value *mirValue);
+
+        mips::rRegister getRegister(const mir::Value *mirValue) {
             return dynamic_cast<mips::rRegister>(translateOperand(mirValue));
         }
 
-        mips::rAddress getAddress(mir::Value *mirValue) {
+        mips::rAddress getAddress(const mir::Value *mirValue) {
             auto ptr = translateOperand(mirValue);
             if (auto addr = dynamic_cast<mips::rAddress>(ptr))
                 return addr;
@@ -102,7 +102,7 @@ namespace backend {
             }
         }
 
-        void compute_phi(mir::Function *mirFunction);
+        void compute_phi(const mir::Function *mirFunction);
 
         void compute_func_start() const;
 

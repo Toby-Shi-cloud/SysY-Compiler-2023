@@ -9,14 +9,12 @@
 
 namespace backend {
     static void flatten(mir::Literal *literal, std::vector<int> &result) {
-        if (auto v = dynamic_cast<mir::IntegerLiteral *>(literal)) {
+        if (auto v = dynamic_cast<mir::IntegerLiteral *>(literal))
             return result.push_back(v->value);
-        }
         auto arr = dynamic_cast<mir::ArrayLiteral *>(literal);
         assert(arr);
-        for (auto ele: arr->values) {
+        for (auto ele: arr->values)
             flatten(ele, result);
-        }
     }
 
     static std::vector<int> flatten(mir::Literal *literal) {
@@ -64,10 +62,8 @@ namespace backend {
             {mips::Instruction::Ty::OR, mips::Instruction::Ty::ORI},
             {mips::Instruction::Ty::XOR, mips::Instruction::Ty::XORI},
         };
-        constexpr auto mipsTy = mipsTys[ty - mir::Instruction::InstrTy::ADD];
-        constexpr auto mipsTyR = mipsTy.first;
-        constexpr auto mipsTyI = mipsTy.second;
-        return createBinaryInstHelper<mipsTyR, mipsTyI>(lhs, rhs);
+        constexpr auto index = ty - mir::Instruction::InstrTy::ADD;
+        return createBinaryInstHelper<mipsTys[index].first, mipsTys[index].second>(lhs, rhs);
     }
 
     mips::rRegister Translator::addressCompute(mips::rAddress addr) const {
@@ -88,7 +84,7 @@ namespace backend {
         return dst;
     }
 
-    void Translator::translateRetInst(mir::Instruction::ret *retInst) {
+    void Translator::translateRetInst(const mir::Instruction::ret *retInst) {
         if (auto v = retInst->getReturnValue()) {
             if (auto imm = dynamic_cast<mir::IntegerLiteral *>(v))
                 // li $v0, v
@@ -105,7 +101,7 @@ namespace backend {
             mips::Instruction::Ty::J, curFunc->exitB->label.get()));
     }
 
-    void Translator::translateBranchInst(mir::Instruction::br *brInst) {
+    void Translator::translateBranchInst(const mir::Instruction::br *brInst) {
         if (!brInst->hasCondition()) {
             curBlock->push_back(std::make_unique<mips::JumpInst>(
                 mips::Instruction::Ty::J, bMap[brInst->getTarget()]->label.get()));
@@ -137,14 +133,14 @@ namespace backend {
     }
 
     template<mir::Instruction::InstrTy ty>
-    void Translator::translateBinaryInst(mir::Instruction::_binary_instruction<ty> *binInst) {
+    void Translator::translateBinaryInst(const mir::Instruction::_binary_instruction<ty> *binInst) {
         auto lhs = getRegister(binInst->getLhs());
         assert(lhs);
         auto reg = translateBinaryInstHelper<ty>(lhs, binInst->getRhs());
         put(binInst, reg);
     }
 
-    void Translator::translateAllocaInst(mir::Instruction::alloca_ *allocaInst) {
+    void Translator::translateAllocaInst(const mir::Instruction::alloca_ *allocaInst) {
         auto alloca_size = allocaInst->getType()->size();
         assert(alloca_size % 4 == 0);
         curFunc->allocaSize += alloca_size;
@@ -152,7 +148,7 @@ namespace backend {
         put(allocaInst, addr);
     }
 
-    void Translator::translateLoadInst(mir::Instruction::load *loadInst) {
+    void Translator::translateLoadInst(const mir::Instruction::load *loadInst) {
         auto dst = curFunc->newVirRegister();
         put(loadInst, dst);
         auto ptr = translateOperand(loadInst->getPointerOperand());
@@ -170,7 +166,7 @@ namespace backend {
         }
     }
 
-    void Translator::translateStoreInst(mir::Instruction::store *storeInst) {
+    void Translator::translateStoreInst(const mir::Instruction::store *storeInst) {
         auto src = getRegister(storeInst->getSrc());
         auto dst = translateOperand(storeInst->getDest());
         if (auto label = dynamic_cast<mips::rLabel>(dst)) {
@@ -187,13 +183,13 @@ namespace backend {
         }
     }
 
-    void Translator::translateGetPtrInst(mir::Instruction::getelementptr *getPtrInst) {
+    void Translator::translateGetPtrInst(const mir::Instruction::getelementptr *getPtrInst) {
         auto deduce_type = getPtrInst->getIndexTy();
         auto addr = getAddress(getPtrInst->getPointerOperand());
         for (int i = 0; i < getPtrInst->getNumIndices(); i++) {
             if (i != 0) deduce_type = deduce_type->getBase();
             auto value = getPtrInst->getIndexOperand(i);
-            int deduce_size = deduce_type->size();
+            int deduce_size = static_cast<int>(deduce_type->size());
             if (auto imm = dynamic_cast<mir::IntegerLiteral *>(value)) {
                 addr = curFunc->newAddress(addr->base, addr->offset + imm->value * deduce_size, addr->label);
             } else {
@@ -211,14 +207,14 @@ namespace backend {
     }
 
     template<mir::Instruction::InstrTy ty>
-    void Translator::translateConversionInst(mir::Instruction::_conversion_instruction<ty> *convInst) {
+    void Translator::translateConversionInst(const mir::Instruction::_conversion_instruction<ty> *convInst) {
         assert(ty == mir::Instruction::ZEXT);
         auto icmp = dynamic_cast<mir::Instruction::icmp *>(convInst->getValueOperand());
         assert(icmp);
         put(convInst, oMap[icmp]);
     }
 
-    void Translator::translateIcmpInst(mir::Instruction::icmp *icmpInst) {
+    void Translator::translateIcmpInst(const mir::Instruction::icmp *icmpInst) {
         auto lhs = icmpInst->getLhs();
         auto rhs = icmpInst->getRhs();
         mips::rRegister reg;
@@ -277,14 +273,14 @@ namespace backend {
         put(icmpInst, reg);
     }
 
-    void Translator::translatePhiInst(mir::Instruction::phi *phiInst) {
+    void Translator::translatePhiInst(const mir::Instruction::phi *phiInst) {
         // Put a new virtual register to indicate the phi instruction,
         // and we will translate it later.
         if (oMap.count(phiInst)) return;
         put(phiInst, curFunc->newVirRegister());
     }
 
-    void Translator::translateCallInst(mir::Instruction::call *callInst) {
+    void Translator::translateCallInst(const mir::Instruction::call *callInst) {
         if (auto func = callInst->getFunction();
             func == mir::Function::getint) {
             auto dst = curFunc->newVirRegister();
@@ -320,7 +316,7 @@ namespace backend {
                 mips::SyscallInst::SyscallId::PrintString));
         } else {
             auto callee = fMap[func];
-            unsigned stack_arg_cnt = std::max(0, (int)callInst->getNumArgs() - 4);
+            unsigned stack_arg_cnt = std::max(0, static_cast<int>(callInst->getNumArgs()) - 4);
             curFunc->argSize = std::max(curFunc->argSize, stack_arg_cnt * 4);
             for (int i = 0; i < callInst->getNumArgs(); i++) {
                 auto reg = getRegister(callInst->getArg(i));
@@ -345,7 +341,7 @@ namespace backend {
         }
     }
 
-    void Translator::translateFunction(mir::Function *mirFunction) {
+    void Translator::translateFunction(const mir::Function *mirFunction) {
         const bool isMain = mirFunction->isMain();
         const bool isLeaf = mirFunction->isLeaf();
         std::string name = mirFunction->getName().substr(1);
@@ -401,68 +397,68 @@ namespace backend {
         curFunc->allocName();
     }
 
-    void Translator::translateBasicBlock(mir::BasicBlock *mirBlock) {
+    void Translator::translateBasicBlock(const mir::BasicBlock *mirBlock) {
         curBlock = bMap[mirBlock];
         for (auto inst: mirBlock->instructions)
             translateInstruction(inst);
     }
 
-    void Translator::translateInstruction(mir::Instruction *mirInst) {
+    void Translator::translateInstruction(const mir::Instruction *mirInst) {
         switch (mirInst->instrTy) {
             case mir::Instruction::RET:
-                return translateRetInst(dynamic_cast<mir::Instruction::ret *>(mirInst));
+                return translateRetInst(dynamic_cast<const mir::Instruction::ret *>(mirInst));
             case mir::Instruction::BR:
-                return translateBranchInst(dynamic_cast<mir::Instruction::br *>(mirInst));
+                return translateBranchInst(dynamic_cast<const mir::Instruction::br *>(mirInst));
             case mir::Instruction::ADD:
-                return translateBinaryInst(dynamic_cast<mir::Instruction::add *>(mirInst));
+                return translateBinaryInst(dynamic_cast<const mir::Instruction::add *>(mirInst));
             case mir::Instruction::SUB:
-                return translateBinaryInst(dynamic_cast<mir::Instruction::sub *>(mirInst));
+                return translateBinaryInst(dynamic_cast<const mir::Instruction::sub *>(mirInst));
             case mir::Instruction::MUL:
-                return translateBinaryInst(dynamic_cast<mir::Instruction::mul *>(mirInst));
+                return translateBinaryInst(dynamic_cast<const mir::Instruction::mul *>(mirInst));
             case mir::Instruction::UDIV:
-                return translateBinaryInst(dynamic_cast<mir::Instruction::udiv *>(mirInst));
+                return translateBinaryInst(dynamic_cast<const mir::Instruction::udiv *>(mirInst));
             case mir::Instruction::SDIV:
-                return translateBinaryInst(dynamic_cast<mir::Instruction::sdiv *>(mirInst));
+                return translateBinaryInst(dynamic_cast<const mir::Instruction::sdiv *>(mirInst));
             case mir::Instruction::UREM:
-                return translateBinaryInst(dynamic_cast<mir::Instruction::urem *>(mirInst));
+                return translateBinaryInst(dynamic_cast<const mir::Instruction::urem *>(mirInst));
             case mir::Instruction::SREM:
-                return translateBinaryInst(dynamic_cast<mir::Instruction::srem *>(mirInst));
+                return translateBinaryInst(dynamic_cast<const mir::Instruction::srem *>(mirInst));
             case mir::Instruction::SHL:
-                return translateBinaryInst(dynamic_cast<mir::Instruction::shl *>(mirInst));
+                return translateBinaryInst(dynamic_cast<const mir::Instruction::shl *>(mirInst));
             case mir::Instruction::LSHR:
-                return translateBinaryInst(dynamic_cast<mir::Instruction::lshr *>(mirInst));
+                return translateBinaryInst(dynamic_cast<const mir::Instruction::lshr *>(mirInst));
             case mir::Instruction::ASHR:
-                return translateBinaryInst(dynamic_cast<mir::Instruction::ashr *>(mirInst));
+                return translateBinaryInst(dynamic_cast<const mir::Instruction::ashr *>(mirInst));
             case mir::Instruction::AND:
-                return translateBinaryInst(dynamic_cast<mir::Instruction::and_ *>(mirInst));
+                return translateBinaryInst(dynamic_cast<const mir::Instruction::and_ *>(mirInst));
             case mir::Instruction::OR:
-                return translateBinaryInst(dynamic_cast<mir::Instruction::or_ *>(mirInst));
+                return translateBinaryInst(dynamic_cast<const mir::Instruction::or_ *>(mirInst));
             case mir::Instruction::XOR:
-                return translateBinaryInst(dynamic_cast<mir::Instruction::xor_ *>(mirInst));
+                return translateBinaryInst(dynamic_cast<const mir::Instruction::xor_ *>(mirInst));
             case mir::Instruction::ALLOCA:
-                return translateAllocaInst(dynamic_cast<mir::Instruction::alloca_ *>(mirInst));
+                return translateAllocaInst(dynamic_cast<const mir::Instruction::alloca_ *>(mirInst));
             case mir::Instruction::LOAD:
-                return translateLoadInst(dynamic_cast<mir::Instruction::load *>(mirInst));
+                return translateLoadInst(dynamic_cast<const mir::Instruction::load *>(mirInst));
             case mir::Instruction::STORE:
-                return translateStoreInst(dynamic_cast<mir::Instruction::store *>(mirInst));
+                return translateStoreInst(dynamic_cast<const mir::Instruction::store *>(mirInst));
             case mir::Instruction::GETELEMENTPTR:
-                return translateGetPtrInst(dynamic_cast<mir::Instruction::getelementptr *>(mirInst));
+                return translateGetPtrInst(dynamic_cast<const mir::Instruction::getelementptr *>(mirInst));
             case mir::Instruction::TRUNC:
-                return translateConversionInst(dynamic_cast<mir::Instruction::trunc *>(mirInst));
+                return translateConversionInst(dynamic_cast<const mir::Instruction::trunc *>(mirInst));
             case mir::Instruction::ZEXT:
-                return translateConversionInst(dynamic_cast<mir::Instruction::zext *>(mirInst));
+                return translateConversionInst(dynamic_cast<const mir::Instruction::zext *>(mirInst));
             case mir::Instruction::SEXT:
-                return translateConversionInst(dynamic_cast<mir::Instruction::sext *>(mirInst));
+                return translateConversionInst(dynamic_cast<const mir::Instruction::sext *>(mirInst));
             case mir::Instruction::ICMP:
-                return translateIcmpInst(dynamic_cast<mir::Instruction::icmp *>(mirInst));
+                return translateIcmpInst(dynamic_cast<const mir::Instruction::icmp *>(mirInst));
             case mir::Instruction::PHI:
-                return translatePhiInst(dynamic_cast<mir::Instruction::phi *>(mirInst));
+                return translatePhiInst(dynamic_cast<const mir::Instruction::phi *>(mirInst));
             case mir::Instruction::CALL:
-                return translateCallInst(dynamic_cast<mir::Instruction::call *>(mirInst));
+                return translateCallInst(dynamic_cast<const mir::Instruction::call *>(mirInst));
         }
     }
 
-    void Translator::translateGlobalVar(mir::GlobalVar *mirVar) {
+    void Translator::translateGlobalVar(const mir::GlobalVar *mirVar) {
         mips::rGlobalVar result;
         std::string name;
         if (mirVar->unnamed) name = mirVar->getName(), name[0] = '$';
@@ -470,24 +466,25 @@ namespace backend {
         if (mirVar->init == nullptr)
             result = new mips::GlobalVar{
                 std::move(name), false, false, false,
-                (unsigned)mirVar->getType()->size(), {}
+                static_cast<unsigned>(mirVar->getType()->size()), {}
             };
         else if (auto str = dynamic_cast<mir::StringLiteral *>(mirVar->init))
             result = new mips::GlobalVar{
                 std::move(name), true, true, true,
-                (unsigned)mirVar->getType()->size(), str->value
+                static_cast<unsigned>(mirVar->getType()->size()), str->value
             };
         else
             result = new mips::GlobalVar{
                 std::move(name), true, false, false,
-                (unsigned)mirVar->getType()->size(), flatten(mirVar->init)
+                static_cast<unsigned>(mirVar->getType()->size()), flatten(mirVar->init)
             };
         gMap[mirVar] = result;
         mipsModule->globalVars.emplace_back(result);
     }
 
-    mips::rOperand Translator::translateOperand(mir::Value *mirValue) {
-        if (auto imm = dynamic_cast<mir::IntegerLiteral *>(mirValue)) {
+    mips::rOperand Translator::translateOperand(const mir::Value *mirValue) {
+        if (auto imm = dynamic_cast<const mir::IntegerLiteral *>(mirValue)) {
+            if (imm->value == 0) return mips::PhyRegister::get(0);
             auto reg = curFunc->newVirRegister();
             curBlock->push_back(std::make_unique<mips::BinaryIInst>(
                 mips::Instruction::Ty::LI, reg, imm->value));
@@ -495,17 +492,17 @@ namespace backend {
         }
         if (auto op = oMap.find(mirValue); op != oMap.end())
             return op->second;
-        if (auto gv = dynamic_cast<mir::GlobalVar *>(mirValue))
+        if (auto gv = dynamic_cast<const mir::GlobalVar *>(mirValue))
             return gMap[gv]->label.get();
-        if (auto bb = dynamic_cast<mir::BasicBlock *>(mirValue))
+        if (auto bb = dynamic_cast<const mir::BasicBlock *>(mirValue))
             return bMap[bb]->label.get();
-        if (auto func = dynamic_cast<mir::Function *>(mirValue))
+        if (auto func = dynamic_cast<const mir::Function *>(mirValue))
             return fMap[func]->label.get();
         put(mirValue, curFunc->newVirRegister());
         return oMap[mirValue];
     }
 
-    void Translator::compute_phi(mir::Function *mirFunction) {
+    void Translator::compute_phi(const mir::Function *mirFunction) {
         using parallel_copy_t = std::vector<std::pair<mips::rRegister, std::variant<mips::rRegister, int>>>;
         const auto phi2move = [this](const parallel_copy_t &pc) {
             using move_t = mips::MoveInst;
