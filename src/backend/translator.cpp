@@ -3,6 +3,7 @@
 //
 
 #include <queue>
+#include <fstream>
 #include "reg_alloca.h"
 #include "translator.h"
 #include "backend_opt.h"
@@ -385,16 +386,17 @@ namespace backend {
         assert(curFunc->argSize % 4 == 0);
 
         // reformat blocks & alloca registers
+#ifdef DBG_ENABLE
         curFunc->allocName();
+#endif
         optimize();
+        log(curFunc);
         register_alloca(curFunc);
 
         // save registers before function & restore registers
         if (isMain) curFunc->shouldSave.clear(); // save nothing
         compute_func_start();
         compute_func_exit();
-
-        curFunc->allocName();
     }
 
     void Translator::translateBasicBlock(const mir::BasicBlock *mirBlock) {
@@ -633,5 +635,12 @@ namespace backend {
         if (optimizeLevel == 0) return;
         clearDeadCode(curFunc);
         relocateBlock(curFunc);
+    }
+
+    void Translator::log(const mips::Function *func) {
+#ifdef DBG_ENABLE
+        static std::ofstream out("log.txt");
+        out << *func << std::endl;
+#endif
     }
 }

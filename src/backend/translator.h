@@ -110,6 +110,8 @@ namespace backend {
 
         void optimize() const;
 
+        static void log(const mips::Function *func);
+
     public:
         explicit Translator(mir::Manager *mirManager, mips::rModule mipsModule, int optimizeLevel = 2)
             : optimizeLevel(optimizeLevel), mirManager(mirManager), mipsModule(mipsModule) {}

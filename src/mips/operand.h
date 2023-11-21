@@ -5,9 +5,11 @@
 #ifndef COMPILER_MIPS_OPERAND_H
 #define COMPILER_MIPS_OPERAND_H
 
+#include <set>
 #include <array>
 #include <variant>
 #include <ostream>
+#include <functional>
 #include <unordered_set>
 #include <unordered_map>
 #include "alias.h"
@@ -99,12 +101,25 @@ namespace mips {
         explicit PhyRegister(unsigned id) : id(id) {}
 
     public:
-        [[nodiscard]] static rPhyRegister get(unsigned id) {
-            return registers[id].get();
+        [[nodiscard]] static rPhyRegister get(unsigned id) { return registers[id].get(); }
+
+        [[nodiscard]] static rPhyRegister get(const std::string &name) { return registers[name2id.at(name)].get(); }
+
+        [[nodiscard]] static auto get(const std::string &first, const std::string &last) {
+            std::set<rPhyRegister> regs;
+            auto begin = name2id.at(first);
+            auto end = name2id.at(last);
+            for (unsigned id = begin; id <= end; id++) regs.insert(get(id));
+            return regs;
         }
 
-        [[nodiscard]] static rPhyRegister get(const std::string &name) {
-            return registers[name2id.at(name)].get();
+        template<typename Func>
+        [[nodiscard]] static auto get(Func &&pred) -> std::set<decltype(std::invoke(pred, get(0)), get(0))> {
+            std::set<rPhyRegister> regs;
+            for (auto &&reg: registers)
+                if (std::invoke(pred, reg.get()))
+                    regs.insert(reg.get());
+            return regs;
         }
 
         [[nodiscard]] bool isUniversal() const { return id >= 8 && id <= 25; }
@@ -113,7 +128,7 @@ namespace mips {
 
         [[nodiscard]] bool isArg() const { return id >= 4 && id <= 7; }
 
-        [[nodiscard]] bool isTemp() const { return id >= 8 && id <= 9 || id >= 24 && id <= 25; }
+        [[nodiscard]] bool isTemp() const { return id >= 8 && id <= 15 || id >= 24 && id <= 25; }
 
         [[nodiscard]] bool isSaved() const { return id >= 16 && id <= 23; }
 
@@ -131,9 +146,7 @@ namespace mips {
 
         [[nodiscard]] bool isHiLo() const { return id >= 32; }
 
-        std::ostream &output(std::ostream &os) const override {
-            return os << names[id];
-        }
+        std::ostream &output(std::ostream &os) const override { return os << names[id]; }
     };
 
     inline const std::array<pPhyRegister, 34> PhyRegister::registers = [] {

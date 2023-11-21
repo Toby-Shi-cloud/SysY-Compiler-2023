@@ -24,7 +24,8 @@ namespace mips {
         } ty;
 
         std::vector<rRegister> regDef, regUse;
-        inst_node_t node{}; // the position where the inst is. node for jump/branch inst is broken and DO NOT USE!
+        std::unordered_set<rRegister> liveIn, liveOut;
+        inst_node_t node{}; // the position where the inst is.
         rSubBlock parent{};
 
         virtual ~Instruction() {
@@ -79,10 +80,10 @@ namespace mips {
         }
 
         template<typename T>
-        void for_each_use_vreg(T &&func) { for_each_vreg<false, true>(func); }
+        void for_each_use_vreg(T &&func) { for_each_vreg<false, true>(std::forward<T>(func)); }
 
         template<typename T>
-        void for_each_def_vreg(T &&func) { for_each_vreg<true, false>(func); }
+        void for_each_def_vreg(T &&func) { for_each_vreg<true, false>(std::forward<T>(func)); }
 
         template<bool visitDef = true, bool visitUse = true, typename T>
         void for_each_preg(T &&func) {
@@ -97,38 +98,28 @@ namespace mips {
         }
 
         template<typename T>
-        void for_each_use_preg(T &&func) { for_each_preg<false, true>(func); }
+        void for_each_use_preg(T &&func) { for_each_preg<false, true>(std::forward<T>(func)); }
 
         template<typename T>
-        void for_each_def_preg(T &&func) { for_each_preg<true, false>(func); }
+        void for_each_def_preg(T &&func) { for_each_preg<true, false>(std::forward<T>(func)); }
 
         [[nodiscard]] bool isFuncCall() const {
             return ty == Ty::JAL || ty == Ty::JALR || ty == Ty::BGEZAL || ty == Ty::BLTZAL;
         }
 
-        [[nodiscard]] bool isJumpBranch() const {
-            return ty >= Ty::BEQ && ty <= Ty::JALR;
-        }
+        [[nodiscard]] bool isJumpBranch() const { return ty >= Ty::BEQ && ty <= Ty::JALR; }
 
-        [[nodiscard]] bool isConditionalBranch() const {
-            return ty >= Ty::BEQ && ty <= Ty::BLTZ;
-        }
+        [[nodiscard]] bool isConditionalBranch() const { return ty >= Ty::BEQ && ty <= Ty::BLTZ; }
 
-        [[nodiscard]] bool isUnconditionalJump() const {
-            return ty >= Ty::J && ty <= Ty::JR;
-        }
+        [[nodiscard]] bool isUnconditionalJump() const { return ty >= Ty::J && ty <= Ty::JR; }
 
-        [[nodiscard]] bool isSyscall() const {
-            return ty == Ty::SYSCALL;
-        }
+        [[nodiscard]] bool isSyscall() const { return ty == Ty::SYSCALL; }
 
-        [[nodiscard]] bool isStore() const {
-            return ty >= Ty::SW && ty <= Ty::SH;
-        }
+        [[nodiscard]] bool isStore() const { return ty >= Ty::SW && ty <= Ty::SH; }
 
-        [[nodiscard]] bool isLoad() const {
-            return ty >= Ty::LA && ty <= Ty::LBU;
-        }
+        [[nodiscard]] bool isLoad() const { return ty >= Ty::LA && ty <= Ty::LBU; }
+
+        [[nodiscard]] rInstruction next() const;
 
         [[nodiscard]] virtual rLabel getJumpLabel() const { return nullptr; }
 
@@ -138,9 +129,7 @@ namespace mips {
             return os << magic_enum::enum_to_string_lower(t);
         }
 
-        virtual std::ostream &output(std::ostream &os) const {
-            return os << ty;
-        }
+        virtual std::ostream &output(std::ostream &os) const { return os << ty; }
 
         [[nodiscard]] virtual pInstruction clone() const = 0;
     };

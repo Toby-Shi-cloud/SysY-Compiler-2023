@@ -536,7 +536,7 @@ namespace frontend::visitor {
         auto [value, l] = visit(*node.children[2]);
         list.splice(list.end(), l);
         if (variable->isConst()) {
-            auto &[_, __, line, column] = node.children[0]->children[0]->getToken();
+            auto &[ty, raw, line, column] = node.children[0]->children[0]->getToken();
             message_queue.push_back(message{
                 message::ERROR, 'h', line, column,
                 "cannot assign to const variable"
@@ -552,7 +552,7 @@ namespace frontend::visitor {
     SysYVisitor::return_type SysYVisitor::visit<BreakStmt>(const GrammarNode &node) {
         // BREAKTK SEMICN
         if (loop_stack.empty()) {
-            auto &[_, __, line, column] = node.children[0]->getToken();
+            auto &[ty, raw, line, column] = node.children[0]->getToken();
             message_queue.push_back(message{
                 message::ERROR, 'm', line, column,
                 "break statement not within a loop"
@@ -566,7 +566,7 @@ namespace frontend::visitor {
     SysYVisitor::return_type SysYVisitor::visit<ContinueStmt>(const GrammarNode &node) {
         // CONTINUETK SEMICN
         if (loop_stack.empty()) {
-            auto &[_, __, line, column] = node.children[0]->getToken();
+            auto &[ty, raw, line, column] = node.children[0]->getToken();
             message_queue.push_back(message{
                 message::ERROR, 'm', line, column,
                 "continue statement not within a loop"
@@ -579,7 +579,7 @@ namespace frontend::visitor {
     template<>
     SysYVisitor::return_type SysYVisitor::visit<ReturnStmt>(const GrammarNode &node) {
         // RETURNTK exp? SEMICN
-        auto &[_, __, line, column] = node.children[0]->getToken();
+        auto &[ty, raw, line, column] = node.children[0]->getToken();
         if (current_function->retType == mir::Type::getVoidType() && node.children.size() == 3) {
             message_queue.push_back(message{
                 message::ERROR, 'f', line, column,
@@ -607,7 +607,7 @@ namespace frontend::visitor {
         auto call = new Instruction::call(mir::Function::getint, {});
         list.push_back(call);
         if (variable->isConst()) {
-            auto &[_, __, line, column] = node.children[0]->getToken();
+            auto &[ty, raw, line, column] = node.children[0]->getToken();
             message_queue.push_back(message{
                 message::ERROR, 'h', line, column,
                 "cannot assign to const variable"
@@ -636,7 +636,7 @@ namespace frontend::visitor {
                     " arguments for format " + std::string(strcon.raw) +
                     ", expected " + std::to_string(count_format) +
                     " but " + std::to_string(count_params) + " given";
-            auto &[_, __, line, column] = node.children[0]->getToken();
+            auto &[ty, raw, line, column] = node.children[0]->getToken();
             message_queue.push_back(message{message::ERROR, 'l', line, column, msg});
             return {};
         }

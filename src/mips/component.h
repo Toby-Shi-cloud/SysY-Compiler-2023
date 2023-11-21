@@ -19,9 +19,9 @@ namespace mips {
      * at the end of every sub-block. Unconditional jump to other block or
      * function return jump is only allowed and must existed when then
      * sub-block is the last sub-block of all blocks. <br>
-     * SubBlocks will be linked together by Blocks. One sub-block may be
-     * linked by multiply blocks. SubBlocks can also be cloned to support
-     * (trade-off between code size and efficiency). <br>
+     * SubBlocks will be linked together by Blocks. One sub-block can only
+     * be linked by one block. SubBlocks can also be cloned to support
+     * multiply blocks (trade-off between code size and efficiency). <br>
      */
     struct SubBlock {
         std::list<pInstruction> instructions;
@@ -85,10 +85,10 @@ namespace mips {
     struct Block {
         rFunction parent;
         block_node_t node{};
-        std::list<sSubBlock> subBlocks;
+        std::list<pSubBlock> subBlocks;
         pLabel label{new Label("<unnamed block>", this)};
 
-        explicit Block(rFunction parent) : parent(parent), subBlocks{std::make_shared<SubBlock>()} {}
+        explicit Block(rFunction parent) : parent(parent), subBlocks{} { subBlocks.emplace_back(new SubBlock()); }
 
         [[nodiscard]] bool empty() const { return subBlocks.size() == 1 && frontBlock()->empty(); }
 
@@ -202,6 +202,7 @@ namespace mips {
     }
 
     inline std::ostream &operator<<(std::ostream &os, const Function &func) {
+        func.allocName();
         os << func.label << ":" << "\n";
         for (auto &block: func)
             os << *block;
@@ -278,13 +279,6 @@ namespace dbg {
     template<>
     [[maybe_unused]]
     inline bool pretty_print(std::ostream &stream, const mips::rSubBlock &value) {
-        if (value == nullptr) return pretty_print(stream, nullptr);
-        return pretty_print(stream, value->instructions);
-    }
-
-    template<>
-    [[maybe_unused]]
-    inline bool pretty_print(std::ostream &stream, const mips::sSubBlock &value) {
         if (value == nullptr) return pretty_print(stream, nullptr);
         return pretty_print(stream, value->instructions);
     }

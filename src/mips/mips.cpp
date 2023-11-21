@@ -75,4 +75,10 @@ namespace mips {
             lst = sub.get();
         }
     }
+
+    rInstruction Instruction::next() const {
+        auto it = node;
+        if (++it == parent->end()) return nullptr;
+        return it->get();
+    }
 }
