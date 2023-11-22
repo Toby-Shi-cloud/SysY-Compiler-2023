@@ -1,0 +1,1 @@
+output with formatted String: local=0

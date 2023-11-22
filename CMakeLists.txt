@@ -52,32 +52,26 @@ add_executable(Compiler
 
 if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     enable_testing()
-    add_test(NAME LLVM-IR-Test-A
-            COMMAND ./auto_test.sh llvm ${CMAKE_CURRENT_BINARY_DIR}/Compiler A30
+    add_test(NAME LLVM-IR-Test-1
+            COMMAND ./auto_test.py llvm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d C1 -d B1 -d A1
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(NAME LLVM-IR-Test-B
-            COMMAND ./auto_test.sh llvm ${CMAKE_CURRENT_BINARY_DIR}/Compiler B30
+    add_test(NAME LLVM-IR-Test-2
+            COMMAND ./auto_test.py llvm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d C2 -d B2 -d A2
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(NAME LLVM-IR-Test-C
-            COMMAND ./auto_test.sh llvm ${CMAKE_CURRENT_BINARY_DIR}/Compiler C30
+    add_test(NAME LLVM-IR-Test-3
+            COMMAND ./auto_test.py llvm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d D1 -d D2
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(NAME LLVM-IR-Test-D
-            COMMAND ./auto_test.sh llvm ${CMAKE_CURRENT_BINARY_DIR}/Compiler D6
+    add_test(NAME MIPS-Test-1
+            COMMAND ./auto_test.py mips -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d C1 -d B1 -d A1
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(NAME MIPS-Test-A
-            COMMAND ./auto_test.sh mips ${CMAKE_CURRENT_BINARY_DIR}/Compiler A30
+    add_test(NAME MIPS-Test-2
+            COMMAND ./auto_test.py mips -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d C2 -d B2 -d A2
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(NAME MIPS-Test-B
-            COMMAND ./auto_test.sh mips ${CMAKE_CURRENT_BINARY_DIR}/Compiler B30
+    add_test(NAME MIPS-Test-3
+            COMMAND ./auto_test.py mips -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d D1 -d D2
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(NAME MIPS-Test-C
-            COMMAND ./auto_test.sh mips ${CMAKE_CURRENT_BINARY_DIR}/Compiler C30
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(NAME MIPS-Test-D
-            COMMAND ./auto_test.sh mips ${CMAKE_CURRENT_BINARY_DIR}/Compiler D6
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    set_tests_properties(LLVM-IR-Test-A LLVM-IR-Test-B LLVM-IR-Test-C LLVM-IR-Test-D
-            PROPERTIES TIMEOUT 30)
-    set_tests_properties(MIPS-Test-A MIPS-Test-B MIPS-Test-C MIPS-Test-D
+    set_tests_properties(LLVM-IR-Test-1 LLVM-IR-Test-2 LLVM-IR-Test-3
             PROPERTIES TIMEOUT 60)
+    set_tests_properties(MIPS-Test-1 MIPS-Test-2 MIPS-Test-3
+            PROPERTIES TIMEOUT 120)
 endif ()

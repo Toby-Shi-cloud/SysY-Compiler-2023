@@ -195,7 +195,8 @@ namespace mir {
     }
 
     void mergeEmptyBlock(Function *func) {
-        auto it = func->bbs.begin();
+        // First block shouldn't be merged
+        auto it = ++func->bbs.begin();
         while (it != func->bbs.end()) {
             auto bb = *it;
             if (bb->instructions.size() > 1) {

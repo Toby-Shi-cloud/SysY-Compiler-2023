@@ -1,0 +1,62 @@
+Successfully call a function with 3 types of paras.
+
+Just get a number [101] (greater than 100).
+lucky number: 3
+(0)11
+(1)22
+(3)44
+
+Just get a number [32761] (greater than 100).
+lucky number: 3
+(0)11
+(1)22
+(3)44
+
+Just get a number [32761] (greater than 100).
+lucky number: 3
+(0)11
+(1)22
+(3)44
+
+Just get a number [32761] (greater than 100).
+lucky number: 3
+(0)11
+(1)22
+(3)44
+
+Just get a number [32761] (greater than 100).
+lucky number: 3
+(0)11
+(1)22
+(3)44
+
+Just get a number [32761] (greater than 100).
+lucky number: 3
+(0)11
+(1)22
+(3)44
+
+Just get a number [32761] (greater than 100).
+lucky number: 3
+(0)11
+(1)22
+(3)44
+
+Just get a number [32761] (greater than 100).
+lucky number: 3
+(0)11
+(1)22
+(3)44
+
+Just get a number [32761] (greater than 100).
+lucky number: 3
+(0)11
+(1)22
+(3)44
+
+Just get a number [32761] (greater than 100).
+lucky number: 3
+(0)11
+(1)22
+(3)44
+GLOBAL simple_var_c: 327

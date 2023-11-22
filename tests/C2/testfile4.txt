@@ -1,0 +1,108 @@
+const int c=10;
+int x;
+void f1(){
+    int i;
+    for(i=0;i<5;i=i+1){
+        x=x+1;
+    }
+}
+int f2(){
+    if(x>0){
+        return -1;
+    }
+    else{
+        return 1;
+    }
+    return x;
+}
+void f3(int a){
+    x=a;
+}
+int f4(int a){
+    if(a>0) return +a;
+    return -a;
+}
+int f5(int a,int b,int c){
+    if(a>b){
+        if(a>c) return a;
+        else return c;
+    }
+    if(b>c){
+        if(b>a) return b;
+        else return a;
+    }
+    if(c>a){
+        if(c>b) return c;
+        else return b;
+    }
+    return f4(a);
+}
+int f6(int a){
+    x=x+a;
+    if(a==0){
+        return 0;
+    }
+    return f6(a-1);
+}
+
+int main(){
+    printf("21373457\n");
+    int i,j=5,k;
+    for(i=0;i<5;i=i+1) ;
+    if(i==5) printf("Empty for pass!\n");
+    for(i=0;i<2;) i=i+1;
+    for(i=2;;i=i+1){
+        if(i==4) break;
+    }
+    for(;i<5;i=i+1){
+        if(i<5) continue;
+        i=i+2;
+    }
+    for(i=5;;){
+        i=i+1;
+        if(i==6) break;
+    }
+    for(;i<7;){
+        i=i+1;
+    }
+    for(;;i=i+1){
+        if(i==8) break;
+    }
+    for(;;){
+        i=i+1;
+        if(i==10){
+            printf("One stmt for pass!\n");
+            break;
+        }
+    }
+    f1();
+    if(x==5){
+        if(f2()==-1) printf("Basic for and no params function pass!\n");
+    }
+    printf("Please input 5 number (no zero)\n");
+    x=-1;
+    for(i=0;i*i<j*j/(5-4);i=i+1){
+        k=getint();
+        f3(f4(k));
+        if(x<0){
+            break;
+        }
+        if(x>0){
+            continue;
+        }
+        i=i+1;
+    }
+    if(x>=0){
+        printf("Basic for and one params function pass!\n");
+    }
+    i=10;
+    j=5;
+    k=7;
+    if(f5(i,j,k)==i) printf("Basic for and multiple params function pass!\n");
+    x=0;
+    f6(c);
+    printf("Recursive Success, count = %d\n",x);
+    printf("This C level file include decl, if, for ,continue, break, basic cond. No block\n");
+    printf("Pass Success!");
+    return 0;
+}

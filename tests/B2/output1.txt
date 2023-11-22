@@ -1,0 +1,10 @@
+21373457
+1D array function pass!
+1024
+1024
+1024
+2D array function pass!
+1024
+1024
+1D array in 2D array function pass!
+Test2 Success!

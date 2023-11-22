@@ -1,0 +1,10 @@
+21373457
+Empty for pass!
+One stmt for pass!
+Basic for and no params function pass!
+Please input 5 number (no zero)
+Basic for and one params function pass!
+Basic for and multiple params function pass!
+Recursive Success, count = 55
+This C level file include decl, if, for ,continue, break, basic cond. No block
+Pass Success!

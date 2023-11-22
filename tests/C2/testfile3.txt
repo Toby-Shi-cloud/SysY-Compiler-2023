@@ -1,0 +1,42 @@
+int func1() {
+    return 1;
+}
+int func2(int i) {
+    i = i + 1;
+    return i;
+}
+void func3(int s[]) {
+    s[0] = 1;
+    return;
+}
+void func4() {
+    return;
+}
+void func5(int s[][2]) {
+    return;
+}
+int func6(int a, int b, int c) {
+    a = 1;
+    b = 1;
+    c = 1;
+    return 1;
+}
+
+int main() {
+    int input;
+    input = getint();
+    printf("21371295\n");
+    int a = 1;
+    int b = 2;
+    int c = 3;  
+    int d[2] = {1, 2};
+    int e[2][2] = {{1, 2}, {3, 4}};
+    a = func1();
+    a = func2(a);
+    func3(d);
+    func4();
+    func5(e);
+    a = func6(a, b, c);
+    
+    return 0;
+}

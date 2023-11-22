@@ -1,0 +1,9 @@
+int main() {
+	printf("21373119");
+	int a = 0;
+	{
+		int a = 1;
+		printf("%d",a); // 输出 1
+	}
+	return 0;
+}
