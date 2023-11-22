@@ -122,13 +122,8 @@ namespace backend {
         for (auto &&block: all_sub_blocks(function))
             for (auto &&inst: *block)
                 inst->liveIn.clear(), inst->liveOut.clear();
-        for (auto &&block: all_sub_blocks(function)) {
-            for (auto &&inst: *block) {
-                inst->liveIn.insert(inst->regUse.begin(), inst->regUse.end());
-                inst->liveIn.erase(mips::PhyRegister::get(0));
-            }
+        for (auto &&block: all_sub_blocks(function))
             while (compute_instructions_info(block));
-        }
     }
 
     bool compute_instructions_info(mips::rSubBlock block) {
@@ -145,6 +140,7 @@ namespace backend {
             inst->liveIn.insert(inst->liveOut.begin(), inst->liveOut.end());
             for (auto reg: inst->regDef)
                 inst->liveIn.erase(reg);
+            inst->liveIn.insert(inst->regUse.begin(), inst->regUse.end());
             if (s1 != inst->liveIn.size() || s2 != inst->liveOut.size())
                 changed = true;
         }
