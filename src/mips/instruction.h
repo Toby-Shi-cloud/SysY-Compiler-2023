@@ -9,10 +9,6 @@
 #include "../enum.h"
 
 namespace mips {
-    struct Block;
-}
-
-namespace mips {
     struct Instruction {
         enum class Ty {
             NOP, ADDU, SUBU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV, SLT, SLTU, MOVN, MOVZ, MUL,
@@ -54,54 +50,6 @@ namespace mips {
             regUse.push_back(reg);
             reg->useUsers.insert(this);
         }
-
-        template<bool visitDef = true, bool visitUse = true, typename T>
-        void for_each_reg(T &&func) {
-            if constexpr (visitDef) for (auto reg: regDef) func(reg);
-            if constexpr (visitUse) for (auto reg: regUse) func(reg);
-        }
-
-        template<typename T>
-        void for_each_use_reg(T &&func) { for_each_reg<false, true>(func); }
-
-        template<typename T>
-        void for_each_def_reg(T &&func) { for_each_reg<true, false>(func); }
-
-        template<bool visitDef = true, bool visitUse = true, typename T>
-        void for_each_vreg(T &&func) {
-            if constexpr (visitDef)
-                for (auto reg: regDef)
-                    if (auto vir = dynamic_cast<rVirRegister>(reg))
-                        func(vir);
-            if constexpr (visitUse)
-                for (auto reg: regUse)
-                    if (auto vir = dynamic_cast<rVirRegister>(reg))
-                        func(vir);
-        }
-
-        template<typename T>
-        void for_each_use_vreg(T &&func) { for_each_vreg<false, true>(std::forward<T>(func)); }
-
-        template<typename T>
-        void for_each_def_vreg(T &&func) { for_each_vreg<true, false>(std::forward<T>(func)); }
-
-        template<bool visitDef = true, bool visitUse = true, typename T>
-        void for_each_preg(T &&func) {
-            if constexpr (visitDef)
-                for (auto reg: regDef)
-                    if (auto phy = dynamic_cast<rPhyRegister>(reg))
-                        func(phy);
-            if constexpr (visitUse)
-                for (auto reg: regUse)
-                    if (auto phy = dynamic_cast<rPhyRegister>(reg))
-                        func(phy);
-        }
-
-        template<typename T>
-        void for_each_use_preg(T &&func) { for_each_preg<false, true>(std::forward<T>(func)); }
-
-        template<typename T>
-        void for_each_def_preg(T &&func) { for_each_preg<true, false>(std::forward<T>(func)); }
 
         [[nodiscard]] bool isFuncCall() const {
             return ty == Ty::JAL || ty == Ty::JALR || ty == Ty::BGEZAL || ty == Ty::BLTZAL;

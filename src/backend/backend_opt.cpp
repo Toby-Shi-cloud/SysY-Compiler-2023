@@ -16,9 +16,11 @@ namespace backend {
                 std::unordered_set<mips::rInstruction> dead = {};
                 auto used = block->liveOut;
                 auto pred = [&](auto &&reg) -> bool {
-                    return used.count(reg) || dynamic_cast<mips::rPhyRegister>(reg);
+                    return used.count(reg) || reg->isPhysical();
                 };
-                auto addUsed = [&](auto &&inst) { inst->for_each_use_reg([&](auto &&reg) { used.insert(reg); }); };
+                auto addUsed = [&](auto &&inst) {
+                    std::for_each(inst->regUse.begin(), inst->regUse.end(), [&](auto &&reg) { used.insert(reg); });
+                };
                 for (auto it = block->instructions.rbegin(); it != block->instructions.rend(); ++it) {
                     auto &inst = *it;
                     if (inst->isJumpBranch() || inst->isSyscall() || inst->isStore()) {
