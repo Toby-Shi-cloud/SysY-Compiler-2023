@@ -101,7 +101,7 @@ namespace mips {
         [[nodiscard]] rInstruction backInst() const { return backBlock()->instructions.back().get(); }
 
         void push_back(pInstruction &&inst) {
-            if (!empty() && backInst()->isJumpBranch())
+            if (!empty() && backInst()->isJumpBranch() && !backInst()->isFuncCall())
                 subBlocks.emplace_back(new SubBlock());
             subBlocks.back()->insert(subBlocks.back()->end(), std::move(inst));
         }
@@ -122,7 +122,7 @@ namespace mips {
         pLabel label;
         unsigned allocaSize, argSize;
         const bool isMain, isLeaf;
-        std::unordered_set<rPhyRegister> shouldSave;
+        PhyRegister::phy_set_t shouldSave;
         std::list<pBlock> blocks;
         pBlock exitB = std::make_unique<Block>(this);
         std::unordered_set<pVirRegister> usedVirRegs;

@@ -100,22 +100,39 @@ namespace mips {
 
         explicit PhyRegister(unsigned id) : id(id) {}
 
+        struct Comparator {
+            bool operator()(rPhyRegister x, rPhyRegister y) const {
+                if (x == nullptr) return y != nullptr;
+                if (y == nullptr) return false;
+                constexpr auto priority = [](rPhyRegister reg) {
+                    return reg->isTemp() << 0 |
+                           reg->isArg() << 1 |
+                           reg->isRet() << 2 |
+                           reg->isSaved() << 3;
+                };
+                return priority(x) == priority(y) ? x->id < y->id : priority(x) < priority(y);
+            }
+        };
+
     public:
+        using phy_set_t = std::set<rPhyRegister, Comparator>;
+
         [[nodiscard]] static rPhyRegister get(unsigned id) { return registers[id].get(); }
 
         [[nodiscard]] static rPhyRegister get(const std::string &name) { return registers[name2id.at(name)].get(); }
 
         [[nodiscard]] static auto get(const std::string &first, const std::string &last) {
-            std::set<rPhyRegister> regs;
+            phy_set_t regs;
             auto begin = name2id.at(first);
             auto end = name2id.at(last);
             for (unsigned id = begin; id <= end; id++) regs.insert(get(id));
             return regs;
         }
 
-        template<typename Func>
-        [[nodiscard]] static auto get(Func &&pred) -> std::set<decltype(std::invoke(pred, get(0)), get(0))> {
-            std::set<rPhyRegister> regs;
+        template<typename Func,
+            typename = std::enable_if_t<std::is_convertible_v<std::invoke_result_t<Func, rPhyRegister>, bool>>>
+        [[nodiscard]] static auto get(Func &&pred) {
+            phy_set_t regs;
             for (auto &&reg: registers)
                 if (std::invoke(pred, reg.get()))
                     regs.insert(reg.get());

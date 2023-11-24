@@ -282,8 +282,7 @@ namespace backend {
     }
 
     void Translator::translateCallInst(const mir::Instruction::call *callInst) {
-        if (auto func = callInst->getFunction();
-            func == mir::Function::getint) {
+        if (auto func = callInst->getFunction(); func == mir::Function::getint) {
             auto dst = curFunc->newVirRegister();
             curBlock->push_back(mips::SyscallInst::syscall(
                 mips::SyscallInst::SyscallId::ReadInteger));
@@ -319,21 +318,23 @@ namespace backend {
             auto callee = fMap[func];
             unsigned stack_arg_cnt = std::max(0, static_cast<int>(callInst->getNumArgs()) - 4);
             curFunc->argSize = std::max(curFunc->argSize, stack_arg_cnt * 4);
+            auto mipsCall = new mips::JumpInst(mips::Instruction::Ty::JAL, callee->label.get());
             for (int i = 0; i < callInst->getNumArgs(); i++) {
                 auto reg = getRegister(callInst->getArg(i));
                 if (!reg) reg = addressCompute(getAddress(callInst->getArg(i)));
                 if (i < 4) {
-                    curBlock->push_back(std::make_unique<mips::MoveInst>(
-                        mips::PhyRegister::get("$a" + std::to_string(i)), reg));
+                    auto arg = mips::PhyRegister::get("$a" + std::to_string(i));
+                    curBlock->push_back(std::make_unique<mips::MoveInst>(arg, reg));
+                    mipsCall->reg_use_push_back(arg);
                 } else {
                     curBlock->push_back(std::make_unique<mips::StoreInst>(
                         mips::Instruction::Ty::SW, reg,
                         mips::PhyRegister::get("$sp"), (i - 4) * 4));
                 }
             }
-            curBlock->push_back(std::make_unique<mips::JumpInst>(
-                mips::Instruction::Ty::JAL, callee->label.get()));
+            curBlock->push_back(mips::pInstruction{mipsCall});
             if (callInst->isValue()) {
+                mipsCall->reg_def_push_back(mips::PhyRegister::get("$v0"));
                 auto reg = curFunc->newVirRegister();
                 curBlock->push_back(std::make_unique<mips::MoveInst>(
                     reg, mips::PhyRegister::get("$v0")));
@@ -386,9 +387,7 @@ namespace backend {
         assert(curFunc->argSize % 4 == 0);
 
         // reformat blocks & alloca registers
-#ifdef DBG_ENABLE
-        curFunc->allocName();
-#endif
+        assert((curFunc->allocName(), true));
         optimize();
         log(curFunc);
         register_alloca(curFunc);

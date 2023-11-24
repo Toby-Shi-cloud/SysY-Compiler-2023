@@ -10,8 +10,10 @@
 #include "translator.h"
 
 namespace backend {
-    const auto alloca_regs = mips::PhyRegister::get("$t0", "$t9");
-    const auto temp_regs = mips::PhyRegister::get(&mips::PhyRegister::isTemp);
+    const auto alloca_regs = mips::PhyRegister::get("$v0", "$t9");
+    const auto temp_regs = mips::PhyRegister::get([](const auto &&phy) {
+        return phy->isArg() || phy->isRet() || phy->isTemp();
+    });
     constexpr auto should_color = [](mips::rRegister r) {
         return r->isVirtual() || alloca_regs.count(dynamic_cast<mips::rPhyRegister>(r));
     };
@@ -73,6 +75,13 @@ namespace backend {
             if (used && vertex->color->isSaved())
                 function->shouldSave.insert(vertex->color);
         }
+        for (auto &block: all_sub_blocks(function))
+            for (auto it = block->begin(); it != block->end();) {
+                if (auto move = dynamic_cast<mips::MoveInst *>(it->get());
+                    move && move->dst() == move->src()) {
+                    it = block->erase(it);
+                    } else ++it;
+            }
     }
 
     void compute_blocks_info(mips::rFunction function) {
@@ -284,17 +293,18 @@ namespace backend {
             std::pair<VertexInfo *, VertexInfo *> pair;
             for (auto &&vertex: vertexes)
                 for (auto it = vertex->moves.begin(); it != vertex->moves.end();) {
-                    if (!vertexes.count(reg2vertex.at(*it))
-                        || reg2vertex.at(*it)->freezed
+                    auto other = reg2vertex.at(*it);
+                    if (!vertexes.count(other)
+                        || other->freezed
                         || vertex->regs.count(*it)
-                        || vertex->edges.count(reg2vertex.at(*it))) {
+                        || vertex->edges.count(other)) {
                         it = vertex->moves.erase(it);
                         continue;
                     }
-                    if (auto degree = vertex->calc_degree(reg2vertex.at(*it));
-                        degree < alloca_regs.size() && degree > max_degree) {
+                    if (auto degree = vertex->calc_degree(other);
+                        (other->color || degree < alloca_regs.size()) && degree > max_degree) {
                         max_degree = degree;
-                        pair = {vertex, reg2vertex.at(*it)};
+                        pair = {vertex, other};
                     }
                     ++it;
                 }
