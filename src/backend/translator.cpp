@@ -3,7 +3,6 @@
 //
 
 #include <queue>
-#include <fstream>
 #include "reg_alloca.h"
 #include "translator.h"
 #include "backend_opt.h"
@@ -207,68 +206,89 @@ namespace backend {
         put(getPtrInst, addr);
     }
 
-    template<mir::Instruction::InstrTy ty>
-    void Translator::translateConversionInst(const mir::Instruction::_conversion_instruction<ty> *convInst) {
-        assert(ty == mir::Instruction::ZEXT);
-        auto icmp = dynamic_cast<mir::Instruction::icmp *>(convInst->getValueOperand());
-        assert(icmp);
-        put(convInst, oMap[icmp]);
+    void Translator::translateConversionInst(const mir::Instruction::trunc *truncInst) {
+        // assume i32 -> i1
+        auto reg = getRegister(truncInst->getValueOperand());
+        auto dst = curFunc->newVirRegister();
+        curBlock->push_back(std::make_unique<mips::BinaryRInst>(
+                mips::Instruction::Ty::SLTU, dst, mips::PhyRegister::get(0), reg));
+        put(truncInst, reg);
+    }
+
+    void Translator::translateConversionInst(const mir::Instruction::zext *zextInst) {
+        // assume i1 -> i32
+        put(zextInst, oMap[zextInst->getValueOperand()]);
+    }
+
+    void Translator::translateConversionInst(const mir::Instruction::sext *sextInst) {
+        // assume i1 -> i32
+        auto reg = getRegister(sextInst->getValueOperand());
+        auto dst = curFunc->newVirRegister();
+        curBlock->push_back(std::make_unique<mips::BinaryRInst>(
+                mips::Instruction::Ty::SUBU, dst, mips::PhyRegister::get(0), reg));
+        put(sextInst, reg);
     }
 
     void Translator::translateIcmpInst(const mir::Instruction::icmp *icmpInst) {
         auto lhs = icmpInst->getLhs();
         auto rhs = icmpInst->getRhs();
-        mips::rRegister reg;
+        mips::rRegister reg, tmp;
         switch (icmpInst->cond) {
             case mir::Instruction::icmp::EQ:
-                reg = translateBinaryInstHelper<mir::Instruction::SUB>(getRegister(lhs), rhs);
+                reg = curFunc->newVirRegister();
+                tmp = translateBinaryInstHelper<mir::Instruction::SUB>(getRegister(lhs), rhs);
                 curBlock->push_back(std::make_unique<mips::BinaryIInst>(
-                    mips::Instruction::Ty::SLTIU, reg, reg, 1));
+                    mips::Instruction::Ty::SLTIU, reg, tmp, 1));
                 break;
             case mir::Instruction::icmp::NE:
-                reg = translateBinaryInstHelper<mir::Instruction::SUB>(getRegister(lhs), rhs);
+                reg = curFunc->newVirRegister();
+                tmp = translateBinaryInstHelper<mir::Instruction::SUB>(getRegister(lhs), rhs);
                 curBlock->push_back(std::make_unique<mips::BinaryRInst>(
-                    mips::Instruction::Ty::SLTU, reg, mips::PhyRegister::get(0), reg));
+                    mips::Instruction::Ty::SLTU, reg, mips::PhyRegister::get(0), tmp));
                 break;
             case mir::Instruction::icmp::UGT:
                 reg = createBinaryInstHelper<mips::Instruction::Ty::SLTU, mips::Instruction::Ty::SLTIU>(
                     getRegister(rhs), lhs);
                 break;
             case mir::Instruction::icmp::UGE:
-                reg = createBinaryInstHelper<mips::Instruction::Ty::SLTU, mips::Instruction::Ty::SLTIU>(
+                reg = curFunc->newVirRegister();
+                tmp = createBinaryInstHelper<mips::Instruction::Ty::SLTU, mips::Instruction::Ty::SLTIU>(
                     getRegister(lhs), rhs);
                 curBlock->push_back(std::make_unique<mips::BinaryIInst>(
-                    mips::Instruction::Ty::XORI, reg, reg, 1));
+                    mips::Instruction::Ty::XORI, reg, tmp, 1));
                 break;
             case mir::Instruction::icmp::ULT:
                 reg = createBinaryInstHelper<mips::Instruction::Ty::SLTU, mips::Instruction::Ty::SLTIU>(
                     getRegister(lhs), rhs);
                 break;
             case mir::Instruction::icmp::ULE:
-                reg = createBinaryInstHelper<mips::Instruction::Ty::SLTU, mips::Instruction::Ty::SLTIU>(
+                reg = curFunc->newVirRegister();
+                tmp = createBinaryInstHelper<mips::Instruction::Ty::SLTU, mips::Instruction::Ty::SLTIU>(
                     getRegister(rhs), lhs);
                 curBlock->push_back(std::make_unique<mips::BinaryIInst>(
-                    mips::Instruction::Ty::XORI, reg, reg, 1));
+                    mips::Instruction::Ty::XORI, reg, tmp, 1));
                 break;
             case mir::Instruction::icmp::SGT:
                 reg = createBinaryInstHelper<mips::Instruction::Ty::SLT, mips::Instruction::Ty::SLTI>(
                     getRegister(rhs), lhs);
                 break;
             case mir::Instruction::icmp::SGE:
-                reg = createBinaryInstHelper<mips::Instruction::Ty::SLT, mips::Instruction::Ty::SLTI>(
+                reg = curFunc->newVirRegister();
+                tmp = createBinaryInstHelper<mips::Instruction::Ty::SLT, mips::Instruction::Ty::SLTI>(
                     getRegister(lhs), rhs);
                 curBlock->push_back(std::make_unique<mips::BinaryIInst>(
-                    mips::Instruction::Ty::XORI, reg, reg, 1));
+                    mips::Instruction::Ty::XORI, reg, tmp, 1));
                 break;
             case mir::Instruction::icmp::SLT:
                 reg = createBinaryInstHelper<mips::Instruction::Ty::SLT, mips::Instruction::Ty::SLTI>(
                     getRegister(lhs), rhs);
                 break;
             case mir::Instruction::icmp::SLE:
-                reg = createBinaryInstHelper<mips::Instruction::Ty::SLT, mips::Instruction::Ty::SLTI>(
+                reg = curFunc->newVirRegister();
+                tmp = createBinaryInstHelper<mips::Instruction::Ty::SLT, mips::Instruction::Ty::SLTI>(
                     getRegister(rhs), lhs);
                 curBlock->push_back(std::make_unique<mips::BinaryIInst>(
-                    mips::Instruction::Ty::XORI, reg, reg, 1));
+                    mips::Instruction::Ty::XORI, reg, tmp, 1));
                 break;
         }
         put(icmpInst, reg);

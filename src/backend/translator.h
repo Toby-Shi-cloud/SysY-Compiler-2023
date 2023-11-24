@@ -56,8 +56,11 @@ namespace backend {
 
         void translateGetPtrInst(const mir::Instruction::getelementptr *getPtrInst);
 
-        template<mir::Instruction::InstrTy ty>
-        void translateConversionInst(const mir::Instruction::_conversion_instruction<ty> *convInst);
+        void translateConversionInst(const mir::Instruction::trunc *truncInst);
+
+        void translateConversionInst(const mir::Instruction::zext *zextInst);
+
+        void translateConversionInst(const mir::Instruction::sext *sextInst);
 
         void translateIcmpInst(const mir::Instruction::icmp *icmpInst);
 
