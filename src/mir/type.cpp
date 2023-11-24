@@ -116,7 +116,7 @@ namespace mir {
         if (isIntegerTy())
             return "i" + std::to_string(getIntegerBits());
         if (isPointerTy())
-            return getPointerBase()->to_string() + "*";
+            return "ptr"s;
         if (isArrayTy())
             return "[" + std::to_string(getArraySize()) + " x " + getArrayBase()->to_string() + "]";
         if (isFunctionTy()) {

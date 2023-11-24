@@ -221,14 +221,38 @@ namespace mir {
         }
     };
 
+    struct BooleanLiteral : Literal {
+        const bool value;
+        static BooleanLiteral *trueLiteral;
+        static BooleanLiteral *falseLiteral;
+
+    private:
+        explicit BooleanLiteral(bool value)
+            : Literal(Type::getI1Type(), std::to_string(value)), value(value) {}
+    };
+
+    inline BooleanLiteral *BooleanLiteral::trueLiteral = new BooleanLiteral(true);
+    inline BooleanLiteral *BooleanLiteral::falseLiteral = new BooleanLiteral(false);
+
+    inline BooleanLiteral *getBooleanLiteral(bool value) {
+        return value ? BooleanLiteral::trueLiteral : BooleanLiteral::falseLiteral;
+    }
+
     struct IntegerLiteral : Literal {
         const int value;
 
         explicit IntegerLiteral(int value)
             : Literal(Type::getI32Type(), std::to_string(value)), value(value) {}
+
+        explicit IntegerLiteral(unsigned value)
+            : IntegerLiteral(static_cast<int>(value)) {}
     };
 
     IntegerLiteral *getIntegerLiteral(int value);
+
+    inline IntegerLiteral *getIntegerLiteral(unsigned value) {
+        return getIntegerLiteral(static_cast<int>(value));
+    }
 
     IntegerLiteral operator+(const IntegerLiteral &lhs, const IntegerLiteral &rhs);
 

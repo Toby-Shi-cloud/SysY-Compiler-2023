@@ -14,7 +14,7 @@ namespace mir {
 
     void calcDF(const Function *func);
 
-    void calcPhi(const Function *func);
+    void calcPhi(Function *func);
 
     void clearDeadInst(const Function *func);
 

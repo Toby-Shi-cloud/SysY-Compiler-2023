@@ -26,7 +26,7 @@ namespace mir {
         explicit br(BasicBlock *target) : Instruction(Type::getVoidType(), BR, target) {}
 
         explicit br(Value *cond, BasicBlock *ifTrue, BasicBlock *ifFalse) :
-                Instruction(Type::getVoidType(), BR, cond, ifTrue, ifFalse) {}
+            Instruction(Type::getVoidType(), BR, cond, ifTrue, ifFalse) {}
 
         [[nodiscard]] bool hasCondition() const { return getNumOperands() == 3; }
 
@@ -59,8 +59,19 @@ namespace mir {
 
         [[nodiscard]] Value *getRhs() const { return getOperand(1); }
 
+        [[nodiscard]] IntegerLiteral *calc() const;
+
         std::ostream &output(std::ostream &os) const override {
             return os << getName() << " = " << ty << " " << getLhs() << ", " << getRhs()->getName();
+        }
+
+    private:
+        [[nodiscard]] auto getLhsLiteral() const {
+            return static_cast<unsigned>(static_cast<IntegerLiteral *>(getLhs())->value);
+        }
+
+        [[nodiscard]] auto getRhsLiteral() const {
+            return static_cast<unsigned>(static_cast<IntegerLiteral *>(getRhs())->value);
         }
     };
 
@@ -123,7 +134,7 @@ namespace mir {
         } cond;
 
         explicit icmp(Cond cond, Value *lhs, Value *rhs) :
-                Instruction(Type::getI1Type(), ICMP, lhs, rhs), cond(cond) {
+            Instruction(Type::getI1Type(), ICMP, lhs, rhs), cond(cond) {
             assert(lhs->getType() == rhs->getType());
             assert(lhs->getType()->isIntegerTy());
         }

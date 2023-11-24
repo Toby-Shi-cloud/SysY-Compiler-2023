@@ -3,7 +3,7 @@
 //
 
 #include <queue>
-#include "mem2reg.h"
+#include "opt.h"
 
 namespace mir {
     void reCalcBBInfo(Function *func) {
@@ -75,7 +75,7 @@ namespace mir {
         dfs(func->bbs.front(), calc, dfs);
     }
 
-    void calcPhi(const Function *func, const Instruction::alloca_ *alloc) {
+    static void calcPhi(const Function *func, const Instruction::alloca_ *alloc) {
         assert(alloc->getType() == Type::getI32Type());
         std::unordered_map<BasicBlock *, Value *> liveInV; // live in value
         std::unordered_map<BasicBlock *, Value *> defs; // def value (live out value)
@@ -151,7 +151,8 @@ namespace mir {
         }
     }
 
-    void calcPhi(const Function *func) {
+    void calcPhi(Function *func) {
+        reCalcBBInfo(func);
         for (auto inst: func->bbs.front()->instructions) {
             if (auto alloc = dynamic_cast<Instruction::alloca_ *>(inst)) {
                 if (alloc->getType() != Type::getI32Type()) continue;
@@ -222,10 +223,7 @@ namespace mir {
             if (!br || !br->hasCondition()) continue;
             if (br->getIfTrue() != br->getIfFalse()) continue;
             auto label = br->getIfTrue();
-            bb->instructions.pop_back();
-            delete br;
-            br = new Instruction::br(label);
-            bb->instructions.push_back(br);
+            substitude(br, new Instruction::br(label));
         }
     }
 }

@@ -64,7 +64,7 @@ namespace mir {
             os << "declare dso_local i32 @getint()" << std::endl;
             os << "declare dso_local void @putint(i32)" << std::endl;
             os << "declare dso_local void @putch(i32)" << std::endl;
-            os << "declare dso_local void @putstr(i8*)" << std::endl;
+            os << "declare dso_local void @putstr(ptr)" << std::endl;
             os << std::endl;
             for (auto function: functions)
                 function->calcPreSuc(), os << function << std::endl;

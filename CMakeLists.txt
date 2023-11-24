@@ -45,9 +45,11 @@ add_executable(Compiler
         src/backend/reg_alloca.h
         src/backend/translator.cpp
         src/backend/translator.h
+        src/opt/constant.cpp
         src/opt/mem2reg.cpp
         src/opt/mem2reg.h
         src/opt/opt.cpp
+        src/opt/opt.h
 )
 
 if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
