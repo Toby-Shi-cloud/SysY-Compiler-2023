@@ -158,6 +158,17 @@ namespace mir {
                 substituteOperand(i, _new);
             }
         }
+
+        /**
+         * This function is virtual because some users may return sorted operands.
+         * @return A copy of operands
+         */
+        [[nodiscard]] virtual std::vector<Value *> getOperands() const {
+            std::vector<Value *> ret;
+            std::transform(operands.begin(), operands.end(), std::back_inserter(ret),
+                           [](auto &&use) { return use->value; });
+            return ret;
+        }
     };
 
     inline bool Value::isUsed() const {

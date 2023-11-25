@@ -37,14 +37,14 @@ namespace mir {
         return ret;
     }
 
-    inst_node_t BasicBlock::phi_end() {
-        return std::find_if(instructions.begin(), instructions.end(),
-                            [](auto &&inst) { return inst->instrTy != Instruction::PHI; });
+    inst_pos_t BasicBlock::phi_end() const {
+        return std::find_if_not(instructions.begin(), instructions.end(),
+                                std::function<bool(Instruction *)>(&Instruction::isPhy));
     }
 
-    inst_pos_t BasicBlock::phi_end() const {
-        return std::find_if(instructions.begin(), instructions.end(),
-                            [](auto &&inst) { return inst->instrTy != Instruction::PHI; });
+    inst_pos_t BasicBlock::beginner_end() const {
+        return std::find_if_not(instructions.begin(), instructions.end(),
+                                std::function<bool(Instruction *)>(&Instruction::isBeginner));
     }
 
     Argument *Function::addArgument(pType type) {

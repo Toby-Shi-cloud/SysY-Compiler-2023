@@ -61,9 +61,9 @@ namespace mir {
 
         inst_node_t erase(const Instruction *inst);
 
-        inst_node_t phi_end();
+        [[nodiscard]] inst_pos_t phi_end() const;
 
-        inst_pos_t phi_end() const;
+        [[nodiscard]] inst_pos_t beginner_end() const;
 
         void push_front(Instruction *inst) {
             insert(instructions.cbegin(), inst);
@@ -169,6 +169,12 @@ namespace mir {
         [[nodiscard]] bool isTerminator() const { return instrTy == RET || instrTy == BR; }
 
         [[nodiscard]] bool isCall() const { return instrTy == CALL; }
+
+        [[nodiscard]] bool isPhy() const { return instrTy == PHI; }
+
+        [[nodiscard]] bool isBeginner() const { return instrTy == PHI || instrTy == ALLOCA; }
+
+        [[nodiscard]] bool isMemoryAccess() const { return instrTy == LOAD || instrTy == STORE; }
 
         [[nodiscard]] bool isValue() const { return getType() != Type::getVoidType(); }
 

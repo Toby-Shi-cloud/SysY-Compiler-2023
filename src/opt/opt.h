@@ -23,6 +23,8 @@ namespace mir {
     inst_node_t constantFolding(Instruction *inst);
 
     void constantFolding(const Function *func);
+
+    void localVariableNumbering(const Function *func);
 }
 
 namespace mir {
@@ -30,21 +32,22 @@ namespace mir {
     [[nodiscard]] int &field() { return (*this)[id]; } \
     [[nodiscard]] int field() const { return (*this)[id]; }
 
-    inline struct OptInfos : std::array<int, 5> {
-        DECLARE(constant_folding, 0)
-        DECLARE(clear_dead_inst, 1)
-        DECLARE(clear_dead_block, 2)
-        DECLARE(merge_empty_block, 3)
-        DECLARE(mem_to_reg, 4)
+    inline struct OptInfos : std::array<int, 6> {
+        DECLARE(mem_to_reg, 0)
+        DECLARE(constant_folding, 1)
+        DECLARE(local_variable_numbering, 2)
+        DECLARE(clear_dead_inst, 3)
+        DECLARE(clear_dead_block, 4)
+        DECLARE(merge_empty_block, 5)
 
         OptInfos operator+(const OptInfos &other) const {
             OptInfos res = {};
-            for (int i = 0; i < 5; ++i) res[i] = (*this)[i] + other[i];
+            for (int i = 0; i < size(); ++i) res[i] = (*this)[i] + other[i];
             return res;
         }
 
         OptInfos &operator+=(const OptInfos &other) {
-            for (int i = 0; i < 5; ++i) (*this)[i] += other[i];
+            for (int i = 0; i < size(); ++i) (*this)[i] += other[i];
             return *this;
         }
     } opt_infos;
@@ -58,11 +61,12 @@ namespace dbg {
     inline bool pretty_print(std::ostream &stream, const mir::OptInfos &value) {
 #define str(field) #field << ": " << value.field()
         stream << "{";
+        stream << str(mem_to_reg) << ", ";
         stream << str(constant_folding) << ", ";
+        stream << str(local_variable_numbering) << ", ";
         stream << str(clear_dead_inst) << ", ";
         stream << str(clear_dead_block) << ", ";
-        stream << str(merge_empty_block) << ", ";
-        stream << str(mem_to_reg);
+        stream << str(merge_empty_block);
         stream << "}";
         return true;
 #undef str

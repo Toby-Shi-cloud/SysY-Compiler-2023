@@ -8,11 +8,12 @@ namespace mir {
     static void _optimize(Function *func) {
 // this macro is used to allocName for values when debug mod enabled.
 #define FUNC (assert((func->allocName(), true)), func)
+        calcPhi(FUNC);
         constantFolding(FUNC);
+        localVariableNumbering(FUNC);
         clearDeadInst(FUNC);
         clearDeadBlock(FUNC);
         mergeEmptyBlock(FUNC);
-        calcPhi(FUNC);
 #undef FUNC
     }
 

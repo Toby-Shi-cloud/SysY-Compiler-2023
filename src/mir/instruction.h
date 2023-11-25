@@ -6,6 +6,7 @@
 #define COMPILER_MIR_INSTRUCTION_H
 
 #include <sstream>
+#include <algorithm>
 #include "../enum.h"
 #include "derived_value.h"
 
@@ -60,6 +61,13 @@ namespace mir {
         [[nodiscard]] Value *getRhs() const { return getOperand(1); }
 
         [[nodiscard]] IntegerLiteral *calc() const;
+
+        [[nodiscard]] std::vector<Value *> getOperands() const override {
+            auto res = User::getOperands();
+            if constexpr (ty == ADD || ty == MUL || ty == AND || ty == OR || ty == XOR)
+                std::sort(res.begin(), res.end());
+            return res;
+        }
 
         std::ostream &output(std::ostream &os) const override {
             return os << getName() << " = " << ty << " " << getLhs() << ", " << getRhs()->getName();
@@ -184,7 +192,7 @@ namespace mir {
         [[nodiscard]] size_t getNumIncomingValues() const { return getNumOperands() / 2; }
 
         // check if instruction phi is valid. (may use under debug)
-        [[nodiscard]] bool checkValid() const {
+        [[nodiscard, maybe_unused]] bool checkValid() const {
             auto check_set = parent->predecessors;
             for (auto i = 0; i < getNumIncomingValues(); i++) {
                 auto [value, bb] = getIncomingValue(i);
