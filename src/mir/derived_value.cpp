@@ -3,6 +3,7 @@
 //
 
 #include <sstream>
+#include <functional>
 #include <unordered_map>
 #include "../enum.h"
 #include "derived_value.h"
