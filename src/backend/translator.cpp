@@ -210,6 +210,7 @@ namespace backend {
         // assume i32 -> i1
         auto reg = getRegister(truncInst->getValueOperand());
         auto dst = curFunc->newVirRegister();
+        curBlock->push_back(std::make_unique<mips::MoveInst>(dst, reg));
         curBlock->push_back(std::make_unique<mips::BinaryRInst>(
                 mips::Instruction::Ty::SLTU, dst, mips::PhyRegister::get(0), reg));
         put(truncInst, reg);
@@ -655,11 +656,17 @@ namespace backend {
         clearDeadCode(curFunc);
         relocateBlock(curFunc);
     }
-
-    void Translator::log(const mips::Function *func) {
-#ifdef DBG_ENABLE
-        static std::ofstream out("log.txt");
-        out << *func << std::endl;
-#endif
-    }
 }
+
+#ifdef DBG_ENABLE
+
+#include <fstream>
+
+void backend::Translator::log(const mips::Function *func) {
+    static std::ofstream out("log.txt");
+    out << *func << std::endl;
+}
+
+#else
+void backend::Translator::log(const mips::Function *) {}
+#endif

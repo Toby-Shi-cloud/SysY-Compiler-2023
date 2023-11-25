@@ -74,26 +74,27 @@ namespace mir {
 
         [[nodiscard]] pType getType() const { return type; }
 
-        [[nodiscard]] bool isUsed() const { return !use->users.empty(); }
+        [[nodiscard]] inline bool isUsed() const;
 
         [[nodiscard]] bool isConst() const { return isConstant; }
 
         [[nodiscard]] long getId() const { return std::strtol(getName().c_str() + 1, nullptr, 0); }
+
+        // return a copy of users
+        [[nodiscard]] auto users() const { return use->users; }
 
         void swap(Value *other) {
             std::swap(use->value, other->use->value);
             std::swap(use, other->use);
         }
 
-        inline void moveTo(const Value *other) const;
+        inline void moveTo(Value *other);
     };
 
     /**
      * User is the base class for all mir Value which uses other Values.
      */
     class User : public Value {
-        friend Value;
-
         /**
          * Use shared pointer here to avoid 'use after delete'. <br>
          */
@@ -102,8 +103,21 @@ namespace mir {
     protected:
         void addOperand(const Value *value) {
             operands.push_back(value->use);
-            if (value != this)
-                value->use->users.insert(this);
+            value->use->users.insert(this);
+        }
+
+        void eraseOperand(int _first, int _end) {
+            for (auto i = _first; i != _end; ++i) {
+                auto &&operand = operands[i];
+                operand->users.erase(this);
+            }
+            operands.erase(operands.cbegin() + _first, operands.cbegin() + _end);
+        }
+
+        int findOperand(const Value *value) const {
+            auto it = std::find_if(operands.begin(), operands.end(),
+                                   [&value](auto &&use) { return use->value == value; });
+            return static_cast<int>(it - operands.begin());
         }
 
     public:
@@ -125,16 +139,36 @@ namespace mir {
         [[nodiscard]] R *getOperand(int i) const { return static_cast<R *>(operands[i]->value); }
 
         [[nodiscard]] auto getNumOperands() const { return operands.size(); }
+
+        void substituteOperand(int pos, Value *_new) {
+            operands[pos]->users.erase(this);
+            operands[pos] = _new->use;
+            _new->use->users.insert(this);
+        }
+
+        void substituteOperand(Value *_old, Value *_new) {
+            for (int i = 0; i < operands.size(); ++i) {
+                if (operands[i]->value != _old) continue;
+                substituteOperand(i, _new);
+            }
+        }
     };
 
-    inline void Value::moveTo(const Value *other) const {
+    inline bool Value::isUsed() const {
+        if (use->users.empty()) return false;
+        if (use->users.size() > 1) return true;
+        if (auto self = dynamic_cast<const User *>(this);
+            use->users.count(const_cast<User *>(self)))
+            return false;
+        return true;
+    }
+
+    inline void Value::moveTo(Value *other) {
         if (this == other) return;
-        for (auto &&user: use->users)
-            for (auto &&operand: user->operands)
-                if (operand == this->use)
-                    operand = other->use;
-        other->use->users.insert(use->users.begin(), use->users.end());
-        use->users.clear();
+        if (other->use->users.empty()) return swap(other);
+        for (auto &&user: users())
+            user->substituteOperand(this, other);
+        assert(use->users.empty());
     }
 
     inline std::ostream &operator<<(std::ostream &os, const Value &value) {

@@ -160,7 +160,6 @@ namespace backend {
         assert(!self->edges.count(other) && !other->edges.count(self));
         assert(!(self->color && other->color));
         assert(!self->freezed && !other->freezed);
-        assert(self->calc_degree(other) < alloca_regs.size());
         assert(vertexes.count(self) && vertexes.count(other));
         self->regs.insert(other->regs.begin(), other->regs.end());
         self->moves.insert(other->moves.begin(), other->moves.end());
