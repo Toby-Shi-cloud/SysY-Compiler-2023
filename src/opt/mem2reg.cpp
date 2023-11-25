@@ -210,6 +210,7 @@ namespace mir {
             while (!check_queue.empty()) {
                 auto suc = check_queue.front();
                 check_queue.pop();
+                assert(bb->successors.count(suc));
                 if (suc->instructions.size() > 1) continue;
                 auto br = dynamic_cast<Instruction::br *>(suc->instructions.back());
                 if (!br || br->hasCondition()) continue;
@@ -244,11 +245,12 @@ namespace mir {
                 }
                 br->substituteOperand(suc, target);
                 constantFolding(br);
+                opt_infos.merge_empty_block()++;
                 bb->successors.erase(suc);
+                if (bb->successors.count(target)) continue;
                 bb->successors.insert(target);
                 target->predecessors.insert(bb);
                 check_queue.push(target);
-                opt_infos.merge_empty_block()++;
             }
         }
     }
