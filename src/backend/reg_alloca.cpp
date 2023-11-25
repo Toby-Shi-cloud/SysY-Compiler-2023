@@ -288,6 +288,7 @@ namespace backend {
 
     void Graph::coalesce() {
         for (;;) {
+            const long bonus = 1e9;
             long max_degree = -1;
             std::pair<VertexInfo *, VertexInfo *> pair;
             for (auto &&vertex: vertexes)
@@ -300,9 +301,9 @@ namespace backend {
                         it = vertex->moves.erase(it);
                         continue;
                     }
-                    if (auto degree = vertex->calc_degree(other);
-                        (other->color || degree < alloca_regs.size()) && degree > max_degree) {
-                        max_degree = degree;
+                    if (long degree = vertex->calc_degree(other), res = other->color ? bonus - degree : degree;
+                        (other->color || degree < alloca_regs.size()) && res > max_degree) {
+                        max_degree = res;
                         pair = {vertex, other};
                     }
                     ++it;
