@@ -162,6 +162,21 @@ namespace mir {
             addOperand(pair.second);
         }
 
+        void eraseIncomingValue(const BasicBlock *bb) {
+            auto where = findOperand(bb);
+            assert(where & 1);
+            eraseOperand(where - 1, where + 1);
+        }
+
+        void substituteValue(const BasicBlock *which, Value *_new) {
+            substituteOperand(findOperand(which) - 1, _new);
+        }
+
+        [[nodiscard]] incominng_pair getIncomingValue(const BasicBlock *bb) const {
+            auto where = findOperand(bb);
+            return {getOperand(where - 1), getOperand<BasicBlock>(where)};
+        }
+
         [[nodiscard]] incominng_pair getIncomingValue(int i) const {
             return {getOperand(i * 2), getOperand<BasicBlock>(i * 2 + 1)};
         }
@@ -179,6 +194,22 @@ namespace mir {
             }
             return check_set.empty();
         }
+
+        std::ostream &output(std::ostream &os) const override;
+    };
+
+    struct Instruction::select : Instruction {
+        explicit select(Value *cond, Value *ifTrue, Value *ifFalse) :
+                Instruction(ifTrue->getType(), SELECT, cond, ifTrue, ifFalse) {
+            assert(cond->getType() == Type::getI1Type());
+            assert(ifTrue->getType() == ifFalse->getType());
+        }
+
+        [[nodiscard]] Value *getCondition() const { return getOperand(0); }
+
+        [[nodiscard]] Value *getTrueValue() const { return getOperand(1); }
+
+        [[nodiscard]] Value *getFalseValue() const { return getOperand(2); }
 
         std::ostream &output(std::ostream &os) const override;
     };

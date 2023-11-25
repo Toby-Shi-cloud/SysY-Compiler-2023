@@ -100,6 +100,11 @@ namespace mir {
          */
         std::vector<std::shared_ptr<Use>> operands;
 
+        void reInsertOperandsUser() {
+            for (auto &operand: operands)
+                operand->users.insert(this);
+        }
+
     protected:
         void addOperand(const Value *value) {
             operands.push_back(value->use);
@@ -112,6 +117,7 @@ namespace mir {
                 operand->users.erase(this);
             }
             operands.erase(operands.cbegin() + _first, operands.cbegin() + _end);
+            reInsertOperandsUser();
         }
 
         int findOperand(const Value *value) const {
@@ -123,7 +129,7 @@ namespace mir {
     public:
         template<typename... Args>
         explicit User(pType type, Args... args) : Value(type), operands{args->use...} {
-            for (auto &operand: operands) operand->users.insert(this);
+            reInsertOperandsUser();
         }
 
         explicit User(pType type, const std::vector<Value *> &args) : Value(type) {
@@ -143,7 +149,7 @@ namespace mir {
         void substituteOperand(int pos, Value *_new) {
             operands[pos]->users.erase(this);
             operands[pos] = _new->use;
-            _new->use->users.insert(this);
+            reInsertOperandsUser();
         }
 
         void substituteOperand(Value *_old, Value *_new) {

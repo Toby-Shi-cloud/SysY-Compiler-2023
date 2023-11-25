@@ -8,21 +8,21 @@
 #include "mem2reg.h"
 
 namespace mir {
-    inline auto substitude(Instruction *_old, Instruction *_new) {
+    inline auto substitute(Instruction *_old, Instruction *_new) {
         auto bb = _old->parent;
-        if (_new->isUsed()) _old->moveTo(_new);
-        else _old->swap(_new);
+        _old->moveTo(_new);
         bb->insert(_old->node, _new);
         return bb->erase(_old);
     }
 
-    inline auto substitude(Instruction *_old, Value *_new) {
-        if (_new->isUsed()) _old->moveTo(_new);
-        else _old->swap(_new);
+    inline auto substitute(Instruction *_old, Value *_new) {
+        _old->moveTo(_new);
         return _old->parent->erase(_old);
     }
 
-    void constantFolding(const Function *function);
+    inst_node_t constantFolding(Instruction *inst);
+
+    void constantFolding(const Function *func);
 }
 
 #endif //COMPILER_OPT_H

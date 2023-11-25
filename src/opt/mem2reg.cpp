@@ -182,48 +182,69 @@ namespace mir {
         while (changed) {
             changed = false;
             func->calcPreSuc();
+            // First block shouldn't be cleared
             auto it = ++func->bbs.begin();
             while (it != func->bbs.end()) {
-                if (auto bb = *it; bb->isUsed()) {
-                    ++it;
-                } else {
+                if (auto bb = *it; bb->predecessors.empty()) {
+                    for (auto &&user: bb->users())
+                        if (auto phi = dynamic_cast<Instruction::phi *>(user)) {
+                            phi->eraseIncomingValue(bb);
+                        } else assert(!"Unexpected user of a dead basic block");
                     delete bb;
                     changed = true;
                     it = func->bbs.erase(it);
-                }
+                } else ++it;
             }
         }
     }
 
     void mergeEmptyBlock(Function *func) {
-        // First block shouldn't be merged
-        auto it = ++func->bbs.begin();
-        while (it != func->bbs.end()) {
-            auto bb = *it;
-            if (bb->instructions.size() > 1) {
-                ++it;
-                continue;
+        func->calcPreSuc();
+        for (auto &&bb: func->bbs) {
+            std::queue<BasicBlock *> check_queue;
+            for (auto &&suc: bb->successors) check_queue.push(suc);
+            while (!check_queue.empty()) {
+                auto suc = check_queue.front();
+                check_queue.pop();
+                if (suc->instructions.size() > 1) continue;
+                auto br = dynamic_cast<Instruction::br *>(suc->instructions.back());
+                if (!br || br->hasCondition()) continue;
+                auto target = br->getTarget();
+                br = dynamic_cast<Instruction::br *>(bb->instructions.back());
+                // should check phi here
+                if (bb->successors.count(target)) {
+                    assert(br && br->hasCondition());
+                    auto create_select = [&br](auto &&self, auto &&other) {
+                        auto &&cond = br->getCondition();
+                        if (br->getIfTrue() == other.second) {
+                            return new Instruction::select(cond, other.first, self.first);
+                        } else {
+                            return new Instruction::select(cond, self.first, other.first);
+                        }
+                    };
+                    for (auto &&inst: target->instructions) {
+                        if (auto phi = dynamic_cast<Instruction::phi *>(inst)) {
+                            auto select = create_select(phi->getIncomingValue(bb),
+                                                        phi->getIncomingValue(suc));
+                            bb->insert(br->node, select);
+                            phi->substituteValue(bb, select);
+                        } else break;
+                    }
+                } else {
+                    for (auto &&inst: target->instructions) {
+                        if (auto phi = dynamic_cast<Instruction::phi *>(inst)) {
+                            auto [_v, _b] = phi->getIncomingValue(suc);
+                            phi->addIncomingValue({_v, bb});
+                        } else break;
+                    }
+                }
+                br->substituteOperand(suc, target);
+                constantFolding(br);
+                bb->successors.erase(suc);
+                bb->successors.insert(target);
+                target->predecessors.insert(bb);
+                check_queue.push(target);
             }
-            auto inst = bb->instructions.front();
-            auto br = dynamic_cast<Instruction::br *>(inst);
-            if (!br || br->hasCondition()) {
-                ++it;
-                continue;
-            }
-            // this block only contains a 'br %label' instruction
-            bb->moveTo(br->getTarget());
-            it = func->bbs.erase(it);
-            delete bb;
-        }
-        // after block merging, some br instructions may become:
-        // br i1 %cond, %same_label, %same_label
-        for (auto &bb: func->bbs) {
-            auto inst = bb->instructions.back();
-            auto br = dynamic_cast<Instruction::br *>(inst);
-            if (!br || !br->hasCondition()) continue;
-            if (br->getIfTrue() != br->getIfFalse()) continue;
-            auto label = br->getIfTrue();
-            substitude(br, new Instruction::br(label));
         }
     }
 }

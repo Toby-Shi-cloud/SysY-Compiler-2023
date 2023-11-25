@@ -66,6 +66,8 @@ namespace backend {
 
         void translatePhiInst(const mir::Instruction::phi *phiInst);
 
+        void translateSelectInst(const mir::Instruction::select *selectInst);
+
         void translateCallInst(const mir::Instruction::call *callInst);
 
         void translateFunction(const mir::Function *mirFunction);

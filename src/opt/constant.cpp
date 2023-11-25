@@ -1,6 +1,6 @@
 //
 // Created by toby on 2023/11/24.
-// Contant Folding
+// Constant Folding
 //
 
 #include "opt.h"
@@ -16,7 +16,7 @@ namespace mir {
         else if (auto cond = dynamic_cast<BooleanLiteral *>(br->getCondition()))
             target = cond->value ? br->getIfTrue() : br->getIfFalse();
         else return br->node;
-        return substitude(br, new Instruction::br(target));
+        return substitute(br, new Instruction::br(target));
     }
 
     template<Instruction::InstrTy ty>
@@ -27,11 +27,11 @@ namespace mir {
                       || ty == Instruction::AND || ty == Instruction::OR || ty == Instruction::XOR) {
             if (lhs && !rhs) {
                 using T = std::remove_pointer_t<decltype(binary)>;
-                return substitude(binary, new T(binary->getRhs(), lhs));
+                return substitute(binary, new T(binary->getRhs(), lhs));
             }
         }
         if (!lhs || !rhs) return binary->node;
-        return substitude(binary, binary->calc());
+        return substitute(binary, binary->calc());
     }
 
     static inst_node_t constantFolding(Instruction::load *load) {
@@ -57,7 +57,7 @@ namespace mir {
         };
         auto lit = calc(load->getPointerOperand(), calc);
         if (!lit) return load->node;
-        return substitude(load, *lit);
+        return substitute(load, *lit);
     }
 
     template<Instruction::InstrTy ty>
@@ -67,20 +67,20 @@ namespace mir {
         auto i32 = dynamic_cast<IntegerLiteral *>(literal);
         auto i1 = dynamic_cast<BooleanLiteral *>(literal);
         if constexpr (ty == Instruction::TRUNC) // assmue i32 -> i1
-            return substitude(conversion, getBooleanLiteral(i32->value & 1));
+            return substitute(conversion, getBooleanLiteral(i32->value & 1));
         if constexpr (ty == Instruction::ZEXT) // assmue i1 -> i32
-            return substitude(conversion, getIntegerLiteral(i1->value ? 1 : 0));
+            return substitute(conversion, getIntegerLiteral(i1->value ? 1 : 0));
         if constexpr (ty == Instruction::SEXT) // assmue i1 -> i32
-            return substitude(conversion, getIntegerLiteral(i1->value ? -1 : 0));
+            return substitute(conversion, getIntegerLiteral(i1->value ? -1 : 0));
         __builtin_unreachable();
     }
 
     static inst_node_t constantFolding(Instruction::icmp *icmp) {
         if (icmp->getLhs() == icmp->getRhs()) {
             if (icmp->cond == Instruction::icmp::EQ)
-                return substitude(icmp, getBooleanLiteral(true));
+                return substitute(icmp, getBooleanLiteral(true));
             if (icmp->cond == Instruction::icmp::NE)
-                return substitude(icmp, getBooleanLiteral(false));
+                return substitute(icmp, getBooleanLiteral(false));
         }
         auto lhs = dynamic_cast<IntegerLiteral *>(icmp->getLhs());
         auto rhs = dynamic_cast<IntegerLiteral *>(icmp->getRhs());
@@ -105,27 +105,36 @@ namespace mir {
             __builtin_unreachable();
 #undef CASE
         }();
-        return substitude(icmp, getBooleanLiteral(result));
+        return substitute(icmp, getBooleanLiteral(result));
     }
 
     static inst_node_t constantFolding(Instruction::phi *phi) {
-        reCalcBBInfo(phi->parent->parent);
-        std::vector<Instruction::phi::incominng_pair> vec;
-        for (auto i = 0; i < phi->getNumIncomingValues(); i++)
-            if (phi->parent->predecessors.count(phi->getIncomingValue(i).second))
-                vec.push_back(phi->getIncomingValue(i));
-        if (vec.size() != phi->getNumIncomingValues()) {
-            auto new_phi = new Instruction::phi(vec);
-            substitude(phi, new_phi);
-            phi = new_phi;
-        }
+        phi->parent->parent->calcPreSuc();
+        for (auto i = 0; i < phi->getNumIncomingValues();)
+            if (auto bb = phi->getIncomingValue(i).second;
+                    !phi->parent->predecessors.count(bb))
+                phi->eraseIncomingValue(bb);
+            else ++i;
+        if (phi->getNumIncomingValues() == 0) return phi->node;
         auto [value, bb] = phi->getIncomingValue(0);
         for (auto i = 1; i < phi->getNumIncomingValues(); i++)
             if (value != phi->getIncomingValue(i).first) return phi->node;
-        return substitude(phi, value);
+        return substitute(phi, value);
     }
 
-    static inst_node_t constantFolding(Instruction *inst) {
+    static inst_node_t constantFolding(Instruction::select *select) {
+        Value *result;
+        if (select->getFalseValue() == select->getTrueValue()) {
+            result = select->getTrueValue();
+        } else if (auto lit = dynamic_cast<BooleanLiteral *>(select->getCondition())) {
+            result = lit->value ? select->getTrueValue() : select->getFalseValue();
+        } else {
+            return select->node;
+        }
+        return substitute(select, result);
+    }
+
+    inst_node_t constantFolding(Instruction *inst) {
 #define CASE(ty, cast) case Instruction::ty: return constantFolding(dynamic_cast<Instruction::cast *>(inst))
         switch (inst->instrTy) {
             CASE(BR, br);
@@ -148,17 +157,18 @@ namespace mir {
             CASE(SEXT, sext);
             CASE(ICMP, icmp);
             CASE(PHI, phi);
+            CASE(SELECT, select);
             // ret, alloca, store, getelementptr, call
             default: return inst->node;
         }
 #undef CASE
     }
 
-    void constantFolding(const Function *function) {
+    void constantFolding(const Function *func) {
         bool changed = true;
         while (changed) {
             changed = false;
-            for (auto &bb: function->bbs)
+            for (auto &bb: func->bbs)
                 for (auto it = bb->instructions.begin(); it != bb->instructions.end();) {
                     assert((*it)->parent == bb);
                     assert((*it)->node == it);

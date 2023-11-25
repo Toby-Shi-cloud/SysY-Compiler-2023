@@ -93,7 +93,10 @@ namespace mips {
 
     struct BinaryRInst : InstructionImpl<BinaryRInst> {
         explicit BinaryRInst(Ty ty, rRegister dst, rRegister src1, rRegister src2)
-            : InstructionImpl{ty, {dst}, {src1, src2}} {}
+            : InstructionImpl{ty, {dst}, {src1, src2}} {
+            if (ty == Instruction::Ty::MOVN || ty == Instruction::Ty::MOVZ)
+                reg_use_push_back(dst);
+        }
 
         explicit BinaryRInst(Ty ty, rRegister r1, rRegister r2) : InstructionImpl{ty} {
             if (ty == Ty::CLO || ty == Ty::CLZ) reg_def_push_back(r1), reg_use_push_back(r2);

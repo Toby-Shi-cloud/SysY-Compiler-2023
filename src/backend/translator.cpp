@@ -302,6 +302,17 @@ namespace backend {
         put(phiInst, curFunc->newVirRegister());
     }
 
+    void Translator::translateSelectInst(const mir::Instruction::select *selectInst) {
+        auto cond = getRegister(selectInst->getCondition());
+        auto trueValue = getRegister(selectInst->getTrueValue());
+        auto falseValue = getRegister(selectInst->getFalseValue());
+        auto result = curFunc->newVirRegister();
+        curBlock->push_back(std::make_unique<mips::MoveInst>(result, trueValue));
+        curBlock->push_back(std::make_unique<mips::BinaryRInst>(
+                mips::Instruction::Ty::MOVZ, result, falseValue, cond));
+        put(selectInst, result);
+    }
+
     void Translator::translateCallInst(const mir::Instruction::call *callInst) {
         if (auto func = callInst->getFunction(); func == mir::Function::getint) {
             auto dst = curFunc->newVirRegister();
@@ -475,6 +486,8 @@ namespace backend {
                 return translateIcmpInst(dynamic_cast<const mir::Instruction::icmp *>(mirInst));
             case mir::Instruction::PHI:
                 return translatePhiInst(dynamic_cast<const mir::Instruction::phi *>(mirInst));
+            case mir::Instruction::SELECT:
+                return translateSelectInst(dynamic_cast<const mir::Instruction::select *>(mirInst));
             case mir::Instruction::CALL:
                 return translateCallInst(dynamic_cast<const mir::Instruction::call *>(mirInst));
         }

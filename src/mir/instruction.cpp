@@ -146,6 +146,10 @@ namespace mir {
     Instruction::call::call(Function *func, const std::vector<Value *> &args)
         : Instruction(func->getType()->getFunctionRet(), CALL, merge(func, args.begin(), args.end())) {}
 
+    std::ostream &Instruction::select::output(std::ostream &os) const {
+        return os << getName() << " = select " << getCondition() << ", " << getTrueValue() << ", " << getFalseValue();
+    }
+
     std::ostream &Instruction::call::output(std::ostream &os) const {
         if (getFunction()->retType != Type::getVoidType())
             os << getName() << " = ";

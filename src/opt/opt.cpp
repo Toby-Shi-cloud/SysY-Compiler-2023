@@ -5,14 +5,21 @@
 #include "opt.h"
 
 namespace mir {
+    static void _optimize(Function *func) {
+        constantFolding(func);
+        clearDeadBlock(func);
+        mergeEmptyBlock(func);
+        calcPhi(func);
+        constantFolding(func);
+        clearDeadInst(func);
+        mergeEmptyBlock(func);
+        clearDeadBlock(func);
+        constantFolding(func);
+    }
+
     void Manager::optimize() {
         assert((allocName(), true));
-        for_each_func(constantFolding);
-        for_each_func(clearDeadBlock);
-        for_each_func(mergeEmptyBlock);
-        for_each_func(calcPhi);
-        for_each_func(constantFolding);
-        for_each_func(clearDeadInst);
+        for_each_func(_optimize);
 
         for (auto it = functions.begin(); it != functions.end();) {
             if (auto &&func = *it; func->getName() != "@main" && !func->isUsed()) {

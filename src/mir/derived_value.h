@@ -158,7 +158,7 @@ namespace mir {
             // Conversion Operations
             TRUNC, ZEXT, SEXT,
             // Other Operations
-            ICMP, PHI, CALL
+            ICMP, PHI, SELECT, CALL
         } instrTy;
 
         BasicBlock *parent = nullptr;
@@ -207,6 +207,7 @@ namespace mir {
         using sext = _conversion_instruction<SEXT>;
         struct icmp;
         struct phi;
+        struct select;
         struct call;
     };
 
