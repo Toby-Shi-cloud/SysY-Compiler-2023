@@ -157,6 +157,7 @@ namespace mir {
             if (auto alloc = dynamic_cast<Instruction::alloca_ *>(inst)) {
                 if (alloc->getType() != Type::getI32Type()) continue;
                 calcPhi(func, alloc);
+                opt_infos.mem_to_reg()++;
             } else break;
         }
     }
@@ -169,9 +170,11 @@ namespace mir {
                 auto it = bb->instructions.begin();
                 while (it != bb->instructions.end()) {
                     if (auto inst = *it;
-                        inst->isUsed() || !inst->isValue() || inst->isTerminator() || inst->isCall())
-                        ++it;
-                    else it = bb->erase(inst), changed = true;
+                        inst->isValue() && !inst->isUsed() && !inst->isTerminator() && !inst->isCall()) {
+                        opt_infos.clear_dead_inst()++;
+                        changed = true;
+                        it = bb->erase(inst);
+                    } else ++it;
                 }
             }
         }
@@ -192,6 +195,7 @@ namespace mir {
                         } else assert(!"Unexpected user of a dead basic block");
                     delete bb;
                     changed = true;
+                    opt_infos.clear_dead_block()++;
                     it = func->bbs.erase(it);
                 } else ++it;
             }
@@ -244,6 +248,7 @@ namespace mir {
                 bb->successors.insert(target);
                 target->predecessors.insert(bb);
                 check_queue.push(target);
+                opt_infos.merge_empty_block()++;
             }
         }
     }

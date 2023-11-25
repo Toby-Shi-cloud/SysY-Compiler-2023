@@ -25,4 +25,49 @@ namespace mir {
     void constantFolding(const Function *func);
 }
 
+namespace mir {
+#define DECLARE(field, id) \
+    [[nodiscard]] int &field() { return (*this)[id]; } \
+    [[nodiscard]] int field() const { return (*this)[id]; }
+
+    inline struct OptInfos : std::array<int, 5> {
+        DECLARE(constant_folding, 0)
+        DECLARE(clear_dead_inst, 1)
+        DECLARE(clear_dead_block, 2)
+        DECLARE(merge_empty_block, 3)
+        DECLARE(mem_to_reg, 4)
+
+        OptInfos operator+(const OptInfos &other) const {
+            OptInfos res = {};
+            for (int i = 0; i < 5; ++i) res[i] = (*this)[i] + other[i];
+            return res;
+        }
+
+        OptInfos &operator+=(const OptInfos &other) {
+            for (int i = 0; i < 5; ++i) (*this)[i] += other[i];
+            return *this;
+        }
+    } opt_infos;
+
+#undef DECLARE
+}
+
+#ifdef DBG_ENABLE
+namespace dbg {
+    template<>
+    inline bool pretty_print(std::ostream &stream, const mir::OptInfos &value) {
+#define str(field) #field << ": " << value.field()
+        stream << "{";
+        stream << str(constant_folding) << ", ";
+        stream << str(clear_dead_inst) << ", ";
+        stream << str(clear_dead_block) << ", ";
+        stream << str(merge_empty_block) << ", ";
+        stream << str(mem_to_reg);
+        stream << "}";
+        return true;
+#undef str
+    }
+}
+#endif
+
 #endif //COMPILER_OPT_H

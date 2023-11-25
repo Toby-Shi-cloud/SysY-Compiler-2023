@@ -6,20 +6,25 @@
 
 namespace mir {
     static void _optimize(Function *func) {
-        constantFolding(func);
-        clearDeadBlock(func);
-        mergeEmptyBlock(func);
-        calcPhi(func);
-        constantFolding(func);
-        clearDeadInst(func);
-        mergeEmptyBlock(func);
-        clearDeadBlock(func);
-        constantFolding(func);
+// this macro is used to allocName for values when debug mod enabled.
+#define FUNC (assert((func->allocName(), true)), func)
+        constantFolding(FUNC);
+        clearDeadInst(FUNC);
+        clearDeadBlock(FUNC);
+        mergeEmptyBlock(FUNC);
+        calcPhi(FUNC);
+#undef FUNC
     }
 
     void Manager::optimize() {
-        assert((allocName(), true));
-        for_each_func(_optimize);
+        OptInfos _sum = {};
+        opt_infos = { 1 };
+        while (opt_infos != OptInfos{}) {
+            opt_infos = {};
+            for_each_func(_optimize);
+            _sum += opt_infos;
+        }
+        dbg(_sum);
 
         for (auto it = functions.begin(); it != functions.end();) {
             if (auto &&func = *it; func->getName() != "@main" && !func->isUsed()) {

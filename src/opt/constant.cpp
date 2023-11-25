@@ -173,6 +173,7 @@ namespace mir {
                     assert((*it)->parent == bb);
                     assert((*it)->node == it);
                     if (auto new_it = constantFolding(*it); new_it != it) {
+                        opt_infos.constant_folding()++;
                         changed = true;
                         it = new_it;
                     } else ++it;
