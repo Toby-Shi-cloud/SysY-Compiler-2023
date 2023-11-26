@@ -10,7 +10,9 @@
 #include "translator.h"
 
 namespace backend {
-    const auto alloca_regs = mips::PhyRegister::get("$v0", "$t9");
+    const auto alloca_regs = mips::PhyRegister::get([](const auto &&phy) {
+        return phy->isArg() || phy->isRet() || phy->isTemp() || phy->isSaved();
+    });
     const auto temp_regs = mips::PhyRegister::get([](const auto &&phy) {
         return phy->isArg() || phy->isRet() || phy->isTemp();
     });
@@ -18,14 +20,16 @@ namespace backend {
         return r->isVirtual() || alloca_regs.count(dynamic_cast<mips::rPhyRegister>(r));
     };
 
-    static mips::inst_pos_t load_at(mips::rSubBlock block, mips::inst_pos_t it, mips::rRegister dst, int offset) {
+    static mips::inst_pos_t load_at(mips::rFunction func, mips::rSubBlock block, mips::inst_pos_t it, mips::rRegister dst, int offset) {
         return block->insert(it, std::make_unique<mips::LoadInst>(
-                                 mips::Instruction::Ty::LW, dst, mips::PhyRegister::get("$fp"), offset));
+                                 mips::Instruction::Ty::LW, dst, mips::PhyRegister::get("$sp"),
+                                 offset, &func->stackOffset));
     }
 
-    static mips::inst_pos_t store_at(mips::rSubBlock block, mips::inst_pos_t it, mips::rRegister src, int offset) {
+    static mips::inst_pos_t store_at(mips::rFunction func, mips::rSubBlock block, mips::inst_pos_t it, mips::rRegister src, int offset) {
         return block->insert(it, std::make_unique<mips::StoreInst>(
-                                 mips::Instruction::Ty::SW, src, mips::PhyRegister::get("$fp"), offset));
+                                 mips::Instruction::Ty::SW, src, mips::PhyRegister::get("$sp"),
+                                 offset, &func->stackOffset));
     }
 
     void register_alloca(mips::rFunction function) {
@@ -51,13 +55,13 @@ namespace backend {
                 auto vir = function->newVirRegister();
                 while (!reg->useUsers.empty()) {
                     auto &&user = *reg->useUsers.begin();
-                    load_at(user->parent, user->node, vir, offset);
+                    load_at(function, user->parent, user->node, vir, offset);
                     reg->swapUseIn(vir, user);
                 }
                 while (!reg->defUsers.empty()) {
                     auto &&defer = *reg->defUsers.begin();
                     auto it = defer->node;
-                    store_at(defer->parent, ++it, vir, offset);
+                    store_at(function, defer->parent, ++it, vir, offset);
                     reg->swapDefIn(vir, defer);
                 }
             }

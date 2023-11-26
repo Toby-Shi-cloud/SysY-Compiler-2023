@@ -120,6 +120,7 @@ namespace mips {
 
     struct Function {
         pLabel label;
+        int stackOffset = 0;
         unsigned allocaSize, argSize;
         const bool isMain, isLeaf;
         PhyRegister::phy_set_t shouldSave;
@@ -144,7 +145,7 @@ namespace mips {
 
         template<typename... Args>
         rAddress newAddress(Args... args) {
-            auto addr = new Address(args...);
+            auto addr = new Address(std::forward<decltype(args)>(args)...);
             usedAddress.emplace(addr);
             return addr;
         }

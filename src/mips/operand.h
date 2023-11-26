@@ -33,19 +33,6 @@ namespace mips {
         }
     };
 
-    struct Address : Operand {
-        rRegister base;
-        int offset;
-        rLabel label;
-
-        explicit Address(rRegister base, int offset, rLabel label = nullptr)
-            : base(base), offset(offset), label(label) {}
-
-        std::ostream &output(std::ostream &os) const override {
-            return os << label << " + " << offset << "(" << base << ")";
-        }
-    };
-
     struct Immediate : Operand {
         int value;
 
@@ -53,6 +40,24 @@ namespace mips {
 
         std::ostream &output(std::ostream &os) const override {
             return os << value;
+        }
+
+        [[nodiscard]] virtual pImmediate clone() const {
+            return std::make_unique<Immediate>(value);
+        }
+    };
+
+    struct ImmOffset : Immediate {
+        const int *base;
+
+        explicit ImmOffset(int value, const int *base) : Immediate(value), base(base) {}
+
+        std::ostream &output(std::ostream &os) const override {
+            return os << value + *base;
+        }
+
+        [[nodiscard]] pImmediate clone() const override {
+            return std::make_unique<ImmOffset>(value, base);
         }
     };
 
@@ -121,14 +126,6 @@ namespace mips {
 
         [[nodiscard]] static rPhyRegister get(const std::string &name) { return registers[name2id.at(name)].get(); }
 
-        [[nodiscard]] static auto get(const std::string &first, const std::string &last) {
-            phy_set_t regs;
-            auto begin = name2id.at(first);
-            auto end = name2id.at(last);
-            for (unsigned id = begin; id <= end; id++) regs.insert(get(id));
-            return regs;
-        }
-
         template<typename Func,
             typename = std::enable_if_t<std::is_convertible_v<std::invoke_result_t<Func, rPhyRegister>, bool>>>
         [[nodiscard]] static auto get(Func &&pred) {
@@ -139,29 +136,13 @@ namespace mips {
             return regs;
         }
 
-        [[nodiscard]] bool isUniversal() const { return id >= 8 && id <= 25; }
-
         [[nodiscard]] bool isRet() const { return id >= 2 && id <= 3; }
 
         [[nodiscard]] bool isArg() const { return id >= 4 && id <= 7; }
 
         [[nodiscard]] bool isTemp() const { return id >= 8 && id <= 15 || id >= 24 && id <= 25; }
 
-        [[nodiscard]] bool isSaved() const { return id >= 16 && id <= 23; }
-
-        [[nodiscard]] bool isGp() const { return id == 28; }
-
-        [[nodiscard]] bool isSp() const { return id == 29; }
-
-        [[nodiscard]] bool isFp() const { return id == 30; }
-
-        [[nodiscard]] bool isRa() const { return id == 31; }
-
-        [[nodiscard]] bool isHi() const { return id == 32; }
-
-        [[nodiscard]] bool isLo() const { return id == 33; }
-
-        [[nodiscard]] bool isHiLo() const { return id >= 32; }
+        [[nodiscard]] bool isSaved() const { return id >= 16 && id <= 23 || id == 30; }
 
         std::ostream &output(std::ostream &os) const override { return os << names[id]; }
     };
@@ -191,6 +172,30 @@ namespace mips {
     inline bool Register::isPhysical() const {
         return dynamic_cast<const PhyRegister *>(this) != nullptr;
     }
+
+    struct Address : Operand {
+        rRegister base;
+        pImmediate offset;
+        rLabel label;
+
+        explicit Address(rRegister base, int offset, rLabel label = nullptr)
+                : base(base), offset(new Immediate(offset)), label(label) {}
+
+        explicit Address(rRegister base, int offset, const int *immBase, rLabel label = nullptr)
+                : base(base), offset(new ImmOffset(offset, immBase)), label(label) {}
+
+        explicit Address(rRegister base, pImmediate offset, rLabel label = nullptr)
+                : base(base), offset(std::move(offset)), label(label) {}
+
+        std::ostream &output(std::ostream &os) const override {
+            label->output(os);
+            os << " + ";
+            offset->output(os);
+            os << "(";
+            base->output(os);
+            return os << ")";
+        }
+    };
 
     template<typename T, typename = std::enable_if_t<std::is_base_of_v<Operand, T>>>
     std::ostream &operator<<(std::ostream &os, const T &operand) {

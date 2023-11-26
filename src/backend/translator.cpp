@@ -76,10 +76,10 @@ namespace backend {
                     mips::Instruction::Ty::ADDU, dst, dst, addr->base));
             if (addr->offset)
                 curBlock->push_back(std::make_unique<mips::BinaryIInst>(
-                    mips::Instruction::Ty::ADDIU, dst, dst, addr->offset));
+                        mips::Instruction::Ty::ADDIU, dst, dst, addr->offset->clone()));
         } else {
             curBlock->push_back(std::make_unique<mips::BinaryIInst>(
-                mips::Instruction::Ty::ADDIU, dst, addr->base, addr->offset));
+                    mips::Instruction::Ty::ADDIU, dst, addr->base, addr->offset->clone()));
         }
         return dst;
     }
@@ -144,7 +144,8 @@ namespace backend {
         auto alloca_size = allocaInst->getType()->size();
         assert(alloca_size % 4 == 0);
         curFunc->allocaSize += alloca_size;
-        auto addr = curFunc->newAddress(mips::PhyRegister::get("$fp"), -curFunc->allocaSize);
+        auto addr = curFunc->newAddress(mips::PhyRegister::get("$sp"),
+                                        -curFunc->allocaSize, &curFunc->stackOffset);
         put(allocaInst, addr);
     }
 
@@ -191,7 +192,9 @@ namespace backend {
             auto value = getPtrInst->getIndexOperand(i);
             int deduce_size = static_cast<int>(deduce_type->size());
             if (auto imm = dynamic_cast<mir::IntegerLiteral *>(value)) {
-                addr = curFunc->newAddress(addr->base, addr->offset + imm->value * deduce_size, addr->label);
+                auto _new = addr->offset->clone();
+                _new->value += imm->value * deduce_size;
+                addr = curFunc->newAddress(addr->base, std::move(_new), addr->label);
             } else {
                 auto reg = getRegister(value);
                 auto dst1 = curFunc->newVirRegister();
@@ -200,7 +203,7 @@ namespace backend {
                     mips::Instruction::Ty::MUL, dst1, reg, deduce_size));
                 curBlock->push_back(std::make_unique<mips::BinaryRInst>(
                     mips::Instruction::Ty::ADDU, dst2, addr->base, dst1));
-                addr = curFunc->newAddress(dst2, addr->offset, addr->label);
+                addr = curFunc->newAddress(dst2, addr->offset->clone(), addr->label);
             }
         }
         put(getPtrInst, addr);
@@ -382,7 +385,6 @@ namespace backend {
         curFunc = new mips::Function{std::move(name), isMain, isLeaf};
         fMap[mirFunction] = curFunc;
         if (!isLeaf) curFunc->shouldSave.insert(mips::PhyRegister::get("$ra"));
-        if (!isMain) curFunc->shouldSave.insert(mips::PhyRegister::get("$fp"));
         if (isMain) mipsModule->main = mips::pFunction(curFunc);
         else mipsModule->functions.emplace_back(curFunc);
 
@@ -402,10 +404,10 @@ namespace backend {
                 curFunc->blocks.front()->push_back(std::make_unique<mips::MoveInst>(
                     reg, mips::PhyRegister::get("$a" + std::to_string(i))));
             } else {
-                // lw %vr, x($fp)
+                // lw %vr, x($sp)
                 curFunc->blocks.front()->push_back(std::make_unique<mips::LoadInst>(
                     mips::Instruction::Ty::LW, reg,
-                    mips::PhyRegister::get("$fp"), (i - 4) * 4));
+                    mips::PhyRegister::get("$sp"), (i - 4) * 4, &curFunc->stackOffset));
             }
             put(mirFunction->args[i], reg);
         }
@@ -624,23 +626,23 @@ namespace backend {
     }
 
     void Translator::compute_func_start() const {
-        int cnt = 0;
         auto &first_block = curFunc->blocks.front();
         auto startB = new mips::Block(curFunc);
         startB->node = curFunc->blocks.emplace(curFunc->blocks.begin(), startB);
+
+        // addiu $sp, $sp, -(allocaSize+argSize)
+        curFunc->stackOffset = curFunc->allocaSize + curFunc->argSize + 4 * curFunc->shouldSave.size();
+        if (curFunc->stackOffset)
+            startB->push_back(std::make_unique<mips::BinaryIInst>(
+                    mips::Instruction::Ty::ADDIU, mips::PhyRegister::get("$sp"),
+                    mips::PhyRegister::get("$sp"), -curFunc->stackOffset));
+        // save registers
+        int cnt = 0;
         for (auto reg: curFunc->shouldSave) {
             startB->push_back(std::make_unique<mips::StoreInst>(
                 mips::Instruction::Ty::SW, reg,
-                mips::PhyRegister::get("$sp"), -curFunc->allocaSize - ++cnt * 4));
+                mips::PhyRegister::get("$sp"), -curFunc->allocaSize - ++cnt * 4, &curFunc->stackOffset));
         }
-        // move $fp, $sp
-        startB->push_back(std::make_unique<mips::MoveInst>(
-            mips::PhyRegister::get("$fp"), mips::PhyRegister::get("$sp")));
-        // addiu $sp, $sp, -(allocaSize+argSize)
-        if (-curFunc->allocaSize - curFunc->argSize - cnt * 4 != 0)
-            startB->push_back(std::make_unique<mips::BinaryIInst>(
-                mips::Instruction::Ty::ADDIU, mips::PhyRegister::get("$sp"),
-                mips::PhyRegister::get("$sp"), -curFunc->allocaSize - curFunc->argSize - cnt * 4));
         startB->push_back(std::make_unique<mips::JumpInst>(
             mips::Instruction::Ty::J, first_block->label.get()));
     }
@@ -650,14 +652,15 @@ namespace backend {
             curFunc->exitB->push_back(mips::SyscallInst::syscall(
                 mips::SyscallInst::SyscallId::ExitProc));
         } else {
-            // move $sp, $fp
-            curFunc->exitB->push_back(std::make_unique<mips::MoveInst>(
-                mips::PhyRegister::get("$sp"), mips::PhyRegister::get("$fp")));
             int cnt = 0;
             for (auto reg: curFunc->shouldSave)
                 curFunc->exitB->push_back(std::make_unique<mips::LoadInst>(
                     mips::Instruction::Ty::LW, reg,
-                    mips::PhyRegister::get("$sp"), -curFunc->allocaSize - ++cnt * 4));
+                    mips::PhyRegister::get("$sp"), -curFunc->allocaSize - ++cnt * 4, &curFunc->stackOffset));
+            if (curFunc->stackOffset)
+                curFunc->exitB->push_back(std::make_unique<mips::BinaryIInst>(
+                        mips::Instruction::Ty::ADDIU, mips::PhyRegister::get("$sp"),
+                        mips::PhyRegister::get("$sp"), curFunc->stackOffset));
             // jr $ra
             curFunc->exitB->push_back(std::make_unique<mips::JumpInst>(
                 mips::Instruction::Ty::JR, mips::PhyRegister::get("$ra")));

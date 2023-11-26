@@ -21,10 +21,11 @@ namespace mips {
     def(Operand);
     def(Register);
     def(Label);
-    def(Address);
     def(Immediate);
+    def(ImmOffset);
     def(PhyRegister);
     def(VirRegister);
+    def(Address);
 }
 
 // component.h
