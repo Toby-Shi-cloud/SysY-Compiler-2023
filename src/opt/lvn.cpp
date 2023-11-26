@@ -2,6 +2,7 @@
 // Created by toby on 2023/11/26.
 //
 
+#include <set>
 #include <functional>
 #include "opt.h"
 
@@ -36,6 +37,8 @@ namespace mir {
         std::unordered_map<operator_t, Value *> variables;
         std::unordered_map<Instruction *, inst_vector_t> edges;
         std::unordered_map<Instruction *, int> degrees;
+        std::unordered_map<Instruction *, int> origin;
+        int cnt = 0;
 
         //TODO: This is too simple...
         Instruction *last_memory_inst = nullptr;
@@ -55,14 +58,16 @@ namespace mir {
             }
             variables[key] = inst;
             degrees[inst] = 0;
+            origin[inst] = cnt++;
             for (auto &&v: key.second)
                 if (auto t = dynamic_cast<Instruction *>(v); degrees.count(t))
                     degrees[t]++, edges[inst].push_back(t);
             ++it;
         }
 
+        auto comp = [&](Instruction *x, Instruction *y) { return origin[x] > origin[y]; };
         std::vector<Instruction *> result;
-        std::unordered_set<Instruction *> candidates;
+        std::set<Instruction *, decltype(comp)> candidates{comp};
         for (auto &&[inst, deg]: degrees)
             if (deg == 0) candidates.insert(inst);
         auto dfs = [&](Instruction *inst, auto &&self) -> void {
@@ -73,10 +78,8 @@ namespace mir {
                 if (degrees[v] == 0)
                     candidates.insert(v);
             }
-            for (auto &&v: edges[inst]) {
-                if (!candidates.count(v)) break;
-                self(v, self);
-            }
+            if (!edges[inst].empty() && candidates.count(edges[inst][0]))
+                self(edges[inst][0], self);
         };
         while (!candidates.empty())
             dfs(*candidates.begin(), dfs);
