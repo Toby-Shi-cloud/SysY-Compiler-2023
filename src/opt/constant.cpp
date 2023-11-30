@@ -109,7 +109,7 @@ namespace mir {
         if (auto ret = arithmeticFoldingRem(binary); ret != binary->node) return ret;
         if (auto rhs = dynamic_cast<IntegerLiteral *>(binary->getRhs());
             rhs && rhs->value < 0) {
-            return substitute(binary, new Instruction::urem(binary->getLhs(), getIntegerLiteral(-rhs->value)));
+            return substitute(binary, new Instruction::srem(binary->getLhs(), getIntegerLiteral(-rhs->value)));
             // x % -y = x % y
         }
         return binary->node;
