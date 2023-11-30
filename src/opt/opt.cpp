@@ -10,7 +10,7 @@ namespace mir {
 // this macro is used to allocName for values when debug mod enabled.
 #define FUNC (assert((func->allocName(), true)), func)
         if (opt_settings.using_mem2reg) calcPhi(FUNC);
-        if (opt_settings.using_const_fold) constantFolding(FUNC);
+        if (opt_settings.using_constant_folding) constantFolding(FUNC);
         if (opt_settings.using_lvn) localVariableNumbering(FUNC);
         if (!opt_settings.force_no_opt) clearDeadInst(FUNC);
         if (!opt_settings.force_no_opt) clearDeadBlock(FUNC);

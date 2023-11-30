@@ -20,6 +20,13 @@ namespace mir {
         return _old->parent->erase(_old);
     }
 
+    template<typename... Args>
+    auto substitute(Instruction *_old, Instruction *_new, Args... args) {
+        auto bb = _old->parent;
+        bb->insert(_old->node, _new);
+        return substitute(_old, std::forward<Args>(args)...);
+    }
+
     inst_node_t constantFolding(Instruction *inst);
 
     void constantFolding(const Function *func);
