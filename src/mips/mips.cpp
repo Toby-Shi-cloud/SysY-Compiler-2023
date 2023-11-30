@@ -76,6 +76,17 @@ namespace mips {
         }
     }
 
+    void Module::calcGlobalVarOffset() const {
+        int offset = -0x8000;
+        for (auto &&var: globalVars) {
+            if (var->isInit) continue;
+            if (static_cast<int>(var->size + offset) >= 0x8000) continue;
+            var->inExtern = true;
+            var->offsetofGp = offset;
+            offset += static_cast<int>(var->size);
+        }
+    }
+
     rInstruction Instruction::next() const {
         auto it = node;
         if (++it == parent->end()) return nullptr;

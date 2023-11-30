@@ -28,6 +28,8 @@ namespace mips {
         template<typename T>
         explicit Label(std::string name, T parent) : name(std::move(name)), parent(parent) {}
 
+        explicit Label(std::string name) : name(std::move(name)) {}
+
         std::ostream &output(std::ostream &os) const override {
             return os << name;
         }
@@ -45,6 +47,8 @@ namespace mips {
         [[nodiscard]] virtual pImmediate clone() const {
             return std::make_unique<Immediate>(value);
         }
+
+        [[nodiscard]] virtual bool isDyn() const { return false; }
     };
 
     struct DynImmediate : Immediate {
@@ -59,6 +63,8 @@ namespace mips {
         [[nodiscard]] pImmediate clone() const override {
             return std::make_unique<DynImmediate>(value, base);
         }
+
+        [[nodiscard]] bool isDyn() const override { return true; }
     };
 
     struct Register : Operand {
@@ -78,9 +84,9 @@ namespace mips {
 
         void swapUseIn(rRegister other, rInstruction inst);
 
-        [[nodiscard]] bool isVirtual() const;
+        [[nodiscard]] virtual bool isVirtual() const { return false; };
 
-        [[nodiscard]] bool isPhysical() const;
+        [[nodiscard]] virtual bool isPhysical() const { return false; };
     };
 
     struct PhyRegister : Register {
@@ -136,6 +142,8 @@ namespace mips {
             return regs;
         }
 
+        [[nodiscard]] bool isPhysical() const override { return true; };
+
         [[nodiscard]] bool isRet() const { return id >= 2 && id <= 3; }
 
         [[nodiscard]] bool isArg() const { return id >= 4 && id <= 7; }
@@ -163,15 +171,9 @@ namespace mips {
         std::ostream &output(std::ostream &os) const override {
             return os << "$vr" << id << "";
         }
+
+        [[nodiscard]] bool isVirtual() const override { return true; };
     };
-
-    inline bool Register::isVirtual() const {
-        return dynamic_cast<const VirRegister *>(this) != nullptr;
-    }
-
-    inline bool Register::isPhysical() const {
-        return dynamic_cast<const PhyRegister *>(this) != nullptr;
-    }
 
     struct Address : Operand {
         rRegister base;
@@ -179,13 +181,13 @@ namespace mips {
         rLabel label;
 
         explicit Address(rRegister base, int offset, rLabel label = nullptr)
-                : base(base), offset(new Immediate(offset)), label(label) {}
+            : base(base), offset(new Immediate(offset)), label(label) {}
 
         explicit Address(rRegister base, int offset, const int *immBase, rLabel label = nullptr)
-                : base(base), offset(new DynImmediate(offset, immBase)), label(label) {}
+            : base(base), offset(new DynImmediate(offset, immBase)), label(label) {}
 
         explicit Address(rRegister base, pImmediate offset, rLabel label = nullptr)
-                : base(base), offset(std::move(offset)), label(label) {}
+            : base(base), offset(std::move(offset)), label(label) {}
 
         std::ostream &output(std::ostream &os) const override {
             label->output(os);

@@ -61,8 +61,8 @@ namespace mips {
         }
 
         template<typename... Args>
-        auto erase(Args... args) {
-            return instructions.erase(args...);
+        auto erase(Args... args) -> decltype(instructions.erase(std::forward<decltype(args)>(args)...)) {
+            return instructions.erase(std::forward<decltype(args)>(args)...);
         }
 
         std::ostream &output(std::ostream &os, bool sharp_last = false) const {
@@ -144,7 +144,7 @@ namespace mips {
         }
 
         template<typename... Args>
-        rAddress newAddress(Args... args) {
+        auto newAddress(Args... args) -> decltype(new Address(std::forward<decltype(args)>(args)...)) {
             auto addr = new Address(std::forward<decltype(args)>(args)...);
             usedAddress.emplace(addr);
             return addr;
@@ -174,7 +174,8 @@ namespace mips {
 
     struct GlobalVar {
         pLabel label;
-        bool isInit, isString, isConst;
+        bool isInit, isString, isConst, inExtern{};
+        int offsetofGp = 0;
         unsigned size;
         std::variant<std::string, std::vector<int>> elements;
 
@@ -188,6 +189,12 @@ namespace mips {
         pFunction main;
         std::vector<pFunction> functions;
         std::vector<pGlobalVar> globalVars;
+
+        /**
+         * Calculate the offset of global variables in .data section.
+         * To make full use of $gp, try to place $gp at .data + 0x8000.
+         */
+        void calcGlobalVarOffset() const;
     };
 
     inline std::ostream &operator<<(std::ostream &os, const SubBlock &block) {
@@ -212,6 +219,7 @@ namespace mips {
     }
 
     inline std::ostream &operator<<(std::ostream &os, const GlobalVar &var) {
+        if (var.inExtern) return os << "\t.extern\t" << var.label << ", " << var.size << "\n";
         os << var.label << ":" << "\n";
         if (!var.isInit) os << "\t.space\t" << var.size << "\n";
         else if (var.isString) {

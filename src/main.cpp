@@ -1,5 +1,6 @@
 #include <fstream>
 #include <iostream>
+#include "settings.h"
 #include "frontend/parser.h"
 #include "frontend/visitor.h"
 #include "mir/manager.h"
@@ -10,7 +11,6 @@ frontend::message_queue_t message_queue;
 mir::Manager mir_manager;
 mips::Module mips_module;
 
-int optimize = 2;
 bool no_mips = false;
 const char *source_file = "testfile.txt";
 const char *llvm_ir_file = "llvm_ir.txt";
@@ -18,11 +18,12 @@ const char *mips_file = "mips.txt";
 const char *error_file = "error.txt";
 
 int main(int argc, char **argv) {
+    set_optimize_level(2); // as default
     decltype(source_file) *ptr = &source_file;
     for (int i = 1; i < argc; i++) {
         using namespace std::string_literals;
-        if (argv[i] == "-O0"s) optimize = 0;
-        else if (argv[i] == "-O2"s) optimize = 2;
+        if (argv[i] == "-O0"s) set_optimize_level(0);
+        else if (argv[i] == "-O2"s) set_optimize_level(2);
         else if (argv[i] == "-no-S"s) no_mips = true;
         else if (argv[i] == "-S"s) ptr = &mips_file;
         else if (argv[i] == "-emit-llvm"s) ptr = &llvm_ir_file;
@@ -51,13 +52,13 @@ int main(int argc, char **argv) {
     }
     if (!message_queue.empty()) return 0;
 
-    if (optimize) mir_manager.optimize();
+    mir_manager.optimize();
     mir_manager.allocName();
     mir_manager.output(fir);
 
     if (no_mips) return 0;
 
-    backend::Translator translator(&mir_manager, &mips_module, optimize);
+    backend::Translator translator(&mir_manager, &mips_module);
     translator.translate();
 
     fmips << mips_module;

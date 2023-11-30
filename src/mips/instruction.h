@@ -160,17 +160,13 @@ namespace mips {
             : InstructionImpl{ty, {dst}, {base}}, label(nullptr), offset(new Immediate(offset)) {}
 
         explicit LoadInst(Ty ty, rRegister dst, rRegister base, int offset, const int *immBase)
-                : InstructionImpl{ty, {dst}, {base}}, label(nullptr), offset(new DynImmediate(offset, immBase)) {}
+        : InstructionImpl{ty, {dst}, {base}}, label(nullptr), offset(new DynImmediate(offset, immBase)) {}
 
-        explicit LoadInst(Ty ty, rRegister dst, rRegister base, int offset, rLabel label)
-            : InstructionImpl{ty, {dst}, {base}}, label(label), offset(new Immediate(offset)) {}
+        explicit LoadInst(Ty ty, rRegister dst, rRegister base, pImmediate &&offset)
+                : InstructionImpl{ty, {dst}, {base}}, label(nullptr), offset(std::move(offset)) {}
 
         explicit LoadInst(Ty ty, rRegister dst, rLabel label)
             : InstructionImpl{ty, {dst}, {}}, label(label), offset(nullptr) {}
-
-        explicit LoadInst(Ty ty, rRegister dst, rAddress address)
-                : InstructionImpl{ty, {dst}, {address->base}}, label(address->label),
-                  offset(address->offset->clone()) {}
 
         [[nodiscard]] rRegister dst() const { return regDef[0]; }
 
@@ -196,17 +192,13 @@ namespace mips {
             : InstructionImpl{ty, {}, {src, base}}, label(nullptr), offset(new Immediate(offset)) {}
 
         explicit StoreInst(Ty ty, rRegister src, rRegister base, int offset, const int *immBase)
-                : InstructionImpl{ty, {}, {src, base}}, label(nullptr), offset(new DynImmediate(offset, immBase)) {}
+        : InstructionImpl{ty, {}, {src, base}}, label(nullptr), offset(new DynImmediate(offset, immBase)) {}
 
-        explicit StoreInst(Ty ty, rRegister src, rRegister base, int offset, rLabel label)
-            : InstructionImpl{ty, {}, {src, base}}, label(label), offset(new Immediate(offset)) {}
+        explicit StoreInst(Ty ty, rRegister src, rRegister base, pImmediate &&offset)
+                : InstructionImpl{ty, {}, {src, base}}, label(nullptr), offset(std::move(offset)) {}
 
         explicit StoreInst(Ty ty, rRegister src, rLabel label)
             : InstructionImpl{ty, {}, {src}}, label(label), offset(nullptr) {}
-
-        explicit StoreInst(Ty ty, rRegister src, rAddress address)
-                : InstructionImpl{ty, {}, {src, address->base}}, label(address->label),
-                  offset(address->offset->clone()) {}
 
         [[nodiscard]] rRegister src() const { return regUse[0]; }
 

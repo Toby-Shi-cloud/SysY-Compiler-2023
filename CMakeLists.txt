@@ -17,6 +17,7 @@ add_executable(Compiler
         src/main.cpp
         src/mips.h
         src/mir.h
+        src/settings.h
         src/frontend/grammar.h
         src/frontend/lexer.cpp
         src/frontend/lexer.h

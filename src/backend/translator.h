@@ -10,7 +10,6 @@
 
 namespace backend {
     class Translator {
-        int optimizeLevel;
         mir::Manager *mirManager;
         mips::rModule mipsModule;
         std::unordered_map<const mir::Function *, mips::rFunction> fMap;
@@ -40,6 +39,8 @@ namespace backend {
         mips::rRegister translateBinaryInstHelper(mips::rRegister lhs, mir::Value *rhs);
 
         mips::rRegister addressCompute(mips::rAddress addr) const;
+
+        std::pair<mips::rRegister, mips::pImmediate> addressComputeAsRegImm(mips::rAddress addr) const;
 
         void translateRetInst(const mir::Instruction::ret *retInst);
 
@@ -118,13 +119,10 @@ namespace backend {
         static void log(const mips::Function *func);
 
     public:
-        explicit Translator(mir::Manager *mirManager, mips::rModule mipsModule, int optimizeLevel = 2)
-            : optimizeLevel(optimizeLevel), mirManager(mirManager), mipsModule(mipsModule) {}
+        explicit Translator(mir::Manager *mirManager, mips::rModule mipsModule)
+            : mirManager(mirManager), mipsModule(mipsModule) {}
 
-        void translate() {
-            translateGlobalVars();
-            translateFunctions();
-        }
+        void translate();
     };
 }
 
