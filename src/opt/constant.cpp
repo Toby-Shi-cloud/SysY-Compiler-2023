@@ -69,17 +69,10 @@ namespace mir {
         if (auto ret = arithmeticFoldingDiv(binary); ret != binary->node) return ret;
         if (binary->getRhs() == getIntegerLiteral(-1))
             return substitute(binary, new Instruction::sub(getIntegerLiteral(0), binary->getLhs())); // x / -1 = -x
-        if (auto rhs = dynamic_cast<IntegerLiteral *>(binary->getRhs());
-            rhs && rhs->value > 0 && __builtin_popcount(rhs->value) == 1) {
-            return substitute(binary, new Instruction::ashr(
-                                  binary->getLhs(), getIntegerLiteral(__builtin_ctz(rhs->value))));
-            // x / 2^n = x >> n
-        }
-        if (auto rhs = dynamic_cast<IntegerLiteral *>(binary->getRhs());
-            rhs && rhs->value < 0 && __builtin_popcount(-rhs->value) == 1) {
-            auto inst = new Instruction::ashr(binary->getLhs(), getIntegerLiteral(__builtin_ctz(-rhs->value)));
-            return substitute(binary, inst, new Instruction::sub(getIntegerLiteral(0), inst));
-            // x / -2^n = -x >> n
+        if (binary->getRhs() == getIntegerLiteral(INT32_MIN)) {
+            auto inst = new Instruction::icmp(Instruction::icmp::EQ, binary->getLhs(), getIntegerLiteral(INT32_MIN));
+            return substitute(binary, inst, new Instruction::zext(Type::getI32Type(), inst));
+            // x / INT32_MIN = x == INT32_MIN ? 1 : 0
         }
         return binary->node;
     }
@@ -108,7 +101,7 @@ namespace mir {
     static inst_node_t arithmeticFolding(Instruction::srem *binary) {
         if (auto ret = arithmeticFoldingRem(binary); ret != binary->node) return ret;
         if (auto rhs = dynamic_cast<IntegerLiteral *>(binary->getRhs());
-            rhs && rhs->value < 0) {
+            rhs && rhs->value < 0 && rhs->value != -rhs->value) {
             return substitute(binary, new Instruction::srem(binary->getLhs(), getIntegerLiteral(-rhs->value)));
             // x % -y = x % y
         }
