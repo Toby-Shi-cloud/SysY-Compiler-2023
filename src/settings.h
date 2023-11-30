@@ -5,8 +5,6 @@
 #ifndef COMPILER_SETTINGS_H
 #define COMPILER_SETTINGS_H
 
-#include "dbg.h"
-
 inline struct OptSettings {
     bool force_no_opt;
     bool using_gp;
@@ -18,7 +16,6 @@ inline struct OptSettings {
 } opt_settings;
 
 inline void set_optimize_level(int level) {
-    assert(level >= 0 && level <= 3);
 #define SET(f) opt_settings.f = true;
     opt_settings = {};
     switch (level) {

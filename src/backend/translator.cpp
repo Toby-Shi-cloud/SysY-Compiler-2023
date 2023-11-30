@@ -81,34 +81,6 @@ namespace backend {
         return dst;
     }
 
-    std::pair<mips::rRegister, mips::pImmediate>
-    Translator::addressComputeAsRegImm(mips::rAddress addr) const {
-        mips::rRegister imm_reg;
-        mips::pImmediate offset_imm;
-        if (auto &&imm = addr->offset->value;
-            !addr->offset->isDyn() && (imm >= 0x8000 || imm < -0x8000)) {
-            auto uv = static_cast<unsigned>(imm);
-            imm_reg = curFunc->newVirRegister();
-            auto temp_reg = curFunc->newVirRegister();
-            curBlock->push_back(std::make_unique<mips::BinaryIInst>(
-                mips::Instruction::Ty::LUI, temp_reg, uv >> 16));
-            curBlock->push_back(std::make_unique<mips::BinaryRInst>(
-                mips::Instruction::Ty::ADDU, imm_reg, addr->base, temp_reg));
-            offset_imm = std::make_unique<mips::Immediate>(uv & 0xffff);
-        } else {
-            imm_reg = addr->base;
-            offset_imm = addr->offset->clone();
-        }
-        if (!addr->label) return {imm_reg, std::move(offset_imm)};
-        auto addr_reg = curFunc->newVirRegister();
-        auto dst = curFunc->newVirRegister();
-        curBlock->push_back(std::make_unique<mips::LoadInst>(
-            mips::Instruction::Ty::LA, addr_reg, addr->label));
-        curBlock->push_back(std::make_unique<mips::BinaryRInst>(
-            mips::Instruction::Ty::ADDU, dst, imm_reg, addr_reg));
-        return {dst, std::move(offset_imm)};
-    }
-
     void Translator::translateRetInst(const mir::Instruction::ret *retInst) {
         if (auto v = retInst->getReturnValue()) {
             if (auto imm = dynamic_cast<mir::IntegerLiteral *>(v))
@@ -185,9 +157,8 @@ namespace backend {
             curBlock->push_back(std::make_unique<mips::LoadInst>(
                 mips::Instruction::Ty::LW, dst, reg, 0));
         } else if (auto addr = dynamic_cast<mips::rAddress>(ptr)) {
-            auto &&[reg, imm] = addressComputeAsRegImm(addr);
             curBlock->push_back(std::make_unique<mips::LoadInst>(
-                mips::Instruction::Ty::LW, dst, reg, std::move(imm)));
+                mips::Instruction::Ty::LW, dst, addr));
         } else {
             assert(false);
         }
@@ -203,9 +174,8 @@ namespace backend {
             curBlock->push_back(std::make_unique<mips::StoreInst>(
                 mips::Instruction::Ty::SW, src, reg, 0));
         } else if (auto addr = dynamic_cast<mips::rAddress>(dst)) {
-            auto &&[reg, imm] = addressComputeAsRegImm(addr);
             curBlock->push_back(std::make_unique<mips::StoreInst>(
-                mips::Instruction::Ty::SW, src, reg, std::move(imm)));
+                mips::Instruction::Ty::SW, src, addr));
         } else {
             assert(false);
         }

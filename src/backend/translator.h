@@ -40,8 +40,6 @@ namespace backend {
 
         mips::rRegister addressCompute(mips::rAddress addr) const;
 
-        std::pair<mips::rRegister, mips::pImmediate> addressComputeAsRegImm(mips::rAddress addr) const;
-
         void translateRetInst(const mir::Instruction::ret *retInst);
 
         void translateBranchInst(const mir::Instruction::br *brInst);
