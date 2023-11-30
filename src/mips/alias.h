@@ -22,7 +22,7 @@ namespace mips {
     def(Register);
     def(Label);
     def(Immediate);
-    def(ImmOffset);
+    def(DynImmediate);
     def(PhyRegister);
     def(VirRegister);
     def(Address);

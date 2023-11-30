@@ -160,7 +160,7 @@ namespace mips {
             : InstructionImpl{ty, {dst}, {base}}, label(nullptr), offset(new Immediate(offset)) {}
 
         explicit LoadInst(Ty ty, rRegister dst, rRegister base, int offset, const int *immBase)
-                : InstructionImpl{ty, {dst}, {base}}, label(nullptr), offset(new ImmOffset(offset, immBase)) {}
+                : InstructionImpl{ty, {dst}, {base}}, label(nullptr), offset(new DynImmediate(offset, immBase)) {}
 
         explicit LoadInst(Ty ty, rRegister dst, rRegister base, int offset, rLabel label)
             : InstructionImpl{ty, {dst}, {base}}, label(label), offset(new Immediate(offset)) {}
@@ -196,7 +196,7 @@ namespace mips {
             : InstructionImpl{ty, {}, {src, base}}, label(nullptr), offset(new Immediate(offset)) {}
 
         explicit StoreInst(Ty ty, rRegister src, rRegister base, int offset, const int *immBase)
-                : InstructionImpl{ty, {}, {src, base}}, label(nullptr), offset(new ImmOffset(offset, immBase)) {}
+                : InstructionImpl{ty, {}, {src, base}}, label(nullptr), offset(new DynImmediate(offset, immBase)) {}
 
         explicit StoreInst(Ty ty, rRegister src, rRegister base, int offset, rLabel label)
             : InstructionImpl{ty, {}, {src, base}}, label(label), offset(new Immediate(offset)) {}

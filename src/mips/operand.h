@@ -47,17 +47,17 @@ namespace mips {
         }
     };
 
-    struct ImmOffset : Immediate {
+    struct DynImmediate : Immediate {
         const int *base;
 
-        explicit ImmOffset(int value, const int *base) : Immediate(value), base(base) {}
+        explicit DynImmediate(int value, const int *base) : Immediate(value), base(base) {}
 
         std::ostream &output(std::ostream &os) const override {
             return os << value + *base;
         }
 
         [[nodiscard]] pImmediate clone() const override {
-            return std::make_unique<ImmOffset>(value, base);
+            return std::make_unique<DynImmediate>(value, base);
         }
     };
 
@@ -182,7 +182,7 @@ namespace mips {
                 : base(base), offset(new Immediate(offset)), label(label) {}
 
         explicit Address(rRegister base, int offset, const int *immBase, rLabel label = nullptr)
-                : base(base), offset(new ImmOffset(offset, immBase)), label(label) {}
+                : base(base), offset(new DynImmediate(offset, immBase)), label(label) {}
 
         explicit Address(rRegister base, pImmediate offset, rLabel label = nullptr)
                 : base(base), offset(std::move(offset)), label(label) {}
