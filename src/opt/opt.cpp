@@ -15,6 +15,7 @@ namespace mir {
         if (!opt_settings.force_no_opt) clearDeadInst(FUNC);
         if (!opt_settings.force_no_opt) clearDeadBlock(FUNC);
         if (opt_settings.using_block_merging) mergeEmptyBlock(FUNC);
+        if (opt_settings.using_force_inline) functionInline(FUNC);
 #undef FUNC
     }
 

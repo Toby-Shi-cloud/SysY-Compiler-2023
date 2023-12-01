@@ -26,6 +26,8 @@ namespace mir {
 
     using inst_node_t = std::list<Instruction *>::iterator;
     using inst_pos_t = std::list<Instruction *>::const_iterator;
+    using bb_node_t = std::list<BasicBlock *>::iterator;
+    using bb_pos_t = std::list<BasicBlock *>::const_iterator;
 }
 
 namespace mir {
@@ -36,6 +38,10 @@ namespace mir {
         Function *parent;
 
         explicit Argument(pType type, Function *parent) : Value(type), parent(parent) {}
+
+        Argument(const Argument &) = delete;
+
+        [[nodiscard]] Argument *clone(Function *parent, value_map_t &map) const;
     };
 
     /**
@@ -55,6 +61,8 @@ namespace mir {
 
         explicit BasicBlock(Function *parent) : Value(Type::getLabelType()), parent(parent) {}
 
+        BasicBlock(const BasicBlock &) = delete;
+
         ~BasicBlock() override;
 
         void insert(inst_pos_t p, Instruction *inst);
@@ -73,6 +81,8 @@ namespace mir {
             insert(instructions.cend(), inst);
         }
 
+        void splice(inst_pos_t position, BasicBlock *other, inst_pos_t first, inst_pos_t last);
+
         void clear_info() {
             predecessors.clear();
             successors.clear();
@@ -80,6 +90,8 @@ namespace mir {
             df.clear();
             idom = {};
         }
+
+        [[nodiscard]] BasicBlock *clone(Function *parent, value_map_t &map) const;
     };
 
     /**
@@ -98,6 +110,8 @@ namespace mir {
         explicit Function(pType type, const std::string &name) : Value(type), retType(type->getFunctionRet()) {
             setName("@" + name);
         }
+
+        Function(const Function &) = delete;
 
         ~Function() override;
 
@@ -124,6 +138,20 @@ namespace mir {
         [[nodiscard]] bool isMain() const { return getName() == "@main"; }
 
         [[nodiscard]] bool isLeaf() const;
+
+        [[nodiscard]] bool isLiberal() const {
+            return this == getint || this == putint || this == putch || this == putstr;
+        }
+
+        [[nodiscard]] bool isRecursive() const;
+
+        void splice(bb_pos_t position, Function *other, bb_pos_t first, bb_pos_t last) {
+            for (auto it = first; it != last; ++it)
+                (*it)->parent = this;
+            bbs.splice(position, other->bbs, first, last);
+        }
+
+        [[nodiscard]] Function *clone() const;
     };
 
     /**
@@ -140,6 +168,8 @@ namespace mir {
 
         explicit GlobalVar(pType type, Literal *init, bool isConstant)
             : Value(type, isConstant), init(init), unnamed(true) {}
+
+        GlobalVar(const GlobalVar &) = delete;
 
         ~GlobalVar() override;
     };

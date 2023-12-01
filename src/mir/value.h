@@ -9,6 +9,7 @@
 #include <string>
 #include <ostream>
 #include <unordered_set>
+#include <unordered_map>
 #include "type.h"
 
 // Use List
@@ -24,6 +25,8 @@ namespace mir {
         Value *value;
         std::unordered_set<User *> users;
     };
+
+    using value_map_t = std::unordered_map<const Value *, Value *>;
 }
 
 // Values
@@ -165,9 +168,15 @@ namespace mir {
 
         void substituteOperand(Value *_old, Value *_new) {
             for (int i = 0; i < operands.size(); ++i) {
-                if (operands[i]->value != _old) continue;
+                if (getOperand(i) != _old) continue;
                 substituteOperand(i, _new);
             }
+        }
+
+        void substituteOperands(const value_map_t &map) {
+            for (int i = 0; i < operands.size(); ++i)
+                if (map.count(getOperand(i)))
+                    substituteOperand(i, map.at(getOperand(i)));
         }
 
         /**

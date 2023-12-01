@@ -67,7 +67,7 @@ namespace mir {
             os << "declare dso_local void @putstr(ptr)" << std::endl;
             os << std::endl;
             for (auto function: functions)
-                function->calcPreSuc(), os << function << std::endl;
+                os << function << std::endl;
         }
     };
 }

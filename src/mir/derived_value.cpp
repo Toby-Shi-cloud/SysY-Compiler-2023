@@ -8,6 +8,8 @@
 #include "../enum.h"
 #include "derived_value.h"
 
+#include "instruction.h"
+
 namespace mir {
     Function *Function::getint = new Function(
         FunctionType::getFunctionType(Type::getI32Type(), {}), "getint");
@@ -20,6 +22,12 @@ namespace mir {
 }
 
 namespace mir {
+    Argument *Argument::clone(Function *parent, value_map_t &map) const {
+        auto arg = new Argument(getType(), parent);
+        map[this] = arg;
+        return arg;
+    }
+
     BasicBlock::~BasicBlock() {
         for (auto instruction: instructions)
             delete instruction;
@@ -46,6 +54,23 @@ namespace mir {
     inst_pos_t BasicBlock::beginner_end() const {
         return std::find_if_not(instructions.begin(), instructions.end(),
                                 std::function<bool(Instruction *)>(&Instruction::isBeginner));
+    }
+
+    void BasicBlock::splice(inst_pos_t position, BasicBlock *other, inst_pos_t first, inst_pos_t last) {
+        for (auto it = first; it != last; ++it)
+            (*it)->parent = this;
+        instructions.splice(position, other->instructions, first, last);
+    }
+
+    BasicBlock *BasicBlock::clone(Function *parent, value_map_t &map) const {
+        auto bb = new BasicBlock(parent);
+        map[this] = bb;
+        for (auto &&inst: instructions) {
+            auto newInst = inst->clone();
+            bb->push_back(newInst);
+            map[inst] = newInst;
+        }
+        return bb;
     }
 
     Function::~Function() {
@@ -83,6 +108,28 @@ namespace mir {
                 return inst->instrTy != Instruction::CALL;
             });
         });
+    }
+
+    bool Function::isRecursive() const {
+        return std::any_of(bbs.begin(), bbs.end(), [this](auto bb) {
+            return std::any_of(bb->instructions.begin(), bb->instructions.end(), [this](auto inst) {
+                auto call = dynamic_cast<Instruction::call *>(inst);
+                return call && call->getFunction() == this;
+            });
+        });
+    }
+
+    Function *Function::clone() const {
+        value_map_t map;
+        auto func = new Function(getType(), getName());
+        for (auto &&arg: args)
+            func->args.push_back(arg->clone(func, map));
+        for (auto &&bb: bbs)
+            func->bbs.push_back(bb->clone(func, map));
+        for (auto &&bb: func->bbs)
+            for (auto &&inst: bb->instructions)
+                inst->substituteOperands(map);
+        return func;
     }
 
     GlobalVar::~GlobalVar() {
@@ -185,6 +232,8 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, const Function &func) {
+        func.allocName();
+        func.calcPreSuc();
         os << "define dso_local " << func.retType << " " << func.getName() << "(";
         for (size_t i = 0; i < func.args.size(); i++) {
             if (i) os << ", ";
