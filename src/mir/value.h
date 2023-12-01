@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <ostream>
+#include <functional>
 #include <unordered_set>
 #include <unordered_map>
 #include "type.h"
@@ -97,6 +98,9 @@ namespace mir {
         }
 
         inline void moveTo(Value *other);
+
+        template<typename Func>
+        void moveTo(Value *other, Func &&pred);
     };
 
     /**
@@ -206,6 +210,14 @@ namespace mir {
         for (auto &&user: users())
             user->substituteOperand(this, other);
         assert(use->users.empty());
+    }
+
+    template<typename Func>
+    void Value::moveTo(Value *other, Func &&pred) {
+        if (this == other) return;
+        for (auto &&user: users())
+            if (std::invoke(pred, user))
+                user->substituteOperand(this, other);
     }
 
     inline std::ostream &operator<<(std::ostream &os, const Value &value) {

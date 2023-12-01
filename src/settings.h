@@ -26,7 +26,7 @@ inline void set_optimize_level(int level) {
         case 2:
             SET(using_gp);
             SET(using_lvn);
-            // SET(using_force_inline);
+            SET(using_force_inline);
             [[fallthrough]];
         case 1:
             SET(using_mem2reg);

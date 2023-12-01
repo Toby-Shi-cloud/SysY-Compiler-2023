@@ -16,6 +16,7 @@ namespace mir {
         if (!opt_settings.force_no_opt) clearDeadBlock(FUNC);
         if (opt_settings.using_block_merging) mergeEmptyBlock(FUNC);
         if (opt_settings.using_force_inline) functionInline(FUNC);
+        if (opt_settings.using_block_merging) connectBlocks(FUNC);
 #undef FUNC
     }
 
@@ -25,10 +26,13 @@ namespace mir {
         while (opt_infos != OptInfos{}) {
             opt_infos = {};
             for_each_func(_optimize);
+            clearUnused();
             _sum += opt_infos;
         }
         dbg(_sum);
+    }
 
+    void Manager::clearUnused() {
         for (auto it = functions.begin(); it != functions.end();) {
             if (auto &&func = *it; func->getName() != "@main" && !func->isUsed()) {
                 delete func;
@@ -45,6 +49,7 @@ namespace mir {
             } else ++it;
         }
     }
+
 
     void Function::clearBBInfo() const {
         for (auto bb: bbs)

@@ -34,6 +34,8 @@ namespace mir {
     void localVariableNumbering(const Function *func);
 
     void functionInline(Function *func);
+
+    void connectBlocks(Function *func);
 }
 
 namespace mir {

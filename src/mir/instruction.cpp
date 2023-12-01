@@ -115,10 +115,12 @@ namespace mir {
     }
 
     Instruction::getelementptr::getelementptr(pType type, Value *ptr, const std::vector<Value *> &idxs)
-        : Instruction(type, GETELEMENTPTR, merge(ptr, idxs.begin() + ptr->getType()->isPointerTy(), idxs.end())) {}
+        : Instruction(type, GETELEMENTPTR,
+                      merge(ptr, idxs.begin() + ptr->getType()->isPointerTy(), idxs.end())),
+          indexTy(getIndexTy(ptr->getType())) {}
 
     std::ostream &Instruction::getelementptr::output(std::ostream &os) const {
-        os << getName() << " = getelementptr " << getIndexTy()
+        os << getName() << " = getelementptr " << indexTy
                 << ", ptr " << getPointerOperand()->getName();
         for (int i = 0; i < getNumIndices(); i++) {
             os << ", " << getIndexOperand(i);

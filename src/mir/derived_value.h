@@ -54,6 +54,7 @@ namespace mir {
          */
         std::list<Instruction *> instructions;
         Function *parent;
+        bb_node_t node;
         std::unordered_set<BasicBlock *> predecessors, successors;
         std::unordered_set<BasicBlock *> df; // dominator frontier
         std::set<BasicBlock *> dominators;
@@ -79,6 +80,14 @@ namespace mir {
 
         void push_back(Instruction *inst) {
             insert(instructions.cend(), inst);
+        }
+
+        void pop_front() {
+            erase(*instructions.cbegin());
+        }
+
+        void pop_back() {
+            erase(*instructions.crbegin());
         }
 
         void splice(inst_pos_t position, BasicBlock *other, inst_pos_t first, inst_pos_t last);
@@ -144,6 +153,12 @@ namespace mir {
         }
 
         [[nodiscard]] bool isRecursive() const;
+
+        void markBBNode() {
+            for (auto it = bbs.begin(); it != bbs.end(); ++it)
+                (*it)->node = it;
+            exitBB->node = bbs.end();
+        }
 
         void splice(bb_pos_t position, Function *other, bb_pos_t first, bb_pos_t last) {
             for (auto it = first; it != last; ++it)

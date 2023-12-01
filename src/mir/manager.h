@@ -57,6 +57,8 @@ namespace mir {
 
         void optimize();
 
+        void clearUnused();
+
         void output(std::ostream &os) const {
             for (auto globalVar: globalVars)
                 os << globalVar << std::endl;

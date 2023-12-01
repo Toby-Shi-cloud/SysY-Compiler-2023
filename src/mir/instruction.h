@@ -120,6 +120,8 @@ namespace mir {
     };
 
     struct Instruction::getelementptr : Instruction {
+        pType indexTy;
+
         explicit getelementptr(pType type, Value *ptr, const std::vector<Value *> &idxs);
 
         [[nodiscard]] Value *getPointerOperand() const { return getOperand(0); }
@@ -128,8 +130,8 @@ namespace mir {
 
         [[nodiscard]] size_t getNumIndices() const { return getNumOperands() - 1; }
 
-        [[nodiscard]] pType getIndexTy() const {
-            auto index_ty = getPointerOperand()->getType();
+        [[nodiscard]] static pType getIndexTy(pType pointerOperandType) {
+            auto index_ty = pointerOperandType;
             if (index_ty->isPointerTy()) index_ty = index_ty->getPointerBase();
             return index_ty;
         }

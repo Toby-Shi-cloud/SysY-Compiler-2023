@@ -182,7 +182,7 @@ namespace backend {
     }
 
     void Translator::translateGetPtrInst(const mir::Instruction::getelementptr *getPtrInst) {
-        auto deduce_type = getPtrInst->getIndexTy();
+        auto deduce_type = getPtrInst->indexTy;
         auto addr = getAddress(getPtrInst->getPointerOperand());
         for (int i = 0; i < getPtrInst->getNumIndices(); i++) {
             if (i != 0) deduce_type = deduce_type->getBase();
@@ -681,8 +681,6 @@ namespace backend {
 }
 
 #ifdef DBG_ENABLE
-
-#include <fstream>
 
 void backend::Translator::log(const mips::Function *func) {
     static std::ofstream out("log.txt");
