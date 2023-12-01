@@ -20,6 +20,8 @@ namespace mir {
             return getNumOperands() == 0 ? nullptr : getOperand(0);
         }
 
+        [[nodiscard]] Instruction *clone() const override { return new ret(*this); }
+
         std::ostream &output(std::ostream &os) const override;
     };
 
@@ -47,6 +49,8 @@ namespace mir {
             return hasCondition() ? getOperand<BasicBlock>(2) : getOperand<BasicBlock>(0);
         }
 
+        [[nodiscard]] Instruction *clone() const override { return new br(*this); }
+
         std::ostream &output(std::ostream &os) const override;
     };
 
@@ -69,6 +73,8 @@ namespace mir {
             return res;
         }
 
+        [[nodiscard]] Instruction *clone() const override { return new _binary_instruction(*this); }
+
         std::ostream &output(std::ostream &os) const override {
             return os << getName() << " = " << ty << " " << getLhs() << ", " << getRhs()->getName();
         }
@@ -86,6 +92,8 @@ namespace mir {
     struct Instruction::alloca_ : Instruction {
         explicit alloca_(pType type) : Instruction(type, ALLOCA) {}
 
+        [[nodiscard]] Instruction *clone() const override { return new alloca_(*this); }
+
         std::ostream &output(std::ostream &os) const override;
     };
 
@@ -93,6 +101,8 @@ namespace mir {
         explicit load(pType type, Value *ptr) : Instruction(type, LOAD, ptr) {}
 
         [[nodiscard]] Value *getPointerOperand() const { return getOperand(0); }
+
+        [[nodiscard]] Instruction *clone() const override { return new load(*this); }
 
         std::ostream &output(std::ostream &os) const override;
     };
@@ -103,6 +113,8 @@ namespace mir {
         [[nodiscard]] Value *getSrc() const { return getOperand(0); }
 
         [[nodiscard]] Value *getDest() const { return getOperand(1); }
+
+        [[nodiscard]] Instruction *clone() const override { return new store(*this); }
 
         std::ostream &output(std::ostream &os) const override;
     };
@@ -122,6 +134,8 @@ namespace mir {
             return index_ty;
         }
 
+        [[nodiscard]] Instruction *clone() const override { return new getelementptr(*this); }
+
         std::ostream &output(std::ostream &os) const override;
     };
 
@@ -130,6 +144,8 @@ namespace mir {
         explicit _conversion_instruction(pType type, Value *value) : Instruction(type, ty, value) {}
 
         [[nodiscard]] Value *getValueOperand() const { return getOperand(0); }
+
+        [[nodiscard]] Instruction *clone() const override { return new _conversion_instruction(*this); }
 
         std::ostream &output(std::ostream &os) const override {
             return os << getName() << " = " << ty << " " << getValueOperand() << " to " << getType();
@@ -150,6 +166,8 @@ namespace mir {
         [[nodiscard]] Value *getLhs() const { return getOperand(0); }
 
         [[nodiscard]] Value *getRhs() const { return getOperand(1); }
+
+        [[nodiscard]] Instruction *clone() const override { return new icmp(*this); }
 
         std::ostream &output(std::ostream &os) const override;
     };
@@ -203,12 +221,14 @@ namespace mir {
             return check_set.empty();
         }
 
+        [[nodiscard]] Instruction *clone() const override { return new phi(*this); }
+
         std::ostream &output(std::ostream &os) const override;
     };
 
     struct Instruction::select : Instruction {
         explicit select(Value *cond, Value *ifTrue, Value *ifFalse) :
-                Instruction(ifTrue->getType(), SELECT, cond, ifTrue, ifFalse) {
+            Instruction(ifTrue->getType(), SELECT, cond, ifTrue, ifFalse) {
             assert(cond->getType() == Type::getI1Type());
             assert(ifTrue->getType() == ifFalse->getType());
         }
@@ -218,6 +238,8 @@ namespace mir {
         [[nodiscard]] Value *getTrueValue() const { return getOperand(1); }
 
         [[nodiscard]] Value *getFalseValue() const { return getOperand(2); }
+
+        [[nodiscard]] Instruction *clone() const override { return new select(*this); }
 
         std::ostream &output(std::ostream &os) const override;
     };
@@ -230,6 +252,8 @@ namespace mir {
         [[nodiscard]] Value *getArg(int i) const { return getOperand(i + 1); }
 
         [[nodiscard]] size_t getNumArgs() const { return getNumOperands() - 1; }
+
+        [[nodiscard]] Instruction *clone() const override { return new call(*this); }
 
         std::ostream &output(std::ostream &os) const override;
     };

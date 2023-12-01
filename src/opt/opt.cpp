@@ -61,7 +61,7 @@ namespace mir {
         for (auto bb: bbs) {
             if (auto inst = *bb->instructions.crbegin();
                 inst->instrTy == Instruction::RET) {
-                link(bb, exitBB.get());
+                link(bb, exitBB);
             } else if (auto br = dynamic_cast<Instruction::br *>(inst)) {
                 if (br->hasCondition()) {
                     link(bb, br->getIfTrue());

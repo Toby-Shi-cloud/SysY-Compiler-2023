@@ -58,9 +58,14 @@ namespace mir {
         std::shared_ptr<Use> use;
 
     public:
-        explicit Value(pType type, bool isConstant) : use(new Use{this}), type(type), isConstant(isConstant) {}
+        explicit Value(pType type, bool isConstant) : type(type), isConstant(isConstant), use(new Use{this}) {}
 
         explicit Value(pType type) : Value(type, false) {}
+
+        Value(const Value &value) : type(value.type), name(value.name), isConstant(value.isConstant),
+                                    use(new Use{this}) {}
+
+        Value(Value &&) = default;
 
         virtual ~Value() = default;
 
@@ -135,6 +140,12 @@ namespace mir {
         explicit User(pType type, const std::vector<Value *> &args) : Value(type) {
             for (auto arg: args) addOperand(arg);
         }
+
+        User(const User &user) : Value(user), operands(user.operands) {
+            reInsertOperandsUser();
+        }
+
+        User(User &&) = default;
 
         ~User() override {
             for (auto &operand: operands)

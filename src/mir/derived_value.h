@@ -89,7 +89,7 @@ namespace mir {
         pType retType;
         std::vector<Argument *> args; // owns
         std::list<BasicBlock *> bbs; // owns
-        std::unique_ptr<BasicBlock> exitBB{new BasicBlock(this)};
+        BasicBlock *exitBB = new BasicBlock(this);
         static Function *getint;
         static Function *putint;
         static Function *putch;
@@ -98,6 +98,8 @@ namespace mir {
         explicit Function(pType type, const std::string &name) : Value(type), retType(type->getFunctionRet()) {
             setName("@" + name);
         }
+
+        ~Function() override;
 
         /**
          * Add an argument to the function. <br>
@@ -183,6 +185,12 @@ namespace mir {
 
         explicit Instruction(pType type, InstrTy instrTy, const std::vector<Value *> &args) :
             User(type, args), instrTy(instrTy) {}
+
+        Instruction(const Instruction &inst) : User(inst), instrTy(inst.instrTy) {}
+
+        Instruction(Instruction &&) = default;
+
+        [[nodiscard]] virtual Instruction *clone() const = 0;
 
         template<InstrTy ty>
         struct _binary_instruction;

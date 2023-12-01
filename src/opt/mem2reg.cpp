@@ -14,7 +14,7 @@ namespace mir {
 
     void calcDominators(Function *func) {
         std::set<BasicBlock *> all{func->bbs.begin(), func->bbs.end()};
-        all.insert(func->exitBB.get());
+        all.insert(func->exitBB);
         const auto calc_dom = [&all](auto bb) {
             auto dominators = all;
             std::set<BasicBlock *> temp;
@@ -42,7 +42,7 @@ namespace mir {
                     changed = true;
             }
         }
-        calc_dom(func->exitBB.get());
+        calc_dom(func->exitBB);
 
         constexpr auto calc_idom = [](auto bb) {
             bb->idom = nullptr;
@@ -51,7 +51,7 @@ namespace mir {
                     bb->idom = dom;
         };
         for (auto bb: func->bbs) calc_idom(bb);
-        calc_idom(func->exitBB.get());
+        calc_idom(func->exitBB);
     }
 
     void calcDF(const Function *func) {

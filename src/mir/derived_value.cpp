@@ -48,6 +48,14 @@ namespace mir {
                                 std::function<bool(Instruction *)>(&Instruction::isBeginner));
     }
 
+    Function::~Function() {
+        for (auto arg: args)
+            delete arg;
+        for (auto bb: bbs)
+            delete bb;
+        delete exitBB;
+    }
+
     Argument *Function::addArgument(pType type) {
         auto arg = new Argument(type, this);
         args.push_back(arg);
