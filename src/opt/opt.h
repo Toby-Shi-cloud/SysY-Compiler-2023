@@ -27,7 +27,12 @@ namespace mir {
         return substitute(_old, std::forward<Args>(args)...);
     }
 
-    inst_node_t constantFolding(Instruction *inst);
+    template<typename T>
+    std::enable_if_t<std::is_base_of_v<Instruction, T>, inst_node_t>
+    constantFolding(T *inst) {
+        extern inst_node_t constantFolding(T *);
+        return constantFolding(inst);
+    }
 
     void constantFolding(const Function *func);
 

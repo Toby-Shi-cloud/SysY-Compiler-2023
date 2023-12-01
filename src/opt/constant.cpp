@@ -119,7 +119,7 @@ namespace mir {
         return binary->node;
     }
 
-    static inst_node_t constantFolding(Instruction::br *br) {
+    inst_node_t constantFolding(Instruction::br *br) {
         if (!br->hasCondition()) return br->node;
         BasicBlock *target;
         if (br->getIfFalse() == br->getIfTrue())
@@ -131,7 +131,7 @@ namespace mir {
     }
 
     template<Instruction::InstrTy ty>
-    static inst_node_t constantFolding(Instruction::_binary_instruction<ty> *binary) {
+    inst_node_t constantFolding(Instruction::_binary_instruction<ty> *binary) {
         auto lhs = dynamic_cast<IntegerLiteral *>(binary->getLhs());
         auto rhs = dynamic_cast<IntegerLiteral *>(binary->getRhs());
         if constexpr (ty == Instruction::ADD || ty == Instruction::MUL
@@ -145,7 +145,7 @@ namespace mir {
         return opt_settings.using_arithmetic_folding ? arithmeticFolding(binary) : binary->node;
     }
 
-    static inst_node_t constantFolding(Instruction::load *load) {
+    inst_node_t constantFolding(Instruction::load *load) {
         constexpr auto calc = [](Value *ptr, auto &&self) -> Literal *const *{
             if (auto var = dynamic_cast<GlobalVar *>(ptr))
                 return var->isConst() && var->init ? &var->init : nullptr;
@@ -172,7 +172,7 @@ namespace mir {
     }
 
     template<Instruction::InstrTy ty>
-    static inst_node_t constantFolding(Instruction::_conversion_instruction<ty> *conversion) {
+    inst_node_t constantFolding(Instruction::_conversion_instruction<ty> *conversion) {
         auto literal = dynamic_cast<Literal *>(conversion->getValueOperand());
         if (!literal) return conversion->node;
         auto i32 = dynamic_cast<IntegerLiteral *>(literal);
@@ -186,7 +186,7 @@ namespace mir {
         __builtin_unreachable();
     }
 
-    static inst_node_t constantFolding(Instruction::icmp *icmp) {
+    inst_node_t constantFolding(Instruction::icmp *icmp) {
         if (icmp->getLhs() == icmp->getRhs()) {
             if (icmp->cond == Instruction::icmp::EQ)
                 return substitute(icmp, getBooleanLiteral(true));
@@ -219,7 +219,7 @@ namespace mir {
         return substitute(icmp, getBooleanLiteral(result));
     }
 
-    static inst_node_t constantFolding(Instruction::phi *phi) {
+    inst_node_t constantFolding(Instruction::phi *phi) {
         phi->parent->parent->calcPreSuc();
         for (auto i = 0; i < phi->getNumIncomingValues();)
             if (auto bb = phi->getIncomingValue(i).second;
@@ -233,7 +233,7 @@ namespace mir {
         return substitute(phi, value);
     }
 
-    static inst_node_t constantFolding(Instruction::select *select) {
+    inst_node_t constantFolding(Instruction::select *select) {
         Value *result;
         if (select->getFalseValue() == select->getTrueValue()) {
             result = select->getTrueValue();
