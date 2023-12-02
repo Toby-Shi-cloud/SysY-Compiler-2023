@@ -10,6 +10,7 @@ inline struct OptSettings {
     bool using_gp;
     bool using_mem2reg;
     bool using_lvn;
+    bool using_gcm;
     bool using_constant_folding;
     bool using_arithmetic_folding;
     bool using_block_merging;
@@ -26,6 +27,7 @@ inline void set_optimize_level(int level) {
         case 2:
             SET(using_gp);
             SET(using_lvn);
+            SET(using_gcm);
             SET(using_force_inline);
             [[fallthrough]];
         case 1:

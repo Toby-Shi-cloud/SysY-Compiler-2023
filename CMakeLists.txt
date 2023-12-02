@@ -48,6 +48,7 @@ add_executable(Compiler
         src/backend/translator.h
         src/opt/constant.cpp
         src/opt/functional.cpp
+        src/opt/gcm.cpp
         src/opt/lvn.cpp
         src/opt/mem2reg.cpp
         src/opt/mem2reg.h

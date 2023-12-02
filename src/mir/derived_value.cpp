@@ -3,12 +3,10 @@
 //
 
 #include <sstream>
-#include <functional>
 #include <unordered_map>
 #include "../enum.h"
-#include "derived_value.h"
-
 #include "instruction.h"
+#include "derived_value.h"
 
 namespace mir {
     Function *Function::getint = new Function(
@@ -22,8 +20,8 @@ namespace mir {
 }
 
 namespace mir {
-    Argument *Argument::clone(Function *parent, value_map_t &map) const {
-        auto arg = new Argument(getType(), parent);
+    Argument *Argument::clone(Function *_parent, value_map_t &map) const {
+        auto arg = new Argument(getType(), _parent);
         map[this] = arg;
         return arg;
     }
@@ -53,7 +51,12 @@ namespace mir {
 
     inst_pos_t BasicBlock::beginner_end() const {
         return std::find_if_not(instructions.begin(), instructions.end(),
-                                std::function<bool(Instruction *)>(&Instruction::isBeginner));
+                                [](auto &&inst) { return inst->isBeginner(); });
+    }
+
+    void BasicBlock::splice(inst_pos_t position, BasicBlock *other, inst_pos_t it) {
+        (*it)->parent = this;
+        instructions.splice(position, other->instructions, it);
     }
 
     void BasicBlock::splice(inst_pos_t position, BasicBlock *other, inst_pos_t first, inst_pos_t last) {
@@ -62,8 +65,8 @@ namespace mir {
         instructions.splice(position, other->instructions, first, last);
     }
 
-    BasicBlock *BasicBlock::clone(Function *parent, value_map_t &map) const {
-        auto bb = new BasicBlock(parent);
+    BasicBlock *BasicBlock::clone(Function *_parent, value_map_t &map) const {
+        auto bb = new BasicBlock(_parent);
         map[this] = bb;
         for (auto &&inst: instructions) {
             auto newInst = inst->clone();

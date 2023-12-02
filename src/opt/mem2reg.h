@@ -8,12 +8,6 @@
 #include "../mir.h"
 
 namespace mir {
-    void reCalcBBInfo(Function *func);
-
-    void calcDominators(Function *func);
-
-    void calcDF(const Function *func);
-
     void calcPhi(Function *func);
 
     void clearDeadInst(const Function *func);

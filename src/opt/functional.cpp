@@ -46,7 +46,6 @@ namespace mir {
                 if (ret_val) constantFolding(ret_val);
                 // 7. delete callee
                 delete callee;
-                opt_infos.function_inline()++;
                 // 8. move phi(bb) -> phi(ret_bb)
                 bb->moveTo(ret_bb, [](auto &&user) {
                     return dynamic_cast<Instruction::phi *>(user) != nullptr;

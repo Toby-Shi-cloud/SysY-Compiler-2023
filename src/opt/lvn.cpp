@@ -50,6 +50,8 @@ namespace mir {
                 if (last_memory_inst) values.push_back(last_memory_inst);
                 last_memory_inst = inst;
             }
+            if (auto icmp = dynamic_cast<Instruction::icmp *>(inst))
+                values.push_back(getIntegerLiteral(icmp->cond));
             operator_t key = {inst->instrTy, std::move(values)};
             if (variables.count(key)) {
                 opt_infos.local_variable_numbering()++;

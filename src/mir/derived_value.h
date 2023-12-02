@@ -41,7 +41,7 @@ namespace mir {
 
         Argument(const Argument &) = delete;
 
-        [[nodiscard]] Argument *clone(Function *parent, value_map_t &map) const;
+        [[nodiscard]] Argument *clone(Function *_parent, value_map_t &map) const;
     };
 
     /**
@@ -59,6 +59,8 @@ namespace mir {
         std::unordered_set<BasicBlock *> df; // dominator frontier
         std::set<BasicBlock *> dominators;
         BasicBlock *idom = nullptr;
+        int loop_nest = 0;
+        int dom_depth = 0;
 
         explicit BasicBlock(Function *parent) : Value(Type::getLabelType()), parent(parent) {}
 
@@ -90,6 +92,8 @@ namespace mir {
             erase(*instructions.crbegin());
         }
 
+        void splice(inst_pos_t position, BasicBlock *other, inst_pos_t it);
+
         void splice(inst_pos_t position, BasicBlock *other, inst_pos_t first, inst_pos_t last);
 
         void clear_info() {
@@ -97,10 +101,12 @@ namespace mir {
             successors.clear();
             dominators.clear();
             df.clear();
-            idom = {};
+            idom = nullptr;
+            loop_nest = 0;
+            dom_depth = 0;
         }
 
-        [[nodiscard]] BasicBlock *clone(Function *parent, value_map_t &map) const;
+        [[nodiscard]] BasicBlock *clone(Function *_parent, value_map_t &map) const;
     };
 
     /**
@@ -143,6 +149,23 @@ namespace mir {
          * Calculate predecessors and successors for each basic block. <br>
          */
         void calcPreSuc() const;
+
+        void calcDominators() const;
+
+        void calcDF() const;
+
+        /**
+         * Includes calcPreSuc, calcDominators and calcDF. <br>
+         */
+        void reCalcBBInfo() const {
+            calcPreSuc();
+            calcDominators();
+            calcDF();
+        }
+
+        void calcLoopNest() const;
+
+        void calcDomDepth() const;
 
         [[nodiscard]] bool isMain() const { return getName() == "@main"; }
 
