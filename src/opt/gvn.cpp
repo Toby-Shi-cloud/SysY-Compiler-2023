@@ -49,13 +49,14 @@ namespace mir {
         int cnt = 0;
 
         //TODO: This is too simple...
-        Instruction *last_memory_inst = nullptr;
-        for (auto it = bb->beginner_end(); it != bb->instructions.end();) {
+        Value *last_memory_inst = bb;
+        for (auto it = bb->beginner_end(); it != std::prev(bb->instructions.cend());) {
             auto inst = *it;
-            if (inst->isTerminator()) break;
             auto values = inst->getOperands();
+            bb->parent->allocName();
+            dbg(inst, values);
             if (inst->isCall() || inst->isMemoryAccess()) {
-                if (last_memory_inst) values.push_back(last_memory_inst);
+                values.push_back(last_memory_inst);
                 last_memory_inst = inst;
             }
             if (auto icmp = dynamic_cast<Instruction::icmp *>(inst))
