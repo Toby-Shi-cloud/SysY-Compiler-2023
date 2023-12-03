@@ -11,50 +11,9 @@ if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     include_directories(/usr/local/include)
 endif ()
 
-add_executable(Compiler
-        src/dbg.h
-        src/enum.h
-        src/main.cpp
-        src/mips.h
-        src/mir.h
-        src/settings.h
-        src/frontend/grammar.h
-        src/frontend/lexer.cpp
-        src/frontend/lexer.h
-        src/frontend/message.h
-        src/frontend/parser.cpp
-        src/frontend/parser.h
-        src/frontend/token.h
-        src/frontend/visitor.cpp
-        src/frontend/visitor.h
-        src/mir/derived_value.cpp
-        src/mir/derived_value.h
-        src/mir/instruction.cpp
-        src/mir/instruction.h
-        src/mir/manager.h
-        src/mir/type.cpp
-        src/mir/type.h
-        src/mir/value.h
-        src/mips/alias.h
-        src/mips/component.h
-        src/mips/instruction.h
-        src/mips/mips.cpp
-        src/mips/operand.h
-        src/backend/backend_opt.cpp
-        src/backend/backend_opt.h
-        src/backend/reg_alloca.cpp
-        src/backend/reg_alloca.h
-        src/backend/translator.cpp
-        src/backend/translator.h
-        src/opt/constant.cpp
-        src/opt/functional.cpp
-        src/opt/gcm.cpp
-        src/opt/gvn.cpp
-        src/opt/mem2reg.cpp
-        src/opt/mem2reg.h
-        src/opt/opt.cpp
-        src/opt/opt.h
-)
+file(GLOB_RECURSE SRC_DIR "src/*.cpp")
+set_property(SOURCE ${DIR_SRC} PROPERTY COMPILE_FLAGS "-Werror")
+add_executable(Compiler ${SRC_DIR})
 
 if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     enable_testing()
