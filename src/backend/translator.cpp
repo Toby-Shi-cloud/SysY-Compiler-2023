@@ -410,8 +410,16 @@ namespace backend {
         }
 
         // translate
+        std::priority_queue<std::pair<int, const mir::BasicBlock *>> worklist;
+        mirFunction->reCalcBBInfo();
+        mirFunction->calcDomDepth();
         for (auto bb: mirFunction->bbs)
+            worklist.emplace(-bb->dom_depth, bb);
+        while (!worklist.empty()) {
+            auto bb = worklist.top().second;
+            worklist.pop();
             translateBasicBlock(bb);
+        }
         compute_phi(mirFunction);
         assert(curFunc != nullptr);
         assert(curFunc->allocaSize % 4 == 0);

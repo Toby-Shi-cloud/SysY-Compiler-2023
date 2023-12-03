@@ -41,6 +41,8 @@ namespace mir {
     void functionInline(Function *func);
 
     void connectBlocks(Function *func);
+
+    void globalCodeMotion(Function *func);
 }
 
 namespace mir {

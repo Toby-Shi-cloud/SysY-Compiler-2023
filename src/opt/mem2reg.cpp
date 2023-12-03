@@ -2,19 +2,14 @@
 // Created by toby on 2023/11/14.
 //
 
-#include <queue>
 #include "opt.h"
+#include <stack>
+#include <queue>
 
 namespace mir {
-    void reCalcBBInfo(Function *func) {
-        func->calcPreSuc();
-        calcDominators(func);
-        calcDF(func);
-    }
-
-    void calcDominators(Function *func) {
-        std::set<BasicBlock *> all{func->bbs.begin(), func->bbs.end()};
-        all.insert(func->exitBB);
+    void Function::calcDominators() const {
+        std::set<BasicBlock *> all{bbs.begin(), bbs.end()};
+        all.insert(exitBB);
         const auto calc_dom = [&all](auto bb) {
             auto dominators = all;
             std::set<BasicBlock *> temp;
@@ -35,14 +30,14 @@ namespace mir {
         bool changed = true;
         while (changed) {
             changed = false;
-            for (auto bb: func->bbs) {
+            for (auto bb: bbs) {
                 auto pre_size = bb->dominators.size();
                 calc_dom(bb);
                 if (bb->dominators.size() != pre_size)
                     changed = true;
             }
         }
-        calc_dom(func->exitBB);
+        calc_dom(exitBB);
 
         constexpr auto calc_idom = [](auto bb) {
             bb->idom = nullptr;
@@ -50,11 +45,11 @@ namespace mir {
                 if (bb != dom && (!bb->idom || dom->dominators.count(bb->idom)))
                     bb->idom = dom;
         };
-        for (auto bb: func->bbs) calc_idom(bb);
-        calc_idom(func->exitBB);
+        for (auto bb: bbs) calc_idom(bb);
+        calc_idom(exitBB);
     }
 
-    void calcDF(const Function *func) {
+    void Function::calcDF() const {
         constexpr auto calc = [](auto x, auto y) {
             while (x != y->idom) {
                 x->df.insert(y);
@@ -72,7 +67,7 @@ namespace mir {
             }
         };
 
-        dfs(func->bbs.front(), calc, dfs);
+        dfs(bbs.front(), calc, dfs);
     }
 
     static void calcPhi(const Function *func, const Instruction::alloca_ *alloc) {
@@ -152,7 +147,7 @@ namespace mir {
     }
 
     void calcPhi(Function *func) {
-        reCalcBBInfo(func);
+        func->reCalcBBInfo();
         for (auto inst: func->bbs.front()->instructions) {
             if (auto alloc = dynamic_cast<Instruction::alloca_ *>(inst)) {
                 if (alloc->getType() != Type::getI32Type()) continue;
@@ -181,25 +176,32 @@ namespace mir {
     }
 
     void clearDeadBlock(Function *func) {
-        bool changed = true;
-        while (changed) {
-            changed = false;
-            func->calcPreSuc();
-            // First block shouldn't be cleared
-            auto it = ++func->bbs.begin();
-            while (it != func->bbs.end()) {
-                if (auto bb = *it; bb->predecessors.empty()) {
-                    for (auto &&user: bb->users())
-                        if (auto phi = dynamic_cast<Instruction::phi *>(user)) {
-                            phi->eraseIncomingValue(bb);
-                        } else assert(!"Unexpected user of a dead basic block");
-                    delete bb;
-                    changed = true;
-                    opt_infos.clear_dead_block()++;
-                    it = func->bbs.erase(it);
-                } else ++it;
+        func->calcPreSuc();
+        std::unordered_set<BasicBlock *> visited{func->bbs.front()};
+        std::stack<BasicBlock *> stack;
+        stack.push(func->bbs.front());
+        while (!stack.empty()) {
+            auto bb = stack.top();
+            stack.pop();
+            for (auto suc: bb->successors) {
+                if (visited.count(suc)) continue;
+                visited.insert(suc);
+                stack.push(suc);
             }
         }
+        // delete block that not visited
+        for (auto it = func->bbs.begin(); it != func->bbs.end();) {
+            if (auto bb = *it; !visited.count(bb)) {
+                for (auto &&user: bb->users())
+                    if (auto phi = dynamic_cast<Instruction::phi *>(user))
+                        phi->eraseIncomingValue(bb);
+                bb->moveTo(func->exitBB); // temporary move to exitBB
+                delete bb;
+                opt_infos.clear_dead_block()++;
+                it = func->bbs.erase(it);
+            } else ++it;
+        }
+        assert(!func->exitBB->isUsed());
     }
 
     void mergeEmptyBlock(Function *func) {

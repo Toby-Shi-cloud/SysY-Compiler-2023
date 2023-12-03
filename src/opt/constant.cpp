@@ -6,8 +6,6 @@
 #include "opt.h"
 #include "../settings.h"
 
-// extern mir::Manager mir_manager;
-
 namespace mir {
     static inst_node_t arithmeticFolding(Instruction::add *binary) {
         if (binary->getLhs() == getIntegerLiteral(0))
