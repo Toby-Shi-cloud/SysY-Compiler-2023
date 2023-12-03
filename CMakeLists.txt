@@ -49,7 +49,7 @@ add_executable(Compiler
         src/opt/constant.cpp
         src/opt/functional.cpp
         src/opt/gcm.cpp
-        src/opt/lvn.cpp
+        src/opt/gvn.cpp
         src/opt/mem2reg.cpp
         src/opt/mem2reg.h
         src/opt/opt.cpp

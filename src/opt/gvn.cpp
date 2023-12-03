@@ -33,8 +33,16 @@ struct [[maybe_unused]] std::hash<operator_t> {
 };
 
 namespace mir {
-    static void localVariableNumbering(BasicBlock *bb) {
-        std::unordered_map<operator_t, Value *> variables;
+    using variable_map_t = std::unordered_map<operator_t, Value *>;
+    inline std::unordered_map<BasicBlock *, variable_map_t> variables;
+
+    inline Value *find(BasicBlock *bb, const operator_t &key) {
+        if (bb == nullptr) return nullptr;
+        if (variables[bb].count(key)) return variables[bb][key];
+        return variables[bb][key] = find(bb->idom, key);
+    }
+
+    inline void globalVariableNumbering(BasicBlock *bb) {
         std::unordered_map<Instruction *, inst_vector_t> edges;
         std::unordered_map<Instruction *, int> degrees;
         std::unordered_map<Instruction *, int> origin;
@@ -53,12 +61,12 @@ namespace mir {
             if (auto icmp = dynamic_cast<Instruction::icmp *>(inst))
                 values.push_back(getIntegerLiteral(icmp->cond));
             operator_t key = {inst->instrTy, std::move(values)};
-            if (variables.count(key)) {
+            if (auto value = find(bb, key)) {
                 opt_infos.local_variable_numbering()++;
-                it = substitute(inst, variables[key]);
+                it = substitute(inst, value);
                 continue;
             }
-            variables[key] = inst;
+            variables[bb][key] = inst;
             degrees[inst] = 0;
             origin[inst] = cnt++;
             for (auto &&v: key.second)
@@ -91,8 +99,14 @@ namespace mir {
         }
     }
 
-    void localVariableNumbering(const Function *func) {
-        for (auto &bb: func->bbs)
-            localVariableNumbering(bb);
+    void globalVariableNumbering(const Function *func) {
+        std::vector<BasicBlock *> sorted_bbs{func->bbs.begin(), func->bbs.end()};
+        std::sort(sorted_bbs.begin(), sorted_bbs.end(), [](auto &&x, auto &&y) {
+            return x->dom_depth < y->dom_depth;
+        });
+
+        for (auto &&bb: sorted_bbs)
+            globalVariableNumbering(bb);
+        variables.clear();
     }
 }

@@ -36,7 +36,7 @@ namespace mir {
 
     void constantFolding(const Function *func);
 
-    void localVariableNumbering(const Function *func);
+    void globalVariableNumbering(const Function *func);
 
     void functionInline(Function *func);
 

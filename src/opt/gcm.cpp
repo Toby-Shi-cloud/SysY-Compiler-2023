@@ -50,7 +50,6 @@ namespace mir {
 
     void globalCodeMotion(Function *func) {
         clearDeadBlock(func);
-        localVariableNumbering(func);
         func->reCalcBBInfo();
         func->calcLoopNest();
         func->calcDomDepth();
@@ -85,9 +84,6 @@ namespace mir {
                 } else break;
             }
         }
-
-        // LVN
-        localVariableNumbering(func);
 
         // Schedule Late
         std::stack<Instruction *> work_stack;
