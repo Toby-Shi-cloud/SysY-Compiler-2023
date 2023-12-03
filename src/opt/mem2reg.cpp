@@ -146,7 +146,7 @@ namespace mir {
         }
     }
 
-    void calcPhi(Function *func) {
+    void mem2reg(Function *func) {
         func->reCalcBBInfo();
         for (auto inst: func->bbs.front()->instructions) {
             if (auto alloc = dynamic_cast<Instruction::alloca_ *>(inst)) {
