@@ -8,7 +8,7 @@
 #include "../mir.h"
 
 namespace mir {
-    void calcPhi(Function *func);
+    void mem2reg(Function *func);
 
     void clearDeadInst(const Function *func);
 

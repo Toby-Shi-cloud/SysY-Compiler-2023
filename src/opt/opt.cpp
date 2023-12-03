@@ -6,28 +6,29 @@
 #include "../settings.h"
 
 namespace mir {
-    static void _optimize(Function *func) {
+    static void basic_optimize(Function *func) {
 // this macro is used to allocName for values when debug mod enabled.
 #define FUNC (assert((func->allocName(), true)), func)
-        if (opt_settings.using_mem2reg) calcPhi(FUNC);
-        if (opt_settings.using_gcm) globalCodeMotion(FUNC);
-        if (opt_settings.using_constant_folding) constantFolding(FUNC);
-        if (opt_settings.using_lvn) localVariableNumbering(FUNC);
-        if (!opt_settings.force_no_opt) clearDeadInst(FUNC);
-        if (opt_settings.using_block_merging) mergeEmptyBlock(FUNC);
+        if (opt_settings.using_mem2reg) mem2reg(FUNC);
         if (!opt_settings.force_no_opt) clearDeadBlock(FUNC);
+        if (!opt_settings.force_no_opt) clearDeadInst(FUNC);
+        if (opt_settings.using_constant_folding) constantFolding(FUNC);
+        if (opt_settings.using_gcm) globalCodeMotion(FUNC);
+        if (opt_settings.using_lvn) localVariableNumbering(FUNC);
+        if (opt_settings.using_block_merging) mergeEmptyBlock(FUNC);
         if (opt_settings.using_block_merging) connectBlocks(FUNC);
 #undef FUNC
     }
 
     void Manager::optimize() {
-        if (opt_settings.using_force_inline) for_each_func(functionInline);
-        clearUnused();
         OptInfos _sum = {};
         opt_infos = { 1 };
         while (opt_infos != OptInfos{}) {
             opt_infos = {};
-            for_each_func(_optimize);
+            for_each_func(basic_optimize);
+            if (opt_infos == OptInfos{})
+                if (opt_settings.using_force_inline)
+                    for_each_func(functionInline);
             clearUnused();
             _sum += opt_infos;
         }

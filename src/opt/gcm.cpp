@@ -50,6 +50,7 @@ namespace mir {
 
     void globalCodeMotion(Function *func) {
         clearDeadBlock(func);
+        localVariableNumbering(func);
         func->reCalcBBInfo();
         func->calcLoopNest();
         func->calcDomDepth();

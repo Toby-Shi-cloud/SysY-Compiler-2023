@@ -50,13 +50,14 @@ namespace mir {
     [[nodiscard]] int &field() { return (*this)[id]; } \
     [[nodiscard]] int field() const { return (*this)[id]; }
 
-    inline struct OptInfos : std::array<int, 6> {
+    inline struct OptInfos : std::array<int, 7> {
         DECLARE(mem_to_reg, 0)
         DECLARE(constant_folding, 1)
         DECLARE(local_variable_numbering, 2)
         DECLARE(clear_dead_inst, 3)
         DECLARE(clear_dead_block, 4)
         DECLARE(merge_empty_block, 5)
+        DECLARE(function_inline, 6)
 
         OptInfos operator+(const OptInfos &other) const {
             OptInfos res = {};
@@ -84,7 +85,8 @@ namespace dbg {
         stream << str(local_variable_numbering) << ", ";
         stream << str(clear_dead_inst) << ", ";
         stream << str(clear_dead_block) << ", ";
-        stream << str(merge_empty_block);
+        stream << str(merge_empty_block) << ", ";
+        stream << str(function_inline);
         stream << "}";
         return true;
 #undef str

@@ -29,6 +29,7 @@ int main(int argc, char **argv) {
         else if (argv[i] == "-emit-llvm"s) ptr = &llvm_ir_file;
         else *ptr = argv[i], ptr = &source_file;
     }
+//    opt_settings.using_force_inline = false;
 
     std::ifstream fin(source_file);
     std::ofstream fir(llvm_ir_file);
