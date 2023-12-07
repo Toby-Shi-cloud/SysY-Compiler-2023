@@ -11,8 +11,8 @@
 namespace mips {
     struct Instruction {
         enum class Ty {
-            NOP, ADDU, SUBU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV, SLT, SLTU, MOVN, MOVZ, CLO, CLZ, MUL,
-            MULTU, MADDU, MSUBU, DIV, DIVU,
+            NOP, ADDU, SUBU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV, SLT, SLTU, MOVN, MOVZ, CLO, CLZ,
+            MUL, MULTU, MADDU, MSUBU, DIV, DIVU,
             MOVE, MFHI, MFLO, MTHI, MTLO,
             ADDIU, ANDI, ORI, XORI, SLL, SRL, SRA, SLTI, SLTIU, LUI, LI,
             LA, LW, LWL, LWR, LB, LH, LHU, LBU, SW, SWL, SWR, SB, SH,
@@ -97,9 +97,7 @@ namespace mips {
             : InstructionImpl{ty, {dst}, {src1, src2}} {
             if (ty == Ty::MOVN || ty == Ty::MOVZ)
                 reg_use_push_back(dst);
-            if (ty == Ty::MUL)
-                reg_def_push_back(PhyRegister::HI),
-                reg_def_push_back(PhyRegister::LO);
+            assert(ty >= Ty::ADDU && ty <= Ty::CLZ);
         }
 
         explicit BinaryRInst(Ty ty, rRegister r1, rRegister r2) : InstructionImpl{ty} {
@@ -156,17 +154,28 @@ namespace mips {
     struct BinaryMInst : InstructionImpl<BinaryMInst> {
         explicit BinaryMInst(Ty ty, rRegister src1, rRegister src2)
             : InstructionImpl{ty, {PhyRegister::HI, PhyRegister::LO}, {src1, src2}} {
+            assert(ty != Ty::MUL);
             if (ty == Ty::MADDU || ty == Ty::MSUBU)
                 reg_use_push_back(PhyRegister::HI),
                 reg_use_push_back(PhyRegister::LO);
         }
+
+        explicit BinaryMInst(Ty ty, rRegister dst, rRegister src1, rRegister src2)
+            : InstructionImpl{ty, {dst, PhyRegister::HI, PhyRegister::LO}, {src1, src2}} {
+            assert(ty == Ty::MUL);
+        }
+
+        [[nodiscard]] rRegister dst() const { return ty == Ty::MUL ? regDef[0] : nullptr; }
 
         [[nodiscard]] rRegister src1() const { return regUse[0]; }
 
         [[nodiscard]] rRegister src2() const { return regUse[1]; }
 
         std::ostream &output(std::ostream &os) const override {
-            return os << ty << "\t" << src1() << ", " << src2();
+            os << ty << "\t";
+            if (dst()) os << dst() << ", ";
+            os << src1() << ", " << src2();
+            return os;
         }
     };
 

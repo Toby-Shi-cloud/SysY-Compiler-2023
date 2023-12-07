@@ -36,7 +36,12 @@ namespace backend {
                         continue;
                     }
                     assert(!inst->regDef.empty());
-                    dbg(inst);
+                    if (inst->ty == mips::Instruction::Ty::MUL && !pred(inst->regDef[0])) {
+                        // change to MULTU
+                        mips::pInstruction newInst = std::make_unique<mips::BinaryMInst>(
+                            mips::Instruction::Ty::MULTU, inst->regUse[0], inst->regUse[1]);
+                        inst.swap(newInst);
+                    }
                     if (std::any_of(inst->regDef.begin(), inst->regDef.end(), pred)) {
                         earseDef(inst);
                         addUsed(inst);
@@ -84,15 +89,17 @@ namespace backend {
         enum FoldType { NONE, MULU, DIV, DIVU };
         constexpr auto deduce_fold_type = [](auto ty) {
             switch (ty) {
+                case mips::Instruction::Ty::MUL:
                 case mips::Instruction::Ty::MULTU: return MULU;
                 case mips::Instruction::Ty::DIV: return DIV;
                 case mips::Instruction::Ty::DIVU: return DIVU;
                 default: return NONE;
             }
         };
-        constexpr auto find_hi_lo = [](mips::pInstruction &inst) {
+        constexpr auto find_hi_lo = [](auto inst) {
             auto it = inst->node;
             mips::rRegister hi = nullptr, lo = nullptr;
+            if (inst->ty == mips::Instruction::Ty::MUL) lo = inst->dst();
             if (++it == inst->parent->end()) return std::make_pair(hi, lo);
             if ((*it)->ty == mips::Instruction::Ty::MFHI) hi = (*it)->regDef[0];
             else if ((*it)->ty == mips::Instruction::Ty::MFLO) lo = (*it)->regDef[0];
@@ -112,7 +119,7 @@ namespace backend {
                 auto mInst = dynamic_cast<mips::rBinaryMInst>(inst.get());
                 assert(mInst);
                 auto identity = std::make_tuple(dt, mInst->src1(), mInst->src2());
-                auto [hi, lo] = find_hi_lo(inst);
+                auto [hi, lo] = find_hi_lo(mInst);
                 if (map.count(identity)) {
                     auto &&result = map[identity];
                     auto &&[result_inst, result_hi, result_lo] = result;
@@ -141,6 +148,5 @@ namespace backend {
                 }
             }
         }
-        dbg(*function);
     }
 }

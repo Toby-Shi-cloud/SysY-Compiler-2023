@@ -54,7 +54,6 @@ namespace mir {
             auto inst = *it;
             auto values = inst->getOperands();
             bb->parent->allocName();
-            dbg(inst, values);
             if (inst->isCall() || inst->isMemoryAccess()) {
                 values.push_back(last_memory_inst);
                 last_memory_inst = inst;

@@ -70,7 +70,7 @@ namespace backend {
         auto rhsv = getRegister(rhs);
         if constexpr (ty == mir::Instruction::MUL)
             curBlock->push_back(std::make_unique<mips::BinaryMInst>(
-                mips::Instruction::Ty::MULTU, lhs, rhsv));
+                mips::Instruction::Ty::MUL, dst, lhs, rhsv));
         else if constexpr (ty == mir::Instruction::UDIV || ty == mir::Instruction::UREM)
             curBlock->push_back(std::make_unique<mips::BinaryMInst>(
                 mips::Instruction::Ty::DIVU, lhs, rhsv));
@@ -79,7 +79,7 @@ namespace backend {
                 mips::Instruction::Ty::DIV, lhs, rhsv));
         if constexpr (ty == mir::Instruction::SREM || ty == mir::Instruction::UREM)
             curBlock->push_back(std::make_unique<mips::MoveInst>(dst, mips::PhyRegister::HI));
-        else
+        else if constexpr (ty != mir::Instruction::MUL)
             curBlock->push_back(std::make_unique<mips::MoveInst>(dst, mips::PhyRegister::LO));
         return dst;
     }
@@ -211,10 +211,9 @@ namespace backend {
                 addr = curFunc->newAddress(addr->base, std::move(_new), addr->label);
             } else {
                 auto reg = getRegister(value);
-                auto dst1 = curFunc->newVirRegister();
+                auto dst1 = translateBinaryInstHelper<mir::Instruction::MUL>(
+                    reg, mir::getIntegerLiteral(deduce_size));
                 auto dst2 = curFunc->newVirRegister();
-                curBlock->push_back(std::make_unique<mips::BinaryIInst>(
-                    mips::Instruction::Ty::MUL, dst1, reg, deduce_size));
                 curBlock->push_back(std::make_unique<mips::BinaryRInst>(
                     mips::Instruction::Ty::ADDU, dst2, addr->base, dst1));
                 addr = curFunc->newAddress(dst2, addr->offset->clone(), addr->label);
@@ -545,8 +544,12 @@ namespace backend {
         if (auto imm = dynamic_cast<const mir::IntegerLiteral *>(mirValue)) {
             if (imm->value == 0) return mips::PhyRegister::get(0);
             auto reg = curFunc->newVirRegister();
-            curBlock->push_back(std::make_unique<mips::BinaryIInst>(
-                mips::Instruction::Ty::LI, reg, imm->value));
+            if ((imm->value & 0xffff) == 0)
+                curBlock->push_back(std::make_unique<mips::BinaryIInst>(
+                    mips::Instruction::Ty::LUI, reg, imm->value >> 16));
+            else
+                curBlock->push_back(std::make_unique<mips::BinaryIInst>(
+                    mips::Instruction::Ty::LI, reg, imm->value));
             return reg;
         }
         if (auto op = oMap.find(mirValue); op != oMap.end())
