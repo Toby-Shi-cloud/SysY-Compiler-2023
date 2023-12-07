@@ -466,16 +466,18 @@ namespace frontend::visitor {
         // WHILETK LPARENT cond RPARENT stmt
         auto &cond = node.children[2];
         auto &stmt = node.children[4];
-        // (br) -> (true) -> stmt -> (continue) -> cond -> (break/false)
+        // (continue) -> cond -> (true) -> stmt -> (br) -> (break/false)
         loop_stack.push({new mir::BasicBlock(current_function), new mir::BasicBlock(current_function)});
         cond_stack.push({new mir::BasicBlock(current_function), loop_stack.top().break_block});
-        value_list list = {new Instruction::br(loop_stack.top().continue_block)};
-        list.push_back(cond_stack.top().true_block);
-        auto [stmt_v, stmt_l] = visit(*stmt);
-        list.splice(list.end(), stmt_l);
+        value_list list{};
+        list.push_back(new Instruction::br(loop_stack.top().continue_block));
         list.push_back(loop_stack.top().continue_block);
         auto [cond_v, cond_l] = visit(*cond);
         list.splice(list.end(), cond_l);
+        list.push_back(cond_stack.top().true_block);
+        auto [stmt_v, stmt_l] = visit(*stmt);
+        list.splice(list.end(), stmt_l);
+        list.push_back(new Instruction::br(loop_stack.top().continue_block));
         list.push_back(cond_stack.top().false_block);
         cond_stack.pop();
         loop_stack.pop();
@@ -497,7 +499,7 @@ namespace frontend::visitor {
         auto &cond = cond_it == semicn2 ? nullptr_node : *cond_it;
         auto &forStmt2 = forStmt2_it == node.children.end() ? nullptr_node : *forStmt2_it;
         auto &stmt = node.children.back();
-        // forStmt1 -> (br) -> (true) -> stmt -> (continue) -> forStmt2 -> (cond) -> cond -> (break/false)
+        // forStmt1 -> (cond) -> cond -> (true) -> stmt -> (continue) -> forStmt2 -> (br) -> (break/false)
         auto cond_block = new mir::BasicBlock(current_function);
         loop_stack.push({new mir::BasicBlock(current_function), new mir::BasicBlock(current_function)});
         cond_stack.push({new mir::BasicBlock(current_function), loop_stack.top().break_block});
@@ -507,14 +509,6 @@ namespace frontend::visitor {
             list.splice(list.end(), l);
         }
         list.push_back(new Instruction::br(cond_block));
-        list.push_back(cond_stack.top().true_block);
-        auto [_v, _l] = visit(*stmt);
-        list.splice(list.end(), _l);
-        list.push_back(loop_stack.top().continue_block);
-        if (forStmt2) {
-            auto [v, l] = visit(*forStmt2);
-            list.splice(list.end(), l);
-        }
         list.push_back(cond_block);
         if (cond) {
             auto [v, l] = visit(*cond);
@@ -523,6 +517,15 @@ namespace frontend::visitor {
             auto br = new Instruction::br(cond_stack.top().true_block);
             list.push_back(br);
         }
+        list.push_back(cond_stack.top().true_block);
+        auto [_v, _l] = visit(*stmt);
+        list.splice(list.end(), _l);
+        list.push_back(loop_stack.top().continue_block);
+        if (forStmt2) {
+            auto [v, l] = visit(*forStmt2);
+            list.splice(list.end(), l);
+        }
+        list.push_back(new Instruction::br(cond_block));
         list.push_back(cond_stack.top().false_block);
         cond_stack.pop();
         loop_stack.pop();
