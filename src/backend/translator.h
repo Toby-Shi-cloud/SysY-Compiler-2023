@@ -112,7 +112,9 @@ namespace backend {
 
         void compute_func_exit() const;
 
-        void optimize() const;
+        void optimizeBeforeAlloc() const;
+
+        void optimizAfterAlloc() const;
 
         static void log(const mips::Function *func);
 

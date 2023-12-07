@@ -17,7 +17,11 @@ namespace backend {
     // Flod div & rem with same operands. (i.e. a/b, a%b can be flodded into one div instruction)
     void divisionFold(mips::rFunction function);
 
+    // Convert x / imm (or x % imm) to multiplication (if possible)
     void div2mul(mips::rFunction function);
+
+    // Clear duplicate instructions (LI/LUI)
+    void clearDuplicateInst(mips::rFunction function);
 }
 
 #endif //COMPILER_BACKEND_OPT_H

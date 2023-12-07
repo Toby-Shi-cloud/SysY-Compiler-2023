@@ -443,7 +443,7 @@ namespace backend {
 
         // reformat blocks & alloca registers
         assert((curFunc->allocName(), true));
-        optimize();
+        optimizeBeforeAlloc();
         log(curFunc);
         register_alloca(curFunc);
 
@@ -451,6 +451,7 @@ namespace backend {
         if (isMain) curFunc->shouldSave.clear(); // save nothing
         compute_func_start();
         compute_func_exit();
+        optimizAfterAlloc();
     }
 
     void Translator::translateBasicBlock(const mir::BasicBlock *mirBlock) {
@@ -696,13 +697,16 @@ namespace backend {
         }
     }
 
-    void Translator::optimize() const {
+    void Translator::optimizeBeforeAlloc() const {
         if (!opt_settings.force_no_opt) clearDeadCode(curFunc);
-        if (opt_settings.using_block_relocation) relocateBlock(curFunc);
         if (opt_settings.using_div2mul) div2mul(curFunc);
         if (!opt_settings.force_no_opt) divisionFold(curFunc);
-        log(curFunc);
         clearDeadCode(curFunc);
+    }
+
+    void Translator::optimizAfterAlloc() const {
+        if (!opt_settings.force_no_opt) clearDuplicateInst(curFunc);
+        if (opt_settings.using_block_relocation) relocateBlock(curFunc);
     }
 
     void Translator::translate() {

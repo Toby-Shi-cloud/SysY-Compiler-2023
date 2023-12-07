@@ -10,17 +10,23 @@
 
 namespace backend {
     static std::optional<int> getLastImm(mips::rInstruction inst, mips::rRegister reg) {
-        assert(std::find(inst->regUse.cbegin(), inst->regUse.cend(), reg) != inst->regUse.cend());
-        for (auto it = inst->node; it != inst->parent->begin(); --it) {
-            auto &&cur = *it;
-            if (std::find(cur->regDef.cbegin(), cur->regDef.cend(), reg) == cur->regDef.cend()) continue;
-            if (cur->ty != mips::Instruction::Ty::LI && cur->ty != mips::Instruction::Ty::LUI) return std::nullopt;
-            auto loadImm = dynamic_cast<mips::rBinaryIInst>(cur.get());
-            assert(loadImm);
-            auto imm = dynamic_cast<mips::rImmediate>(loadImm->imm.get());
-            if (!imm) return std::nullopt;
-            if (loadImm->ty == mips::Instruction::Ty::LI) return imm->value;
-            return imm->value << 16;
+        bool first = true;
+        for (auto block_it = inst->parent->node;; --block_it) {
+            auto it = first ? inst->node : (*block_it)->end();
+            while (it != (*block_it)->begin()) {
+                auto &&cur = *--it;
+                if (auto phy = dynamic_cast<mips::rPhyRegister>(reg);
+                    cur->isFuncCall() && (!phy || !phy->isSaved())) return std::nullopt;
+                if (std::find(cur->regDef.cbegin(), cur->regDef.cend(), reg) == cur->regDef.cend()) continue;
+                if (cur->ty != mips::Instruction::Ty::LI && cur->ty != mips::Instruction::Ty::LUI) return std::nullopt;
+                auto loadImm = dynamic_cast<mips::rBinaryIInst>(cur.get());
+                assert(loadImm);
+                if (loadImm->imm->isDyn()) return std::nullopt;
+                if (loadImm->ty == mips::Instruction::Ty::LI) return loadImm->imm->value;
+                return loadImm->imm->value << 16;
+            }
+            first = false;
+            if (block_it == inst->parent->parent->subBlocks.begin()) break;
         }
         return std::nullopt;
     }
@@ -328,6 +334,23 @@ namespace backend {
                                   ? process_udiv(divInst, *imm)
                                   : process_sdiv(divInst, *imm);
                 }
+            }
+        }
+    }
+
+    void clearDuplicateInst(mips::rFunction function) {
+        for (auto &&block: all_sub_blocks(function)) {
+            for (auto it = block->begin(); it != block->end();) {
+                auto inst = it->get();
+                if (inst->ty != mips::Instruction::Ty::LI && inst->ty != mips::Instruction::Ty::LUI) {
+                    ++it;
+                    continue;
+                }
+                auto loadImm = dynamic_cast<mips::rBinaryIInst>(inst);
+                assert(loadImm);
+                auto other_imm = getLastImm(loadImm, loadImm->dst());
+                if (!loadImm->imm->isDyn() && other_imm && *other_imm == loadImm->imm->value) it = block->erase(it);
+                else ++it;
             }
         }
     }
