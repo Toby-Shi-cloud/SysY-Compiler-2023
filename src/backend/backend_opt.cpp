@@ -2,6 +2,7 @@
 // Created by toby on 2023/11/16.
 //
 
+#include <map>
 #include <algorithm>
 #include "reg_alloca.h"
 #include "backend_opt.h"
@@ -13,13 +14,20 @@ namespace backend {
             changed = false;
             compute_blocks_info(function);
             for (auto &block: all_sub_blocks(function)) {
-                std::unordered_set<mips::rInstruction> dead = {};
+                std::vector<mips::rInstruction> dead = {};
                 auto used = block->liveOut;
                 auto pred = [&](auto &&reg) -> bool {
-                    return used.count(reg) || reg->isPhysical();
+                    if (auto phy = dynamic_cast<mips::rPhyRegister>(reg);
+                        !phy || phy->isTemp() || phy->isSaved() ||
+                        phy == mips::PhyRegister::HI || phy == mips::PhyRegister::LO)
+                        return used.count(reg);
+                    return true;
                 };
                 auto addUsed = [&](auto &&inst) {
                     std::for_each(inst->regUse.begin(), inst->regUse.end(), [&](auto &&reg) { used.insert(reg); });
+                };
+                auto earseDef = [&](auto &&inst) {
+                    std::for_each(inst->regDef.begin(), inst->regDef.end(), [&](auto &&reg) { used.erase(reg); });
                 };
                 for (auto it = block->instructions.rbegin(); it != block->instructions.rend(); ++it) {
                     auto &inst = *it;
@@ -28,11 +36,14 @@ namespace backend {
                         continue;
                     }
                     assert(!inst->regDef.empty());
+                    dbg(inst);
                     if (std::any_of(inst->regDef.begin(), inst->regDef.end(), pred)) {
+                        earseDef(inst);
                         addUsed(inst);
                         continue;
                     }
-                    dead.insert(inst.get());
+                    earseDef(inst);
+                    dead.push_back(inst.get());
                     changed = true;
                 }
                 for (auto &inst: dead)
@@ -67,5 +78,69 @@ namespace backend {
             }
         }
         function->blocks = std::move(result);
+    }
+
+    void divisionFold(mips::rFunction function) {
+        enum FoldType { NONE, MULU, DIV, DIVU };
+        constexpr auto deduce_fold_type = [](auto ty) {
+            switch (ty) {
+                case mips::Instruction::Ty::MULTU: return MULU;
+                case mips::Instruction::Ty::DIV: return DIV;
+                case mips::Instruction::Ty::DIVU: return DIVU;
+                default: return NONE;
+            }
+        };
+        constexpr auto find_hi_lo = [](mips::pInstruction &inst) {
+            auto it = inst->node;
+            mips::rRegister hi = nullptr, lo = nullptr;
+            if (++it == inst->parent->end()) return std::make_pair(hi, lo);
+            if ((*it)->ty == mips::Instruction::Ty::MFHI) hi = (*it)->regDef[0];
+            else if ((*it)->ty == mips::Instruction::Ty::MFLO) lo = (*it)->regDef[0];
+            else return std::make_pair(hi, lo);
+            if (++it == inst->parent->end()) return std::make_pair(hi, lo);
+            if ((*it)->ty == mips::Instruction::Ty::MFHI) hi = (*it)->regDef[0];
+            else if ((*it)->ty == mips::Instruction::Ty::MFLO) lo = (*it)->regDef[0];
+            return std::make_pair(hi, lo);
+        };
+
+        for (auto &&block: all_sub_blocks(function)) {
+            std::map<std::tuple<FoldType, mips::rRegister, mips::rRegister>,
+                std::tuple<mips::rInstruction, mips::rRegister, mips::rRegister>> map;
+            for (auto &&inst: *block) {
+                auto dt = deduce_fold_type(inst->ty);
+                if (dt == NONE) continue;
+                auto mInst = dynamic_cast<mips::rBinaryMInst>(inst.get());
+                assert(mInst);
+                auto identity = std::make_tuple(dt, mInst->src1(), mInst->src2());
+                auto [hi, lo] = find_hi_lo(inst);
+                if (map.count(identity)) {
+                    auto &&result = map[identity];
+                    auto &&[result_inst, result_hi, result_lo] = result;
+                    static_assert(std::is_lvalue_reference_v<decltype(result)>, "wtf?");
+                    if (hi) {
+                        if (!result_hi) {
+                            auto vir = function->newVirRegister();
+                            result_inst->parent->insert(std::next(result_inst->node),
+                                                        std::make_unique<mips::MoveInst>(vir, mips::PhyRegister::HI));
+                            result_hi = vir;
+                        }
+                        hi->swapUseTo(result_hi);
+                    }
+                    if (lo) {
+                        if (!result_lo) {
+                            auto vir = function->newVirRegister();
+                            result_inst->parent->insert(std::next(result_inst->node),
+                                                        std::make_unique<mips::MoveInst>(vir, mips::PhyRegister::LO));
+                            result_lo = vir;
+                        }
+                        lo->swapUseTo(result_lo);
+                    }
+                    result = std::make_tuple(result_inst, result_hi, result_lo);
+                } else {
+                    map[identity] = std::make_tuple(mInst, hi, lo);
+                }
+            }
+        }
+        dbg(*function);
     }
 }

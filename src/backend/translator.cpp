@@ -51,11 +51,11 @@ namespace backend {
         constexpr std::pair<mips::Instruction::Ty, mips::Instruction::Ty> mipsTys[] = {
             {mips::Instruction::Ty::ADDU, mips::Instruction::Ty::ADDIU},
             {mips::Instruction::Ty::SUBU, mips::Instruction::Ty::ADDIU},
-            {mips::Instruction::Ty::MUL, mips::Instruction::Ty::MUL},
-            {mips::Instruction::Ty::DIVU, mips::Instruction::Ty::DIVU},
-            {mips::Instruction::Ty::DIV, mips::Instruction::Ty::DIV},
-            {mips::Instruction::Ty::REMU, mips::Instruction::Ty::REMU},
-            {mips::Instruction::Ty::REM, mips::Instruction::Ty::REM},
+            {/* MUL */},
+            {/* UDIV */},
+            {/* SDIV */},
+            {/* UREM */},
+            {/* SREM */},
             {mips::Instruction::Ty::SLLV, mips::Instruction::Ty::SLL},
             {mips::Instruction::Ty::SRLV, mips::Instruction::Ty::SRL},
             {mips::Instruction::Ty::SRAV, mips::Instruction::Ty::SRA},
@@ -63,8 +63,25 @@ namespace backend {
             {mips::Instruction::Ty::OR, mips::Instruction::Ty::ORI},
             {mips::Instruction::Ty::XOR, mips::Instruction::Ty::XORI},
         };
-        constexpr auto index = ty - mir::Instruction::InstrTy::ADD;
-        return createBinaryInstHelper<mipsTys[index].first, mipsTys[index].second>(lhs, rhs);
+        if constexpr (constexpr auto index = ty - mir::Instruction::InstrTy::ADD;
+            mipsTys[index].first != mips::Instruction::Ty::NOP)
+            return createBinaryInstHelper<mipsTys[index].first, mipsTys[index].second>(lhs, rhs);
+        auto dst = curFunc->newVirRegister();
+        auto rhsv = getRegister(rhs);
+        if constexpr (ty == mir::Instruction::MUL)
+            curBlock->push_back(std::make_unique<mips::BinaryMInst>(
+                mips::Instruction::Ty::MULTU, lhs, rhsv));
+        else if constexpr (ty == mir::Instruction::UDIV || ty == mir::Instruction::UREM)
+            curBlock->push_back(std::make_unique<mips::BinaryMInst>(
+                mips::Instruction::Ty::DIVU, lhs, rhsv));
+        else
+            curBlock->push_back(std::make_unique<mips::BinaryMInst>(
+                mips::Instruction::Ty::DIV, lhs, rhsv));
+        if constexpr (ty == mir::Instruction::SREM || ty == mir::Instruction::UREM)
+            curBlock->push_back(std::make_unique<mips::MoveInst>(dst, mips::PhyRegister::HI));
+        else
+            curBlock->push_back(std::make_unique<mips::MoveInst>(dst, mips::PhyRegister::LO));
+        return dst;
     }
 
     mips::rRegister Translator::addressCompute(mips::rAddress addr) const {
@@ -679,6 +696,8 @@ namespace backend {
     void Translator::optimize() const {
         if (!opt_settings.force_no_opt) clearDeadCode(curFunc);
         if (opt_settings.using_block_relocation) relocateBlock(curFunc);
+        if (!opt_settings.force_no_opt) divisionFold(curFunc);
+        clearDeadCode(curFunc);
     }
 
     void Translator::translate() {

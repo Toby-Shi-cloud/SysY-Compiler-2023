@@ -42,6 +42,7 @@ namespace mips {
     def(Instruction);
     def(BinaryRInst);
     def(BinaryIInst);
+    def(BinaryMInst);
     def(LoadInst);
     def(StoreInst);
     def(BranchInst);

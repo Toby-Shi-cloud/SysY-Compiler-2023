@@ -63,7 +63,7 @@ namespace mir {
                 values.push_back(getIntegerLiteral(icmp->cond));
             operator_t key = {inst->instrTy, std::move(values)};
             if (auto value = find(bb, key)) {
-                opt_infos.local_variable_numbering()++;
+                opt_infos.global_variable_numbering()++;
                 it = substitute(inst, value);
                 continue;
             }

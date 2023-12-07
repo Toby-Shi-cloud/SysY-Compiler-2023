@@ -53,7 +53,7 @@ namespace mir {
     inline struct OptInfos : std::array<int, 7> {
         DECLARE(mem_to_reg, 0)
         DECLARE(constant_folding, 1)
-        DECLARE(local_variable_numbering, 2)
+        DECLARE(global_variable_numbering, 2)
         DECLARE(clear_dead_inst, 3)
         DECLARE(clear_dead_block, 4)
         DECLARE(merge_empty_block, 5)
@@ -82,7 +82,7 @@ namespace dbg {
         stream << "{";
         stream << str(mem_to_reg) << ", ";
         stream << str(constant_folding) << ", ";
-        stream << str(local_variable_numbering) << ", ";
+        stream << str(global_variable_numbering) << ", ";
         stream << str(clear_dead_inst) << ", ";
         stream << str(clear_dead_block) << ", ";
         stream << str(merge_empty_block) << ", ";

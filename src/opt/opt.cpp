@@ -14,7 +14,7 @@ namespace mir {
         if (!opt_settings.force_no_opt) clearDeadInst(FUNC);
         if (opt_settings.using_constant_folding) constantFolding(FUNC);
         if (opt_settings.using_gcm) globalCodeMotion(FUNC);
-        if (opt_settings.using_lvn) globalVariableNumbering(FUNC);
+        if (opt_settings.using_gvn) globalVariableNumbering(FUNC);
         if (opt_settings.using_block_merging) mergeEmptyBlock(FUNC);
         if (opt_settings.using_block_merging) connectBlocks(FUNC);
 #undef FUNC

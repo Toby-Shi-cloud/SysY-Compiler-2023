@@ -11,12 +11,13 @@
 namespace mips {
     struct Instruction {
         enum class Ty {
-            NOP, ADDU, SUBU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV, SLT, SLTU, MOVN, MOVZ, MUL,
-            MULT, MULTU, MADD, MADDU, MSUB, MSUBU, DIV, DIVU, CLO, CLZ, MOVE,
-            ADDIU, ANDI, ORI, XORI, SLL, SRL, SRA, SLTI, SLTIU, LUI, LI, REM, REMU,
+            NOP, ADDU, SUBU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV, SLT, SLTU, MOVN, MOVZ, CLO, CLZ, MUL,
+            MULTU, MADDU, MSUBU, DIV, DIVU,
+            MOVE, MFHI, MFLO, MTHI, MTLO,
+            ADDIU, ANDI, ORI, XORI, SLL, SRL, SRA, SLTI, SLTIU, LUI, LI,
             LA, LW, LWL, LWR, LB, LH, LHU, LBU, SW, SWL, SWR, SB, SH,
             BEQ, BNE, BGEZ, BGTZ, BLEZ, BLTZ, BGEZAL, BLTZAL,
-            J, JR, JAL, JALR, MFHI, MFLO, MTHI, MTLO, SYSCALL
+            J, JR, JAL, JALR, SYSCALL
         } ty;
 
         std::vector<rRegister> regDef, regUse;
@@ -96,6 +97,9 @@ namespace mips {
             : InstructionImpl{ty, {dst}, {src1, src2}} {
             if (ty == Ty::MOVN || ty == Ty::MOVZ)
                 reg_use_push_back(dst);
+            if (ty == Ty::MUL)
+                reg_def_push_back(PhyRegister::HI),
+                reg_def_push_back(PhyRegister::LO);
         }
 
         explicit BinaryRInst(Ty ty, rRegister r1, rRegister r2) : InstructionImpl{ty} {
@@ -146,6 +150,23 @@ namespace mips {
             if (src()) os << ", " << src();
             os << ", " << imm;
             return os;
+        }
+    };
+
+    struct BinaryMInst : InstructionImpl<BinaryMInst> {
+        explicit BinaryMInst(Ty ty, rRegister src1, rRegister src2)
+            : InstructionImpl{ty, {PhyRegister::HI, PhyRegister::LO}, {src1, src2}} {
+            if (ty == Ty::MADDU || ty == Ty::MSUBU)
+                reg_use_push_back(PhyRegister::HI),
+                reg_use_push_back(PhyRegister::LO);
+        }
+
+        [[nodiscard]] rRegister src1() const { return regUse[0]; }
+
+        [[nodiscard]] rRegister src2() const { return regUse[1]; }
+
+        std::ostream &output(std::ostream &os) const override {
+            return os << ty << "\t" << src1() << ", " << src2();
         }
     };
 
@@ -242,21 +263,28 @@ namespace mips {
 
     struct MoveInst : InstructionImpl<MoveInst> {
         explicit MoveInst(rRegister dst, rRegister src)
-            : InstructionImpl{Ty::MOVE, {dst}, {src}} {}
+            : InstructionImpl{deduce_type(dst, src), {dst}, {src}} {}
 
-        explicit MoveInst(Ty ty, rRegister universal) : InstructionImpl{ty} {
-            if (ty == Ty::MFHI || ty == Ty::MFLO) reg_def_push_back(universal);
-            else reg_use_push_back(universal);
-        }
+        [[nodiscard]] rRegister dst() const { return regDef[0]; }
 
-        [[nodiscard]] rRegister dst() const { return regDef.empty() ? nullptr : regDef[0]; }
-
-        [[nodiscard]] rRegister src() const { return regUse.empty() ? nullptr : regUse[0]; }
+        [[nodiscard]] rRegister src() const { return regUse[0]; }
 
         std::ostream &output(std::ostream &os) const override {
             if (ty == Ty::MOVE)
                 return os << ty << "\t" << dst() << ", " << src();
-            return os << ty << "\t" << (dst() ? dst() : src());
+            if (ty == Ty::MFHI || ty == Ty::MFLO)
+                return os << ty << "\t" << dst();
+            return os << ty << "\t" << src();
+        }
+
+    private:
+        static Ty deduce_type(rRegister dst, rRegister src) {
+            auto dst_is_hi_lo = dst == PhyRegister::HI || dst == PhyRegister::LO;
+            auto src_is_hi_lo = src == PhyRegister::HI || src == PhyRegister::LO;
+            assert(!dst_is_hi_lo || !src_is_hi_lo);
+            if (!dst_is_hi_lo && !src_is_hi_lo) return Ty::MOVE;
+            if (dst_is_hi_lo) return dst == PhyRegister::HI ? Ty::MTHI : Ty::MTLO;
+            return src == PhyRegister::HI ? Ty::MFHI : Ty::MFLO;
         }
     };
 

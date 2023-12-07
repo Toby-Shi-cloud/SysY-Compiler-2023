@@ -95,7 +95,7 @@ namespace mips {
             "$t0", "$t1", "$t2", "$t3", "$t4", "$t5", "$t6", "$t7",
             "$s0", "$s1", "$s2", "$s3", "$s4", "$s5", "$s6", "$s7",
             "$t8", "$t9", "$k0", "$k1", "$gp", "$sp", "$fp", "$ra",
-            "$(hi)", "$(lo)"
+            "HI", "LO"
         };
 
         static inline const std::unordered_map<std::string, unsigned> name2id = [] {
@@ -126,6 +126,9 @@ namespace mips {
         };
 
     public:
+        static const rPhyRegister HI;
+        static const rPhyRegister LO;
+
         using phy_set_t = std::set<rPhyRegister, Comparator>;
 
         [[nodiscard]] static rPhyRegister get(unsigned id) { return registers[id].get(); }
@@ -161,6 +164,9 @@ namespace mips {
             registers[i] = pPhyRegister(new PhyRegister(i));
         return registers;
     }();
+
+    inline const rPhyRegister PhyRegister::HI = get("HI");
+    inline const rPhyRegister PhyRegister::LO = get("LO");
 
     struct VirRegister : Register {
         static inline unsigned counter = 0;

@@ -9,7 +9,7 @@ inline struct OptSettings {
     bool force_no_opt;
     bool using_gp;
     bool using_mem2reg;
-    bool using_lvn;
+    bool using_gvn;
     bool using_gcm;
     bool using_constant_folding;
     bool using_arithmetic_folding;
@@ -26,7 +26,7 @@ inline void set_optimize_level(int level) {
             [[fallthrough]];
         case 2:
             SET(using_gp);
-            SET(using_lvn);
+            SET(using_gvn);
             SET(using_gcm);
             SET(using_force_inline);
             [[fallthrough]];
