@@ -29,14 +29,6 @@ namespace mips {
         std::unordered_set<rRegister> liveIn, liveOut;
         std::unordered_set<rRegister> use, def;
 
-        // Only clone the instructions.
-        [[nodiscard]] SubBlock clone() const {
-            SubBlock subBlock{};
-            for (auto &inst: instructions)
-                subBlock.instructions.emplace_back(inst->clone());
-            return subBlock;
-        }
-
         [[nodiscard]] bool empty() const { return instructions.empty(); }
 
         [[nodiscard]] auto back() const { return instructions.back().get(); }
@@ -65,6 +57,14 @@ namespace mips {
             return instructions.erase(std::forward<decltype(args)>(args)...);
         }
 
+        // Only clone the instructions.
+        [[nodiscard]] pSubBlock clone() const {
+            auto subBlock = std::make_unique<SubBlock>();
+            for (auto &inst: instructions)
+                subBlock->insert(subBlock->end(), inst->clone());
+            return subBlock;
+        }
+
         std::ostream &output(std::ostream &os, bool sharp_last = false) const {
             for (auto &inst: instructions)
                 os << "\t" << (sharp_last && &inst == &instructions.back() ? "# " : "")
@@ -88,7 +88,7 @@ namespace mips {
         std::list<pSubBlock> subBlocks;
         pLabel label{new Label("<unnamed block>", this)};
 
-        explicit Block(rFunction parent) : parent(parent), subBlocks{} { subBlocks.emplace_back(new SubBlock()); }
+        explicit Block(rFunction parent) : parent(parent) { subBlocks.emplace_back(new SubBlock()); }
 
         [[nodiscard]] bool empty() const { return subBlocks.size() == 1 && frontBlock()->empty(); }
 
@@ -116,6 +116,23 @@ namespace mips {
         void clearBlockInfo() const;
 
         void computePreSuc() const;
+
+        // Only clone the instructions.
+        [[nodiscard]] pBlock clone() const {
+            auto block = std::make_unique<Block>(parent);
+            block->subBlocks.clear();
+            for (auto &sub: subBlocks)
+                block->subBlocks.push_back(sub->clone());
+            return block;
+        }
+
+        void mergeBlock(rBlock other) {
+            assert(std::get<rBlock>(backInst()->getJumpLabel()->parent) == other);
+            backBlock()->instructions.pop_back();
+            if (backBlock()->empty()) subBlocks.pop_back();
+            subBlocks.splice(subBlocks.end(), other->clone()->subBlocks);
+            // other free here...
+        }
     };
 
     struct Function {
@@ -214,7 +231,7 @@ namespace mips {
         os << func.label << ":" << "\n";
         for (auto &block: func)
             os << *block;
-        os << *func.exitB;
+        if (!func.exitB->empty()) os << *func.exitB;
         return os;
     }
 

@@ -16,6 +16,12 @@ namespace backend {
 
     // Flod div & rem with same operands. (i.e. a/b, a%b can be flodded into one div instruction)
     void divisionFold(mips::rFunction function);
+
+    // Inline some sub-blocks to reduce the number of jumps
+    void blockInline(mips::rFunction function);
+
+    // Inline function exitBB
+    void exitBBInline(mips::rFunction function);
 }
 
 #endif //COMPILER_BACKEND_OPT_H

@@ -3,11 +3,40 @@
 //
 
 #include <map>
+#include <stack>
 #include <algorithm>
+#include <unordered_set>
 #include "reg_alloca.h"
 #include "backend_opt.h"
 
 namespace backend {
+    inline void clearDeadBlock(mips::rFunction function) {
+        std::unordered_set<mips::rBlock> visited;
+        std::stack<mips::rBlock> stack;
+        visited.insert(function->blocks.front().get());
+        stack.push(function->blocks.front().get());
+        while (!stack.empty()) {
+            auto block = stack.top();
+            stack.pop();
+            for (auto &sub: block->subBlocks) {
+                auto lbl = sub->back()->getJumpLabel();
+                if (lbl == nullptr) continue;
+                if (!std::holds_alternative<mips::rBlock>(lbl->parent)) continue;
+                auto suc = std::get<mips::rBlock>(lbl->parent);
+                if (suc == function->exitB.get()) continue;
+                if (visited.count(suc)) continue;
+                stack.push(suc);
+                visited.insert(suc);
+            }
+        }
+        for (auto it = function->begin(); it != function->end();) {
+            auto &&block = *it;
+            if (!visited.count(block.get())) {
+                it = function->blocks.erase(it);
+            } else ++it;
+        }
+    }
+
     void clearDeadCode(mips::rFunction function) {
         bool changed = true;
         while (changed) {
@@ -36,7 +65,6 @@ namespace backend {
                         continue;
                     }
                     assert(!inst->regDef.empty());
-                    dbg(inst);
                     if (std::any_of(inst->regDef.begin(), inst->regDef.end(), pred)) {
                         earseDef(inst);
                         addUsed(inst);
@@ -103,44 +131,84 @@ namespace backend {
             return std::make_pair(hi, lo);
         };
 
-        for (auto &&block: all_sub_blocks(function)) {
+        for (auto &&block: *function) {
             std::map<std::tuple<FoldType, mips::rRegister, mips::rRegister>,
                 std::tuple<mips::rInstruction, mips::rRegister, mips::rRegister>> map;
-            for (auto &&inst: *block) {
-                auto dt = deduce_fold_type(inst->ty);
-                if (dt == NONE) continue;
-                auto mInst = dynamic_cast<mips::rBinaryMInst>(inst.get());
-                assert(mInst);
-                auto identity = std::make_tuple(dt, mInst->src1(), mInst->src2());
-                auto [hi, lo] = find_hi_lo(inst);
-                if (map.count(identity)) {
-                    auto &&result = map[identity];
-                    auto &&[result_inst, result_hi, result_lo] = result;
-                    static_assert(std::is_lvalue_reference_v<decltype(result)>, "wtf?");
-                    if (hi) {
-                        if (!result_hi) {
-                            auto vir = function->newVirRegister();
-                            result_inst->parent->insert(std::next(result_inst->node),
-                                                        std::make_unique<mips::MoveInst>(vir, mips::PhyRegister::HI));
-                            result_hi = vir;
+            for (auto &&sub: block->subBlocks) {
+                for (auto &&inst: *sub) {
+                    auto dt = deduce_fold_type(inst->ty);
+                    if (dt == NONE) continue;
+                    auto mInst = dynamic_cast<mips::rBinaryMInst>(inst.get());
+                    assert(mInst);
+                    auto identity = std::make_tuple(dt, mInst->src1(), mInst->src2());
+                    auto [hi, lo] = find_hi_lo(inst);
+                    if (map.count(identity)) {
+                        auto &&result = map[identity];
+                        auto &&[result_inst, result_hi, result_lo] = result;
+                        static_assert(std::is_lvalue_reference_v<decltype(result)>, "wtf?");
+                        if (hi) {
+                            if (!result_hi) {
+                                auto vir = function->newVirRegister();
+                                result_inst->parent->insert(
+                                    std::next(result_inst->node),
+                                    std::make_unique<mips::MoveInst>(vir, mips::PhyRegister::HI));
+                                result_hi = vir;
+                            }
+                            hi->swapUseTo(result_hi);
                         }
-                        hi->swapUseTo(result_hi);
-                    }
-                    if (lo) {
-                        if (!result_lo) {
-                            auto vir = function->newVirRegister();
-                            result_inst->parent->insert(std::next(result_inst->node),
-                                                        std::make_unique<mips::MoveInst>(vir, mips::PhyRegister::LO));
-                            result_lo = vir;
+                        if (lo) {
+                            if (!result_lo) {
+                                auto vir = function->newVirRegister();
+                                result_inst->parent->insert(
+                                    std::next(result_inst->node),
+                                    std::make_unique<mips::MoveInst>(vir, mips::PhyRegister::LO));
+                                result_lo = vir;
+                            }
+                            lo->swapUseTo(result_lo);
                         }
-                        lo->swapUseTo(result_lo);
+                        result = std::make_tuple(result_inst, result_hi, result_lo);
+                    } else {
+                        map[identity] = std::make_tuple(mInst, hi, lo);
                     }
-                    result = std::make_tuple(result_inst, result_hi, result_lo);
-                } else {
-                    map[identity] = std::make_tuple(mInst, hi, lo);
                 }
             }
         }
+    }
+
+    void blockInline(mips::rFunction function) {
+        std::list<mips::pBlock> newBlocks;
+        std::unordered_map<mips::rLabel, mips::rLabel> labels;
         dbg(*function);
+        for (auto &&block: *function) {
+            auto newBlock = block->clone();
+            labels[block->label.get()] = newBlock->label.get();
+            while (true) {
+                auto &&inst = newBlock->backInst();
+                auto lbl = inst->getJumpLabel();
+                if (!lbl || !std::holds_alternative<mips::rBlock>(lbl->parent)) break;
+                auto suc = std::get<mips::rBlock>(lbl->parent);
+                if (suc == function->exitB.get()) break;
+                if (suc == block.get()) break;
+                newBlock->mergeBlock(suc);
+            }
+            dbg(*newBlock, newBlock->subBlocks.size());
+            auto node = newBlocks.insert(newBlocks.cend(), std::move(newBlock));
+            newBlocks.back()->node = node;
+        }
+        for (auto &&block: newBlocks) {
+            for (auto &&sub: block->subBlocks) {
+                auto &&inst = sub->back();
+                if (!labels.count(inst->getJumpLabel())) continue;
+                inst->setJumpLabel(labels[inst->getJumpLabel()]);
+            }
+        }
+        function->blocks.swap(newBlocks);
+        clearDeadBlock(function);
+        dbg(*function);
+        // original blocks are deleted automatically
+    }
+
+    void exitBBInline(mips::rFunction function) {
+
     }
 }
