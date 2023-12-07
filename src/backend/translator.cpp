@@ -699,7 +699,9 @@ namespace backend {
     void Translator::optimize() const {
         if (!opt_settings.force_no_opt) clearDeadCode(curFunc);
         if (opt_settings.using_block_relocation) relocateBlock(curFunc);
+        if (opt_settings.using_div2mul) div2mul(curFunc);
         if (!opt_settings.force_no_opt) divisionFold(curFunc);
+        log(curFunc);
         clearDeadCode(curFunc);
     }
 

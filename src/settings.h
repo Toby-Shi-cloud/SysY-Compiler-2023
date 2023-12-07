@@ -16,6 +16,7 @@ inline struct OptSettings {
     bool using_block_merging;
     bool using_block_relocation;
     bool using_force_inline;
+    bool using_div2mul;
 } opt_settings;
 
 inline void set_optimize_level(int level) {
@@ -29,6 +30,7 @@ inline void set_optimize_level(int level) {
             SET(using_gvn);
             SET(using_gcm);
             SET(using_force_inline);
+            SET(using_div2mul);
             [[fallthrough]];
         case 1:
             SET(using_mem2reg);

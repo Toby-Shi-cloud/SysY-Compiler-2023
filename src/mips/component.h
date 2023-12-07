@@ -24,18 +24,14 @@ namespace mips {
      * multiply blocks (trade-off between code size and efficiency). <br>
      */
     struct SubBlock {
+        rBlock parent;
+        std::list<pSubBlock>::iterator node;
         std::list<pInstruction> instructions;
         std::unordered_set<rSubBlock> predecessors, successors;
         std::unordered_set<rRegister> liveIn, liveOut;
         std::unordered_set<rRegister> use, def;
 
-        // Only clone the instructions.
-        [[nodiscard]] SubBlock clone() const {
-            SubBlock subBlock{};
-            for (auto &inst: instructions)
-                subBlock.instructions.emplace_back(inst->clone());
-            return subBlock;
-        }
+        explicit SubBlock(rBlock parent) : parent(parent) {}
 
         [[nodiscard]] bool empty() const { return instructions.empty(); }
 
@@ -88,7 +84,10 @@ namespace mips {
         std::list<pSubBlock> subBlocks;
         pLabel label{new Label("<unnamed block>", this)};
 
-        explicit Block(rFunction parent) : parent(parent), subBlocks{} { subBlocks.emplace_back(new SubBlock()); }
+        explicit Block(rFunction parent) : parent(parent), subBlocks{} {
+            subBlocks.emplace_back(new SubBlock(this));
+            subBlocks.back()->node = std::prev(subBlocks.end());
+        }
 
         [[nodiscard]] bool empty() const { return subBlocks.size() == 1 && frontBlock()->empty(); }
 
@@ -101,8 +100,10 @@ namespace mips {
         [[nodiscard]] rInstruction backInst() const { return backBlock()->instructions.back().get(); }
 
         void push_back(pInstruction &&inst) {
-            if (!empty() && backInst()->isJumpBranch() && !backInst()->isFuncCall())
-                subBlocks.emplace_back(new SubBlock());
+            if (!empty() && backInst()->isJumpBranch() && !backInst()->isFuncCall()) {
+                subBlocks.emplace_back(new SubBlock(this));
+                subBlocks.back()->node = std::prev(subBlocks.end());
+            }
             subBlocks.back()->insert(subBlocks.back()->end(), std::move(inst));
         }
 
@@ -110,6 +111,8 @@ namespace mips {
             push_back(std::move(pair.first));
             push_back(std::move(pair.second));
         }
+
+        rBlock splitBlock(inst_pos_t pos);
 
         [[nodiscard]] rLabel nextLabel() const;
 

@@ -44,6 +44,22 @@ namespace mips {
         other->useUsers.insert(inst);
     }
 
+    rBlock Block::splitBlock(inst_pos_t pos) {
+        assert((*pos)->parent->parent == this);
+        auto oldSubBlock = (*pos)->parent;
+        auto newBlock = new Block(parent);
+        newBlock->frontBlock()->instructions.splice(
+            newBlock->frontBlock()->end(), oldSubBlock->instructions, pos, oldSubBlock->end());
+        for (auto it = pos; it != newBlock->frontBlock()->end(); ++it)
+            (*it)->parent = newBlock->frontBlock();
+        newBlock->subBlocks.splice(
+            newBlock->subBlocks.end(), subBlocks, std::next(oldSubBlock->node), subBlocks.end());
+        for (auto &&sub: newBlock->subBlocks)
+            sub->parent = newBlock;
+        newBlock->node = parent->blocks.emplace(std::next(node), newBlock);
+        return newBlock;
+    }
+
     rLabel Block::nextLabel() const {
         if (node == block_node_t{}) return nullptr;
         auto it = node;
