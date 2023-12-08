@@ -59,7 +59,6 @@ namespace mir {
     void connectBlocks(Function *func) {
         func->calcPreSuc();
         func->markBBNode();
-        dbg1(*func);
         for (auto it = func->bbs.begin(); it != func->bbs.end(); ++it) {
             auto &&bb = *it;
             if (bb->successors.size() != 1) continue;
@@ -78,6 +77,5 @@ namespace mir {
             func->calcPreSuc();
             opt_infos.merge_empty_block()++;
         }
-        dbg2(*func);
     }
 }

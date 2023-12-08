@@ -36,6 +36,12 @@ namespace mips {
             : ty{ty}, regDef{std::move(regDef)}, regUse{std::move(regUse)} {
             for (auto reg: this->regDef) reg->defUsers.insert(this);
             for (auto reg: this->regUse) reg->useUsers.insert(this);
+            if (isFuncCall()) {
+                for (auto reg: PhyRegister::get(&PhyRegister::isArg))
+                    reg_use_push_back(reg);
+                for (auto reg: PhyRegister::get(&PhyRegister::isRet))
+                    reg_def_push_back(reg);
+            }
         }
 
         Instruction(const Instruction &inst) noexcept: Instruction(inst.ty, inst.regDef, inst.regUse) {}
@@ -97,26 +103,23 @@ namespace mips {
             : InstructionImpl{ty, {dst}, {src1, src2}} {
             if (ty == Ty::MOVN || ty == Ty::MOVZ)
                 reg_use_push_back(dst);
-            assert(ty >= Ty::ADDU && ty <= Ty::CLZ);
+            assert(ty >= Ty::ADDU && ty <= Ty::MOVZ);
         }
 
-        explicit BinaryRInst(Ty ty, rRegister r1, rRegister r2) : InstructionImpl{ty} {
-            if (ty == Ty::CLO || ty == Ty::CLZ) reg_def_push_back(r1), reg_use_push_back(r2);
-            else reg_use_push_back(r1), reg_use_push_back(r2);
+        explicit BinaryRInst(Ty ty, rRegister dst, rRegister src)
+            : InstructionImpl{ty, {dst}, {src}} {
+            assert(ty == Ty::CLO || ty == Ty::CLZ);
         }
 
-        [[nodiscard]] rRegister dst() const { return regDef.empty() ? nullptr : regDef[0]; }
+        [[nodiscard]] rRegister dst() const { return regDef[0]; }
 
-        [[nodiscard]] rRegister src1() const { return regUse.empty() ? nullptr : regUse[0]; }
+        [[nodiscard]] rRegister src1() const { return regUse[0]; }
 
         [[nodiscard]] rRegister src2() const { return regUse.size() <= 1 ? nullptr : regUse[1]; }
 
         std::ostream &output(std::ostream &os) const override {
-            bool first = true;
-            os << ty << "\t";
-            if (dst()) os << dst(), first = false;
-            if (src1()) os << (first ? "" : ", ") << src1(), first = false;
-            if (src2()) os << (first ? "" : ", ") << src2();
+            os << ty << "\t" << dst() << ", " << src1();
+            if (src2()) os << ", " << src2();
             return os;
         }
     };

@@ -394,8 +394,9 @@ namespace backend {
     void Translator::translateFunction(const mir::Function *mirFunction) {
         const bool isMain = mirFunction->isMain();
         const bool isLeaf = mirFunction->isLeaf();
+        const bool retValue = mirFunction->retType == mir::Type::getI32Type() && !isMain;
         std::string name = mirFunction->getName().substr(1);
-        curFunc = new mips::Function{std::move(name), isMain, isLeaf};
+        curFunc = new mips::Function{std::move(name), isMain, isLeaf, retValue};
         fMap[mirFunction] = curFunc;
         if (!isLeaf) curFunc->shouldSave.insert(mips::PhyRegister::get("$ra"));
         if (isMain) mipsModule->main = mips::pFunction(curFunc);
@@ -701,6 +702,7 @@ namespace backend {
         if (!opt_settings.force_no_opt) clearDeadCode(curFunc);
         if (opt_settings.using_div2mul) div2mul(curFunc);
         if (!opt_settings.force_no_opt) divisionFold(curFunc);
+        if (!opt_settings.force_no_opt) arithmeticFolding(curFunc);
         clearDeadCode(curFunc);
     }
 

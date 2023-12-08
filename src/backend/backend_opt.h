@@ -22,6 +22,9 @@ namespace backend {
 
     // Clear duplicate instructions (LI/LUI)
     void clearDuplicateInst(mips::rFunction function);
+
+    // Do some arithmetic folding
+    void arithmeticFolding(mips::rFunction function);
 }
 
 #endif //COMPILER_BACKEND_OPT_H

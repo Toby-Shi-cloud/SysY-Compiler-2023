@@ -99,6 +99,8 @@ namespace backend {
             block->liveIn.insert(block->use.begin(), block->use.end());
             block->liveIn.erase(mips::PhyRegister::get(0));
         }
+        if (function->retValue)
+            function->exitB->frontBlock()->liveIn.insert(mips::PhyRegister::get("$v0"));
         while (compute_liveIn_liveOut(function));
     }
 

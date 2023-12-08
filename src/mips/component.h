@@ -125,20 +125,21 @@ namespace mips {
         pLabel label;
         int stackOffset = 0;
         unsigned allocaSize, argSize;
-        const bool isMain, isLeaf;
+        bool isMain, isLeaf, retValue;
         PhyRegister::phy_set_t shouldSave;
         std::list<pBlock> blocks;
         pBlock exitB = std::make_unique<Block>(this);
         std::unordered_set<pVirRegister> usedVirRegs;
         std::unordered_set<pAddress> usedAddress;
 
-        explicit Function(std::string name, bool isMain, bool isLeaf)
-            : Function(std::move(name), 0, 0, isMain, isLeaf) {}
+        explicit Function(std::string name, bool isMain, bool isLeaf, bool retValue)
+            : Function(std::move(name), 0, 0, isMain, isLeaf, retValue) {}
 
-        explicit Function(std::string name, unsigned allocaSize, unsigned argSize, bool isMain, bool isLeaf)
+        explicit Function(std::string name, unsigned allocaSize, unsigned argSize,
+                          bool isMain, bool isLeaf, bool retValue)
             : label(std::make_unique<Label>(std::move(name), this)),
               allocaSize(allocaSize), argSize(argSize),
-              isMain(isMain), isLeaf(isLeaf) {}
+              isMain(isMain), isLeaf(isLeaf), retValue(retValue) {}
 
         rVirRegister newVirRegister() {
             auto reg = new VirRegister();

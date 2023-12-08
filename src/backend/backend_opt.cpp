@@ -40,11 +40,8 @@ namespace backend {
                 std::vector<mips::rInstruction> dead = {};
                 auto used = block->liveOut;
                 auto pred = [&](auto &&reg) -> bool {
-                    if (auto phy = dynamic_cast<mips::rPhyRegister>(reg);
-                        !phy || phy->isTemp() || phy->isSaved() ||
-                        phy == mips::PhyRegister::HI || phy == mips::PhyRegister::LO)
-                        return used.count(reg);
-                    return true;
+                    static const auto zero = mips::PhyRegister::get(0);
+                    return reg != zero && used.count(reg);
                 };
                 auto addUsed = [&](auto &&inst) {
                     std::for_each(inst->regUse.begin(), inst->regUse.end(), [&](auto &&reg) { used.insert(reg); });
@@ -55,6 +52,7 @@ namespace backend {
                 for (auto it = block->instructions.rbegin(); it != block->instructions.rend(); ++it) {
                     auto &inst = *it;
                     if (inst->isJumpBranch() || inst->isSyscall() || inst->isStore()) {
+                        earseDef(inst);
                         addUsed(inst);
                         continue;
                     }
@@ -353,5 +351,9 @@ namespace backend {
                 else ++it;
             }
         }
+    }
+
+    void arithmeticFolding(mips::rFunction function) {
+
     }
 }
