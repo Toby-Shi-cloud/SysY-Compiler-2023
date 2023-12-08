@@ -3,44 +3,24 @@
 //
 
 #include <map>
-#include <optional>
 #include <algorithm>
 #include "reg_alloca.h"
 #include "backend_opt.h"
 
-namespace backend {
-    static std::optional<int> getLastImm(mips::rInstruction inst, mips::rRegister reg) {
-        bool first = true;
-        for (auto block_it = inst->parent->node;; --block_it) {
-            auto it = first ? inst->node : (*block_it)->end();
-            while (it != (*block_it)->begin()) {
-                auto &&cur = *--it;
-                if (auto phy = dynamic_cast<mips::rPhyRegister>(reg);
-                    cur->isFuncCall() && (!phy || !phy->isSaved())) return std::nullopt;
-                if (std::find(cur->regDef.cbegin(), cur->regDef.cend(), reg) == cur->regDef.cend()) continue;
-                if (cur->ty != mips::Instruction::Ty::LI && cur->ty != mips::Instruction::Ty::LUI) return std::nullopt;
-                auto loadImm = dynamic_cast<mips::rBinaryIInst>(cur.get());
-                assert(loadImm);
-                if (loadImm->imm->isDyn()) return std::nullopt;
-                if (loadImm->ty == mips::Instruction::Ty::LI) return loadImm->imm->value;
-                return loadImm->imm->value << 16;
-            }
-            first = false;
-            if (block_it == inst->parent->parent->subBlocks.begin()) break;
-        }
-        return std::nullopt;
-    }
+namespace mips {
+    using backend::all_sub_blocks;
+    using backend::compute_blocks_info;
 
-    void clearDeadCode(mips::rFunction function) {
+    void clearDeadCode(rFunction function) {
         bool changed = true;
         while (changed) {
             changed = false;
             compute_blocks_info(function);
             for (auto &block: all_sub_blocks(function)) {
-                std::vector<mips::rInstruction> dead = {};
+                std::vector<rInstruction> dead = {};
                 auto used = block->liveOut;
                 auto pred = [&](auto &&reg) -> bool {
-                    static const auto zero = mips::PhyRegister::get(0);
+                    static const auto zero = PhyRegister::get(0);
                     return reg != zero && used.count(reg);
                 };
                 auto addUsed = [&](auto &&inst) {
@@ -57,10 +37,10 @@ namespace backend {
                         continue;
                     }
                     assert(!inst->regDef.empty());
-                    if (inst->ty == mips::Instruction::Ty::MUL && !pred(inst->regDef[0])) {
+                    if (inst->ty == Instruction::Ty::MUL && !pred(inst->regDef[0])) {
                         // change to MULTU
-                        mips::pInstruction newInst = std::make_unique<mips::BinaryMInst>(
-                            mips::Instruction::Ty::MULTU, inst->regUse[0], inst->regUse[1]);
+                        pInstruction newInst = std::make_unique<BinaryMInst>(
+                            Instruction::Ty::MULTU, inst->regUse[0], inst->regUse[1]);
                         newInst->parent = inst->parent;
                         newInst->node = inst->node;
                         inst.swap(newInst);
@@ -80,22 +60,22 @@ namespace backend {
         }
     }
 
-    void relocateBlock(mips::rFunction function) {
-        constexpr auto next = [](auto &&block) -> mips::rBlock {
+    void relocateBlock(rFunction function) {
+        constexpr auto next = [](auto &&block) -> rBlock {
             if (auto label = block->backInst()->getJumpLabel();
-                label && std::holds_alternative<mips::rBlock>(label->parent))
-                return std::get<mips::rBlock>(label->parent);
+                label && std::holds_alternative<rBlock>(label->parent))
+                return std::get<rBlock>(label->parent);
             return nullptr;
         };
 
-        std::unordered_set<mips::rBlock> unordered, ordered;
+        std::unordered_set<rBlock> unordered, ordered;
         for (auto &block: *function)
             unordered.insert(block.get());
         for (auto &block: *function)
             unordered.erase(next(block));
         ordered.insert(function->exitB.get());
 
-        std::list<mips::pBlock> result;
+        std::list<pBlock> result;
         for (auto current = function->begin()->get(); !unordered.empty();
              current = unordered.empty() ? nullptr : *unordered.begin()) {
             unordered.erase(current);
@@ -108,40 +88,26 @@ namespace backend {
         function->blocks = std::move(result);
     }
 
-    static auto find_hi_lo(mips::rBinaryMInst inst) {
-        auto it = inst->node;
-        mips::rRegister hi = nullptr, lo = nullptr;
-        if (inst->ty == mips::Instruction::Ty::MUL) lo = inst->dst();
-        if (++it == inst->parent->end()) return std::make_pair(hi, lo);
-        if ((*it)->ty == mips::Instruction::Ty::MFHI) hi = (*it)->regDef[0];
-        else if ((*it)->ty == mips::Instruction::Ty::MFLO) lo = (*it)->regDef[0];
-        else return std::make_pair(hi, lo);
-        if (++it == inst->parent->end()) return std::make_pair(hi, lo);
-        if ((*it)->ty == mips::Instruction::Ty::MFHI) hi = (*it)->regDef[0];
-        else if ((*it)->ty == mips::Instruction::Ty::MFLO) lo = (*it)->regDef[0];
-        return std::make_pair(hi, lo);
-    };
-
-    void divisionFold(mips::rFunction function) {
+    void divisionFold(rFunction function) {
         enum FoldType { NONE, MULU, DIV, DIVU };
         constexpr auto deduce_fold_type = [](auto ty) {
             switch (ty) {
-                case mips::Instruction::Ty::MUL:
-                case mips::Instruction::Ty::MULTU: return MULU;
-                case mips::Instruction::Ty::DIV: return DIV;
-                case mips::Instruction::Ty::DIVU: return DIVU;
+                case Instruction::Ty::MUL:
+                case Instruction::Ty::MULTU: return MULU;
+                case Instruction::Ty::DIV: return DIV;
+                case Instruction::Ty::DIVU: return DIVU;
                 default: return NONE;
             }
         };
 
         for (auto &&block: all_sub_blocks(function)) {
-            using operand_t = std::variant<int, mips::rRegister>;
+            using operand_t = std::variant<int, rRegister>;
             std::map<std::tuple<FoldType, operand_t, operand_t>,
-                std::tuple<mips::rInstruction, mips::rRegister, mips::rRegister>> map;
+                std::tuple<rInstruction, rRegister, rRegister>> map;
             for (auto &&inst: *block) {
                 auto dt = deduce_fold_type(inst->ty);
                 if (dt == NONE) continue;
-                auto mInst = dynamic_cast<mips::rBinaryMInst>(inst.get());
+                auto mInst = dynamic_cast<rBinaryMInst>(inst.get());
                 assert(mInst);
                 auto src1_imm = getLastImm(mInst, mInst->src1());
                 auto src2_imm = getLastImm(mInst, mInst->src2());
@@ -157,7 +123,7 @@ namespace backend {
                         if (!result_hi) {
                             auto vir = function->newVirRegister();
                             result_inst->parent->insert(std::next(result_inst->node),
-                                                        std::make_unique<mips::MoveInst>(vir, mips::PhyRegister::HI));
+                                                        std::make_unique<MoveInst>(vir, PhyRegister::HI));
                             result_hi = vir;
                         }
                         hi->swapUseTo(result_hi);
@@ -166,7 +132,7 @@ namespace backend {
                         if (!result_lo) {
                             auto vir = function->newVirRegister();
                             result_inst->parent->insert(std::next(result_inst->node),
-                                                        std::make_unique<mips::MoveInst>(vir, mips::PhyRegister::LO));
+                                                        std::make_unique<MoveInst>(vir, PhyRegister::LO));
                             result_lo = vir;
                         }
                         lo->swapUseTo(result_lo);
@@ -192,24 +158,24 @@ namespace backend {
         return {};
     }
 
-    void div2mul(mips::rFunction function) {
+    void div2mul(rFunction function) {
         divisionFold(function);
         bool changed = false;
 
-        auto process_udiv = [&](mips::rBinaryMInst inst, unsigned imm) {
+        auto process_udiv = [&](rBinaryMInst inst, unsigned imm) {
             auto [hi, lo] = find_hi_lo(inst);
             auto block = inst->parent;
             if (__builtin_popcount(imm) == 1) {
                 if (lo) {
                     auto dst = function->newVirRegister();
-                    block->insert(inst->node, std::make_unique<mips::BinaryIInst>(
-                                      mips::Instruction::Ty::SRL, dst, inst->src1(), __builtin_ctz(imm)));
+                    block->insert(inst->node, std::make_unique<BinaryIInst>(
+                                      Instruction::Ty::SRL, dst, inst->src1(), __builtin_ctz(imm)));
                     lo->swapUseTo(dst);
                 }
                 if (hi) {
                     auto dst = function->newVirRegister();
-                    block->insert(inst->node, std::make_unique<mips::BinaryIInst>(
-                                      mips::Instruction::Ty::ANDI, dst, inst->src1(), imm - 1));
+                    block->insert(inst->node, std::make_unique<BinaryIInst>(
+                                      Instruction::Ty::ANDI, dst, inst->src1(), imm - 1));
                     hi->swapUseTo(dst);
                 }
                 return block->erase(inst->node);
@@ -220,77 +186,77 @@ namespace backend {
             auto m_reg = function->newVirRegister();
             auto temp = function->newVirRegister();
             auto dst = temp;
-            block->insert(inst->node, std::make_unique<mips::BinaryIInst>(
-                              mips::Instruction::Ty::LI, m_reg, static_cast<int>(m)));
-            block->insert(inst->node, std::make_unique<mips::BinaryMInst>(
-                              mips::Instruction::Ty::MULTU, inst->src1(), m_reg));
-            block->insert(inst->node, std::make_unique<mips::MoveInst>(
-                              temp, mips::PhyRegister::HI));
+            block->insert(inst->node, std::make_unique<BinaryIInst>(
+                              Instruction::Ty::LI, m_reg, static_cast<int>(m)));
+            block->insert(inst->node, std::make_unique<BinaryMInst>(
+                              Instruction::Ty::MULTU, inst->src1(), m_reg));
+            block->insert(inst->node, std::make_unique<MoveInst>(
+                              temp, PhyRegister::HI));
             if (l != 0) {
                 dst = function->newVirRegister();
-                block->insert(inst->node, std::make_unique<mips::BinaryIInst>(
-                                         mips::Instruction::Ty::SRL, dst, temp, l));
+                block->insert(inst->node, std::make_unique<BinaryIInst>(
+                                         Instruction::Ty::SRL, dst, temp, l));
             }
             changed = true;
             if (lo) lo->swapUseTo(dst);
             if (hi) {
                 auto imm_reg = function->newVirRegister();
                 auto mul_reg = function->newVirRegister();
-                block->insert(inst->node, std::make_unique<mips::BinaryIInst>(
-                                  mips::Instruction::Ty::LI, imm_reg, static_cast<int>(imm)));
-                block->insert(inst->node, std::make_unique<mips::BinaryMInst>(
-                                  mips::Instruction::Ty::MUL, mul_reg, dst, imm_reg));
+                block->insert(inst->node, std::make_unique<BinaryIInst>(
+                                  Instruction::Ty::LI, imm_reg, static_cast<int>(imm)));
+                block->insert(inst->node, std::make_unique<BinaryMInst>(
+                                  Instruction::Ty::MUL, mul_reg, dst, imm_reg));
                 auto hi_dst = function->newVirRegister();
-                block->insert(inst->node, std::make_unique<mips::BinaryRInst>(
-                                  mips::Instruction::Ty::SUBU, hi_dst, inst->src1(), mul_reg));
+                block->insert(inst->node, std::make_unique<BinaryRInst>(
+                                  Instruction::Ty::SUBU, hi_dst, inst->src1(), mul_reg));
                 hi->swapUseTo(hi_dst);
             }
             return block->erase(inst->node);
         };
 
-        auto process_sdiv = [&](mips::rBinaryMInst inst, int imm)  {
+        auto process_sdiv = [&](rBinaryMInst inst, int imm)  {
             if (auto [m, l] = div2mul(abs(imm)); m == 0) return inst->node;
             auto [hi, lo] = find_hi_lo(inst);
             auto src_block = inst->parent->parent;
             auto result_block = src_block->splitBlock(inst->node);
             auto result_label = result_block->label.get();
-            auto &neg_block = function->blocks.emplace_back(new mips::Block(function));
+            auto &neg_block = function->blocks.emplace_back(new Block(function));
             neg_block->node = std::prev(function->blocks.end());
-            src_block->push_back(std::make_unique<mips::BranchInst>(
-                mips::Instruction::Ty::BLTZ, inst->src1(), neg_block->label.get()));
+            src_block->push_back(std::make_unique<BranchInst>(
+                Instruction::Ty::BLTZ, inst->src1(), neg_block->label.get()));
             auto merge_dest = function->newVirRegister();
 
             auto imm_reg_1 = function->newVirRegister();
-            src_block->push_back(std::make_unique<mips::BinaryIInst>(mips::Instruction::Ty::LI, imm_reg_1, abs(imm)));
-            auto pos_divu = new mips::BinaryMInst(mips::Instruction::Ty::DIVU, inst->src1(), imm_reg_1);
-            src_block->push_back(mips::pBinaryMInst{pos_divu});
+            src_block->push_back(std::make_unique<BinaryIInst>(Instruction::Ty::LI, imm_reg_1, abs(imm)));
+            auto pos_divu = new BinaryMInst(Instruction::Ty::DIVU, inst->src1(), imm_reg_1);
+            src_block->push_back(pBinaryMInst{pos_divu});
             auto pos_temp = function->newVirRegister(), pos_dest = pos_temp;
-            src_block->push_back(std::make_unique<mips::MoveInst>(pos_temp, mips::PhyRegister::LO));
+            src_block->push_back(std::make_unique<MoveInst>(pos_temp, PhyRegister::LO));
             if (imm < 0) {
                 pos_dest = function->newVirRegister();
-                src_block->push_back(std::make_unique<mips::BinaryRInst>(
-                    mips::Instruction::Ty::SUBU, pos_dest, mips::PhyRegister::get(0), pos_temp));
+                src_block->push_back(std::make_unique<BinaryRInst>(
+                    Instruction::Ty::SUBU, pos_dest, PhyRegister::get(0), pos_temp));
             }
-            src_block->push_back(std::make_unique<mips::MoveInst>(merge_dest, pos_dest));
-            src_block->push_back(std::make_unique<mips::JumpInst>(mips::Instruction::Ty::J, result_label));
+            src_block->push_back(std::make_unique<MoveInst>(merge_dest, pos_dest));
+            src_block->push_back(std::make_unique<JumpInst>(Instruction::Ty::J, result_label));
             process_udiv(pos_divu, abs(imm));
 
             auto neg_src = function->newVirRegister();
-            neg_block->push_back(std::make_unique<mips::BinaryRInst>(
-                mips::Instruction::Ty::SUBU, neg_src, mips::PhyRegister::get(0), inst->src1()));
+            neg_block->push_back(std::make_unique<BinaryRInst>(
+                Instruction::Ty::SUBU, neg_src, PhyRegister::get(0), inst->src1()));
             auto imm_reg_2 = function->newVirRegister();
-            neg_block->push_back(std::make_unique<mips::BinaryIInst>(mips::Instruction::Ty::LI, imm_reg_2, abs(imm)));
-            auto neg_divu = new mips::BinaryMInst(mips::Instruction::Ty::DIVU, neg_src, imm_reg_2);
-            neg_block->push_back(mips::pBinaryMInst{neg_divu});
+            neg_block->push_back(std::make_unique<BinaryIInst>(Instruction::Ty::LI, imm_reg_2, abs(imm)));
+            auto neg_divu = new BinaryMInst(Instruction::Ty::DIVU, neg_src, imm_reg_2);
+            neg_block->push_back(pBinaryMInst{neg_divu});
             auto neg_temp = function->newVirRegister(), neg_dest = neg_temp;
-            neg_block->push_back(std::make_unique<mips::MoveInst>(neg_temp, mips::PhyRegister::LO));
+            neg_block->push_back(std::make_unique<MoveInst>(neg_temp, PhyRegister::LO));
             if (imm > 0) {
                 neg_dest = function->newVirRegister();
-                neg_block->push_back(std::make_unique<mips::BinaryRInst>(
-                    mips::Instruction::Ty::SUBU, neg_dest, mips::PhyRegister::get(0), neg_temp));
+                neg_block->push_back(std::make_unique<BinaryRInst>(
+                    Instruction::Ty::SUBU, neg_dest, PhyRegister::get(0), neg_temp));
             }
-            neg_block->push_back(std::make_unique<mips::MoveInst>(merge_dest, neg_dest));
-            neg_block->push_back(std::make_unique<mips::JumpInst>(mips::Instruction::Ty::J, result_label));
+            neg_block->push_back(std::make_unique<MoveInst>(merge_dest, neg_dest));
+            neg_block->push_back(std::make_unique<JumpInst>(Instruction::Ty::J, result_label));
             process_udiv(neg_divu, abs(imm));
 
             auto result_sub = result_block->frontBlock();
@@ -298,13 +264,13 @@ namespace backend {
             if (hi) {
                 auto imm_reg = function->newVirRegister();
                 auto mul_reg = function->newVirRegister();
-                result_sub->insert(inst->node, std::make_unique<mips::BinaryIInst>(
-                                  mips::Instruction::Ty::LI, imm_reg, imm));
-                result_sub->insert(inst->node, std::make_unique<mips::BinaryMInst>(
-                                  mips::Instruction::Ty::MUL, mul_reg, merge_dest, imm_reg));
+                result_sub->insert(inst->node, std::make_unique<BinaryIInst>(
+                                  Instruction::Ty::LI, imm_reg, imm));
+                result_sub->insert(inst->node, std::make_unique<BinaryMInst>(
+                                  Instruction::Ty::MUL, mul_reg, merge_dest, imm_reg));
                 auto hi_dst = function->newVirRegister();
-                result_sub->insert(inst->node, std::make_unique<mips::BinaryRInst>(
-                                  mips::Instruction::Ty::SUBU, hi_dst, inst->src1(), mul_reg));
+                result_sub->insert(inst->node, std::make_unique<BinaryRInst>(
+                                  Instruction::Ty::SUBU, hi_dst, inst->src1(), mul_reg));
                 hi->swapUseTo(hi_dst);
             }
 
@@ -323,12 +289,12 @@ namespace backend {
                 for (; inst_it != (*sub_it)->end(); do_after()) {
                     changed = false;
                     auto &&inst = *inst_it;
-                    if (inst->ty != mips::Instruction::Ty::DIVU && inst->ty != mips::Instruction::Ty::DIV) continue;
-                    auto divInst = dynamic_cast<mips::rBinaryMInst>(inst.get());
+                    if (inst->ty != Instruction::Ty::DIVU && inst->ty != Instruction::Ty::DIV) continue;
+                    auto divInst = dynamic_cast<rBinaryMInst>(inst.get());
                     assert(divInst);
                     auto imm = getLastImm(divInst, divInst->src2());
                     if (imm == std::nullopt) continue;
-                    inst_it = divInst->ty == mips::Instruction::Ty::DIVU
+                    inst_it = divInst->ty == Instruction::Ty::DIVU
                                   ? process_udiv(divInst, *imm)
                                   : process_sdiv(divInst, *imm);
                 }
@@ -336,15 +302,15 @@ namespace backend {
         }
     }
 
-    void clearDuplicateInst(mips::rFunction function) {
+    void clearDuplicateInst(rFunction function) {
         for (auto &&block: all_sub_blocks(function)) {
             for (auto it = block->begin(); it != block->end();) {
                 auto inst = it->get();
-                if (inst->ty != mips::Instruction::Ty::LI && inst->ty != mips::Instruction::Ty::LUI) {
+                if (inst->ty != Instruction::Ty::LI && inst->ty != Instruction::Ty::LUI) {
                     ++it;
                     continue;
                 }
-                auto loadImm = dynamic_cast<mips::rBinaryIInst>(inst);
+                auto loadImm = dynamic_cast<rBinaryIInst>(inst);
                 assert(loadImm);
                 auto other_imm = getLastImm(loadImm, loadImm->dst());
                 if (!loadImm->imm->isDyn() && other_imm && *other_imm == loadImm->imm->value) it = block->erase(it);
@@ -353,7 +319,7 @@ namespace backend {
         }
     }
 
-    void arithmeticFolding(mips::rFunction function) {
+    void arithmeticFolding(rFunction function) {
 
     }
 }
