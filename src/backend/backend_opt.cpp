@@ -318,8 +318,4 @@ namespace mips {
             }
         }
     }
-
-    void arithmeticFolding(rFunction function) {
-
-    }
 }

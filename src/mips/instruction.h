@@ -11,7 +11,7 @@
 namespace mips {
     struct Instruction {
         enum class Ty {
-            NOP, ADDU, SUBU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV, SLT, SLTU, MOVN, MOVZ, CLO, CLZ,
+            NOP, ADDU, SUBU, AND, OR, XOR, SLLV, SRAV, SRLV, SLT, SLTU, MOVN, MOVZ, CLO, CLZ,
             MUL, MULTU, MADDU, MSUBU, DIV, DIVU,
             MOVE, MFHI, MFLO, MTHI, MTLO,
             ADDIU, ANDI, ORI, XORI, SLL, SRL, SRA, SLTI, SLTIU, LUI, LI,

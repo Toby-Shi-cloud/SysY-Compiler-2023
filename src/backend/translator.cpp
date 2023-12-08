@@ -85,17 +85,22 @@ namespace backend {
     }
 
     mips::rRegister Translator::addressCompute(mips::rAddress addr) const {
-        auto imm_reg = curFunc->newVirRegister();
-        curBlock->push_back(std::make_unique<mips::BinaryIInst>(
-            mips::Instruction::Ty::ADDIU, imm_reg, addr->base, addr->offset->clone()));
-        if (!addr->label) return imm_reg;
+        if (addr->label == nullptr) {
+            auto imm_reg = curFunc->newVirRegister();
+            curBlock->push_back(std::make_unique<mips::BinaryIInst>(
+                mips::Instruction::Ty::ADDIU, imm_reg, addr->base, addr->offset->clone()));
+            return imm_reg;
+        }
         auto addr_reg = curFunc->newVirRegister();
-        auto dst = curFunc->newVirRegister();
+        auto dst1 = curFunc->newVirRegister();
+        auto dst2 = curFunc->newVirRegister();
         curBlock->push_back(std::make_unique<mips::LoadInst>(
             mips::Instruction::Ty::LA, addr_reg, addr->label));
         curBlock->push_back(std::make_unique<mips::BinaryRInst>(
-            mips::Instruction::Ty::ADDU, dst, imm_reg, addr_reg));
-        return dst;
+            mips::Instruction::Ty::ADDU, dst1, addr_reg, addr->base));
+        curBlock->push_back(std::make_unique<mips::BinaryIInst>(
+            mips::Instruction::Ty::ADDIU, dst2, dst1, addr->offset->clone()));
+        return dst2;
     }
 
     void Translator::translateRetInst(const mir::Instruction::ret *retInst) {
