@@ -17,6 +17,7 @@ inline struct OptSettings {
     bool using_block_relocation;
     bool using_force_inline;
     bool using_div2mul;
+    bool using_inline_printer;
 } opt_settings;
 
 inline void set_optimize_level(int level) {
@@ -31,6 +32,7 @@ inline void set_optimize_level(int level) {
             SET(using_gcm);
             SET(using_force_inline);
             SET(using_div2mul);
+            SET(using_inline_printer);
             [[fallthrough]];
         case 1:
             SET(using_mem2reg);

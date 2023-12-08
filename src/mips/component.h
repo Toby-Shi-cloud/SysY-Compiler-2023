@@ -119,6 +119,14 @@ namespace mips {
         void clearBlockInfo() const;
 
         void computePreSuc() const;
+
+        [[nodiscard]] rBlock getJumpTo() const {
+            if (empty()) return nullptr;
+            auto &&lbl = backInst()->getJumpLabel();
+            if (lbl && std::holds_alternative<rBlock>(lbl->parent))
+                return std::get<rBlock>(lbl->parent);
+            return nullptr;
+        }
     };
 
     struct Function {
@@ -199,6 +207,8 @@ namespace mips {
          * To make full use of $gp, try to place $gp at .data + 0x8000.
          */
         void calcGlobalVarOffset() const;
+
+        friend void inline_printer(std::ostream &os, const Module &module);
     };
 
     inline std::ostream &operator<<(std::ostream &os, const SubBlock &block) {

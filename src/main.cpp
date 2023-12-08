@@ -61,6 +61,9 @@ int main(int argc, char **argv) {
     backend::Translator translator(&mir_manager, &mips_module);
     translator.translate();
 
-    fmips << mips_module;
+    dbg2(mips_module);
+    if (opt_settings.using_inline_printer)
+        inline_printer(fmips, mips_module);
+    else fmips << mips_module;
     return 0;
 }
