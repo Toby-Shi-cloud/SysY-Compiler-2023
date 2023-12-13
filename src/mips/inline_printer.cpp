@@ -2,6 +2,7 @@
 // Created by toby on 2023/12/8.
 //
 
+#include <optional>
 #include "../mips.h"
 
 // inline printer is a special printer which will print some blocks several times (copy them) to avoid jump
