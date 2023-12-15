@@ -107,7 +107,9 @@ namespace mips {
         unsigned id;
 
     private:
-        static const std::array<pPhyRegister, 34> registers;
+        static inline std::array<pPhyRegister, 34> _init_registers();
+
+        static inline const auto registers = _init_registers();
 
         explicit PhyRegister(unsigned id) : id(id) {}
 
@@ -158,12 +160,12 @@ namespace mips {
         std::ostream &output(std::ostream &os) const override { return os << names[id]; }
     };
 
-    inline const std::array<pPhyRegister, 34> PhyRegister::registers = [] {
-        std::array<pPhyRegister, 34> registers;
+    inline std::array<pPhyRegister, 34> PhyRegister::_init_registers() {
+        std::array<pPhyRegister, 34> _registers;
         for (unsigned i = 0; i < 34; i++)
-            registers[i] = pPhyRegister(new PhyRegister(i));
-        return registers;
-    }();
+            _registers[i] = pPhyRegister(new PhyRegister(i));
+        return _registers;
+    };
 
     inline const rPhyRegister PhyRegister::HI = get("HI");
     inline const rPhyRegister PhyRegister::LO = get("LO");

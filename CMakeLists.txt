@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.10)
 project(Compiler)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -12,7 +12,7 @@ if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
 endif ()
 
 file(GLOB_RECURSE SRC_DIR "src/*.cpp")
-set_property(SOURCE ${DIR_SRC} PROPERTY COMPILE_FLAGS "-Werror")
+set_property(SOURCE ${SRC_DIR} PROPERTY COMPILE_FLAGS "-Werror -g")
 add_executable(Compiler ${SRC_DIR})
 
 if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")

@@ -10,7 +10,7 @@
 
 namespace mips {
     using backend::all_sub_blocks;
-    static const auto zero = PhyRegister::get(0);
+    inline const auto zero = PhyRegister::get(0);
 
     inline inst_node_t substitute(rInstruction _old, pInstruction _new) {
         _new->node = _old->node;
