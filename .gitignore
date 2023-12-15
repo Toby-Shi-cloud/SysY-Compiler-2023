@@ -9,7 +9,7 @@
 /bin
 /lib
 /build
-/cmake-build-*
+/cmake-build*
 
 # zip
 *.zip
