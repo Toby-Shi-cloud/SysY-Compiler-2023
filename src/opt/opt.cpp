@@ -22,36 +22,43 @@ namespace mir {
     }
 
     void Manager::optimize() {
+        clearUnused();
         OptInfos _sum = {};
         opt_infos = { 1 };
         while (opt_infos != OptInfos{}) {
             opt_infos = {};
             for_each_func(basic_optimize);
+            clearUnused();
+            if (opt_settings.using_array_splitting)
+                spiltArray(*this), clearUnused();
+            if (opt_settings.using_inline_global_var)
+                inlineGlobalVar(*this), clearUnused();
             if (opt_infos == OptInfos{})
                 if (opt_settings.using_force_inline)
-                    for_each_func(functionInline);
-            clearUnused();
+                    for_each_func(functionInline), clearUnused();
             _sum += opt_infos;
         }
         dbg(_sum);
     }
 
     void Manager::clearUnused() {
-        for (auto it = functions.begin(); it != functions.end();) {
-            if (auto &&func = *it; func->getName() != "@main" && !func->isUsed()) {
+        decltype(functions) newFunctions;
+        for (auto &&func: functions) {
+            if (!func->isMain() && !func->isUsed()) {
                 delete func;
-                it = functions.erase(it);
-            } else ++it;
+            } else newFunctions.push_back(func);
         }
+        functions.swap(newFunctions);
 
-        for (auto it = globalVars.begin(); it != globalVars.end();) {
-            if (auto &&var = *it; !var->isUsed()) {
+        decltype(globalVars) newGlobalVars;
+        for (auto &&var: globalVars) {
+            if (!var->isUsed()) {
                 if (auto str = dynamic_cast<StringLiteral *>(var->init))
                     stringPool.erase(str->value);
                 delete var;
-                it = globalVars.erase(it);
-            } else ++it;
+            } else newGlobalVars.push_back(var);
         }
+        globalVars.swap(newGlobalVars);
     }
 
 

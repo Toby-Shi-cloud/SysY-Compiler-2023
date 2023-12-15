@@ -18,6 +18,8 @@ inline struct OptSettings {
     bool using_force_inline;
     bool using_div2mul;
     bool using_inline_printer;
+    bool using_array_splitting;
+    bool using_inline_global_var;
 } opt_settings;
 
 inline void set_optimize_level(int level) {
@@ -33,6 +35,8 @@ inline void set_optimize_level(int level) {
             SET(using_force_inline);
             SET(using_div2mul);
             SET(using_inline_printer);
+            SET(using_array_splitting);
+            SET(using_inline_global_var);
             [[fallthrough]];
         case 1:
             SET(using_mem2reg);

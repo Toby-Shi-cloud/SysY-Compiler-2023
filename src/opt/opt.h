@@ -57,6 +57,10 @@ namespace mir {
     void globalVariableNumbering(const Function *func);
 
     void globalCodeMotion(Function *func);
+
+    void spiltArray(Manager &mgr);
+
+    void inlineGlobalVar(Manager &mgr);
 }
 
 namespace mir {
@@ -64,7 +68,7 @@ namespace mir {
     [[nodiscard]] int &field() { return (*this)[id]; } \
     [[nodiscard]] int field() const { return (*this)[id]; }
 
-    inline struct OptInfos : std::array<int, 7> {
+    inline struct OptInfos : std::array<int, 9> {
         DECLARE(mem_to_reg, 0)
         DECLARE(constant_folding, 1)
         DECLARE(global_variable_numbering, 2)
@@ -72,6 +76,8 @@ namespace mir {
         DECLARE(clear_dead_block, 4)
         DECLARE(merge_empty_block, 5)
         DECLARE(function_inline, 6)
+        DECLARE(split_array, 7)
+        DECLARE(inline_global_var, 8)
 
         OptInfos operator+(const OptInfos &other) const {
             OptInfos res = {};
@@ -100,7 +106,9 @@ namespace dbg {
         stream << str(clear_dead_inst) << ", ";
         stream << str(clear_dead_block) << ", ";
         stream << str(merge_empty_block) << ", ";
-        stream << str(function_inline);
+        stream << str(function_inline) << ", ";
+        stream << str(split_array) << ", ";
+        stream << str(inline_global_var);
         stream << "}";
         return true;
 #undef str
