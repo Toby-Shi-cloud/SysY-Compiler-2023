@@ -3,6 +3,7 @@
 //
 
 #include <set>
+#include <optional>
 #include <functional>
 #include "opt.h"
 
@@ -42,19 +43,77 @@ namespace mir {
         return variables[bb][key] = find(bb->idom, key);
     }
 
+    inline const Value *getRootValue(const Value *value) {
+        if (auto load = dynamic_cast<const Instruction::load *>(value))
+            return getRootValue(load->getPointerOperand());
+        if (auto store = dynamic_cast<const Instruction::store *>(value))
+            return getRootValue(store->getDest());
+        if (auto gep = dynamic_cast<const Instruction::getelementptr *>(value))
+            return getRootValue(gep->getPointerOperand());
+        return value;
+    }
+
+    inline std::optional<Value *> isUseless(const BasicBlock *bb, const Instruction::load *current) {
+        auto it = current->node;
+        auto root = getRootValue(current);
+        while (it != bb->instructions.begin()) {
+            auto &&inst = *--it;
+            if (isPureInst(inst)) continue;
+            if (inst->isCall()) return std::nullopt;
+            if (auto store = dynamic_cast<Instruction::store *>(inst)) {
+                if (store->getDest() == current->getPointerOperand())
+                    return store->getSrc();
+                if (getRootValue(store) != root) continue;
+                return std::nullopt;
+            }
+            auto other = dynamic_cast<Instruction::load *>(inst);
+            assert(other);
+            if (other->getPointerOperand() == current->getPointerOperand()) return other;
+        }
+        return std::nullopt;
+    }
+
+    inline std::optional<Value *> isUseless(const BasicBlock *bb, const Instruction::store *current) {
+        auto root = getRootValue(current);
+        for (auto it = std::next(current->node); it != bb->instructions.end(); ++it) {
+            auto &&inst = *it;
+            if (isPureInst(inst)) continue;
+            if (inst->isCall()) return std::nullopt;
+            if (auto load = dynamic_cast<Instruction::load *>(inst)) {
+                if (getRootValue(load) != root) continue;
+                return std::nullopt;
+            }
+            auto other = dynamic_cast<Instruction::store *>(inst);
+            assert(other);
+            if (other->getDest() == current->getDest()) return nullptr;
+        }
+        return std::nullopt;
+    }
+
     inline void globalVariableNumbering(BasicBlock *bb) {
         std::unordered_map<Instruction *, inst_vector_t> edges;
         std::unordered_map<Instruction *, int> degrees;
         std::unordered_map<Instruction *, int> origin;
         int cnt = 0;
+        auto _isUseless = [&bb](auto &&inst) -> std::optional<Value *> {
+            if (auto load = dynamic_cast<const Instruction::load *>(inst))
+                return isUseless(bb, load);
+            if (auto store = dynamic_cast<const Instruction::store *>(inst))
+                return isUseless(bb, store);
+            return std::nullopt;
+        };
 
-        //TODO: This is too simple...
         Value *last_memory_inst = bb;
         for (auto it = bb->beginner_end(); it != std::prev(bb->instructions.cend());) {
             auto inst = *it;
             auto values = inst->getOperands();
-            bb->parent->allocName();
-            if (inst->isCall() || inst->isMemoryAccess()) {
+            if (auto _value = _isUseless(inst)) {
+                opt_infos.global_variable_numbering()++;
+                if (auto value = *_value) it = substitute(inst, value);
+                else it = bb->erase(inst);
+                continue;
+            }
+            if (!isPureInst(inst)) {
                 values.push_back(last_memory_inst);
                 last_memory_inst = inst;
             }

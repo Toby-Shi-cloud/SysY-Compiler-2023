@@ -53,6 +53,7 @@ namespace mir {
         func->reCalcBBInfo();
         func->calcLoopNest();
         func->calcDomDepth();
+        calcPure(func);
         std::vector<BasicBlock *> sorted_bbs{func->bbs.begin(), func->bbs.end()};
         std::sort(sorted_bbs.begin(), sorted_bbs.end(), [](auto &&x, auto &&y) {
             return x->dom_depth < y->dom_depth;
@@ -61,7 +62,7 @@ namespace mir {
         auto create_worklist = [&](auto &&container) {
             for (auto &&bb: sorted_bbs) {
                 for (auto it = bb->beginner_end(); it != --bb->instructions.cend(); ++it)
-                    if (auto &&inst = *it; !inst->isMemoryAccess() && !inst->isCall())
+                    if (auto &&inst = *it; isPureInst(inst))
                         container.push(inst);
             }
         };

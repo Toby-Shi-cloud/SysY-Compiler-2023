@@ -6,6 +6,7 @@
 #define COMPILER_OPT_H
 
 #include "mem2reg.h"
+#include "functional.h"
 
 namespace mir {
     inline auto substitute(Instruction *_old, Instruction *_new) {
@@ -34,13 +35,16 @@ namespace mir {
         return constantFolding(inst);
     }
 
+    inline bool isPureInst(const Instruction *inst) {
+        if (inst->isMemoryAccess()) return false;
+        if (auto call = dynamic_cast<const Instruction::call *>(inst))
+            return call->getFunction()->isPure;
+        return true;
+    }
+
     void constantFolding(const Function *func);
 
     void globalVariableNumbering(const Function *func);
-
-    void functionInline(Function *func);
-
-    void connectBlocks(Function *func);
 
     void globalCodeMotion(Function *func);
 }

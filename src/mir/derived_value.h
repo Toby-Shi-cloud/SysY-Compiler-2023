@@ -114,6 +114,7 @@ namespace mir {
      */
     struct Function : Value {
         pType retType;
+        bool isPure = false;
         std::vector<Argument *> args; // owns
         std::list<BasicBlock *> bbs; // owns
         BasicBlock *exitBB = new BasicBlock(this);

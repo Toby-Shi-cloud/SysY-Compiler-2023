@@ -17,6 +17,7 @@ namespace mir {
         if (opt_settings.using_gvn) globalVariableNumbering(FUNC);
         if (opt_settings.using_block_merging) mergeEmptyBlock(FUNC);
         if (opt_settings.using_block_merging) connectBlocks(FUNC);
+        calcPure(FUNC);
 #undef FUNC
     }
 

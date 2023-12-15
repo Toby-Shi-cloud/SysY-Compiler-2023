@@ -78,4 +78,24 @@ namespace mir {
             opt_infos.merge_empty_block()++;
         }
     }
+
+    bool calcPure(Function *func) {
+        func->isPure = true;
+        if (func->isLiberal()) return func->isPure = false;
+        for (auto &&arg: func->args)
+            if (!arg->getType()->isIntegerTy())
+                return func->isPure = false;
+        for (auto bb: func->bbs)
+            for (auto inst: bb->instructions) {
+                if (auto call = dynamic_cast<Instruction::call *>(inst)) {
+                    if (!call->getFunction()->isPure)
+                        return func->isPure = false;
+                    continue;
+                }
+                for (auto &&op: inst->getOperands())
+                    if (dynamic_cast<GlobalVar *>(op))
+                        return func->isPure = false;
+            }
+        return true;
+    }
 }
