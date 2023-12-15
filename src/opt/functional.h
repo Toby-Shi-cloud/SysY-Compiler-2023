@@ -12,6 +12,6 @@ namespace mir {
 
     void connectBlocks(Function *func);
 
-    bool calcPure(Function *func);
+    void calcPure(Function *func);
 }
 #endif //COMPILER_FUNCTIONAL_H

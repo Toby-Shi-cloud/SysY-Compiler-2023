@@ -22,6 +22,12 @@ namespace mir {
 
         [[nodiscard]] Instruction *clone() const override { return new ret(*this); }
 
+        void interpret(Interpreter &interpreter) const override {
+            interpreter.lastBB = interpreter.currentBB;
+            interpreter.currentBB = nullptr;
+            interpreter.retValue = getReturnValue() ? interpreter.getValue(getReturnValue()) : 0;
+        }
+
         std::ostream &output(std::ostream &os) const override;
     };
 
@@ -51,6 +57,16 @@ namespace mir {
 
         [[nodiscard]] Instruction *clone() const override { return new br(*this); }
 
+        void interpret(Interpreter &interpreter) const override {
+            interpreter.lastBB = interpreter.currentBB;
+            if (hasCondition()) {
+                if (interpreter.getValue(getCondition())) interpreter.currentBB = getIfTrue();
+                else interpreter.currentBB = getIfFalse();
+            } else {
+                interpreter.currentBB = getTarget();
+            }
+        }
+
         std::ostream &output(std::ostream &os) const override;
     };
 
@@ -64,7 +80,31 @@ namespace mir {
 
         [[nodiscard]] Value *getRhs() const { return getOperand(1); }
 
-        [[nodiscard]] IntegerLiteral *calc() const;
+        void interpret(Interpreter &interpreter) const override {
+            constexpr auto calcFunc = [] (unsigned lhs, unsigned rhs) {
+                if constexpr (ty == ADD) return lhs + rhs;
+                if constexpr (ty == SUB) return lhs - rhs;
+                if constexpr (ty == MUL) return lhs * rhs;
+                if constexpr (ty == UDIV) return lhs / rhs;
+                if constexpr (ty == SDIV) return (int) lhs / (int) rhs;
+                if constexpr (ty == UREM) return lhs % rhs;
+                if constexpr (ty == SREM) return (int) lhs % (int) rhs;
+                if constexpr (ty == SHL) return lhs << rhs;
+                if constexpr (ty == LSHR) return lhs >> rhs;
+                if constexpr (ty == ASHR) return (int) lhs >> (int) rhs;
+                if constexpr (ty == AND) return lhs & rhs;
+                if constexpr (ty == OR) return lhs | rhs;
+                if constexpr (ty == XOR) return lhs ^ rhs;
+                __builtin_unreachable();
+            };
+            interpreter.map[this] = calcFunc(interpreter.getValue(getLhs()), interpreter.getValue(getRhs()));
+        }
+
+        [[nodiscard]] IntegerLiteral *calc() const {
+            Interpreter interpreter{};
+            interpret(interpreter);
+            return getIntegerLiteral(interpreter.getValue(this));
+        }
 
         [[nodiscard]] std::vector<Value *> getOperands() const override {
             auto res = User::getOperands();
@@ -78,21 +118,17 @@ namespace mir {
         std::ostream &output(std::ostream &os) const override {
             return os << getName() << " = " << ty << " " << getLhs() << ", " << getRhs()->getName();
         }
-
-    private:
-        [[nodiscard]] auto getLhsLiteral() const {
-            return static_cast<unsigned>(static_cast<IntegerLiteral *>(getLhs())->value);
-        }
-
-        [[nodiscard]] auto getRhsLiteral() const {
-            return static_cast<unsigned>(static_cast<IntegerLiteral *>(getRhs())->value);
-        }
     };
 
     struct Instruction::alloca_ : Instruction {
         explicit alloca_(pType type) : Instruction(type, ALLOCA) {}
 
         [[nodiscard]] Instruction *clone() const override { return new alloca_(*this); }
+
+        void interpret(Interpreter &interpreter) const override {
+            interpreter.map[this] = (int) interpreter.stack.size();
+            interpreter.stack.resize(interpreter.stack.size() + getType()->size() / 4);
+        }
 
         std::ostream &output(std::ostream &os) const override;
     };
@@ -103,6 +139,10 @@ namespace mir {
         [[nodiscard]] Value *getPointerOperand() const { return getOperand(0); }
 
         [[nodiscard]] Instruction *clone() const override { return new load(*this); }
+
+        void interpret(Interpreter &interpreter) const override {
+            interpreter.map[this] = interpreter.stack.at(interpreter.getValue(getPointerOperand()));
+        }
 
         std::ostream &output(std::ostream &os) const override;
     };
@@ -115,6 +155,10 @@ namespace mir {
         [[nodiscard]] Value *getDest() const { return getOperand(1); }
 
         [[nodiscard]] Instruction *clone() const override { return new store(*this); }
+
+        void interpret(Interpreter &interpreter) const override {
+            interpreter.stack[interpreter.getValue(getDest())] = interpreter.getValue(getSrc());
+        }
 
         std::ostream &output(std::ostream &os) const override;
     };
@@ -138,6 +182,16 @@ namespace mir {
 
         [[nodiscard]] Instruction *clone() const override { return new getelementptr(*this); }
 
+        void interpret(Interpreter &interpreter) const override {
+            int curPos = interpreter.getValue(getPointerOperand());
+            auto curType = indexTy;
+            for (int i = 0; i < getNumIndices(); i++) {
+                if (i) curType = curType->getBase();
+                curPos += (int) curType->size() / 4 * interpreter.getValue(getIndexOperand(i));
+            }
+            interpreter.map[this] = curPos;
+        }
+
         std::ostream &output(std::ostream &os) const override;
     };
 
@@ -148,6 +202,10 @@ namespace mir {
         [[nodiscard]] Value *getValueOperand() const { return getOperand(0); }
 
         [[nodiscard]] Instruction *clone() const override { return new _conversion_instruction(*this); }
+
+        void interpret(Interpreter &interpreter) const override {
+            interpreter.map[this] = interpreter.getValue(getValueOperand());
+        }
 
         std::ostream &output(std::ostream &os) const override {
             return os << getName() << " = " << ty << " " << getValueOperand() << " to " << getType();
@@ -170,6 +228,25 @@ namespace mir {
         [[nodiscard]] Value *getRhs() const { return getOperand(1); }
 
         [[nodiscard]] Instruction *clone() const override { return new icmp(*this); }
+
+        void interpret(Interpreter &interpreter) const override {
+            auto calc = [this](int lhs, int rhs) {
+                switch (cond) {
+                    case EQ: return lhs == rhs;
+                    case NE: return lhs != rhs;
+                    case UGT: return (unsigned) lhs > (unsigned) rhs;
+                    case UGE: return (unsigned) lhs >= (unsigned) rhs;
+                    case ULT: return (unsigned) lhs < (unsigned) rhs;
+                    case ULE: return (unsigned) lhs <= (unsigned) rhs;
+                    case SGT: return lhs > rhs;
+                    case SGE: return lhs >= rhs;
+                    case SLT: return lhs < rhs;
+                    case SLE: return lhs <= rhs;
+                    default: __builtin_unreachable();
+                }
+            };
+            interpreter.map[this] = calc(interpreter.getValue(getLhs()), interpreter.getValue(getRhs()));
+        }
 
         std::ostream &output(std::ostream &os) const override;
     };
@@ -225,6 +302,11 @@ namespace mir {
 
         [[nodiscard]] Instruction *clone() const override { return new phi(*this); }
 
+        void interpret(Interpreter &interpreter) const override {
+            // phi instruction will write value in temp map, and will be copied to map after all phis are interpreted.
+            interpreter.phi[this] = interpreter.getValue(getIncomingValue(interpreter.lastBB).first);
+        }
+
         std::ostream &output(std::ostream &os) const override;
     };
 
@@ -243,6 +325,11 @@ namespace mir {
 
         [[nodiscard]] Instruction *clone() const override { return new select(*this); }
 
+        void interpret(Interpreter &interpreter) const override {
+            if (interpreter.getValue(getCondition())) interpreter.map[this] = interpreter.getValue(getTrueValue());
+            else interpreter.map[this] = interpreter.getValue(getFalseValue());
+        }
+
         std::ostream &output(std::ostream &os) const override;
     };
 
@@ -256,6 +343,13 @@ namespace mir {
         [[nodiscard]] size_t getNumArgs() const { return getNumOperands() - 1; }
 
         [[nodiscard]] Instruction *clone() const override { return new call(*this); }
+
+        void interpret(Interpreter &interpreter) const override {
+            std::vector<int> args;
+            for (int i = 0; i < getNumArgs(); i++)
+                args.push_back(interpreter.getValue(getArg(i)));
+            interpreter.map[this] = getFunction()->interpret(args);
+        }
 
         std::ostream &output(std::ostream &os) const override;
     };

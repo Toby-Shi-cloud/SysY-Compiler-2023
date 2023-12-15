@@ -28,6 +28,17 @@ namespace mir {
     using inst_pos_t = std::list<Instruction *>::const_iterator;
     using bb_node_t = std::list<BasicBlock *>::iterator;
     using bb_pos_t = std::list<BasicBlock *>::const_iterator;
+
+    struct Interpreter {
+        int retValue{};
+        const BasicBlock *lastBB{};
+        const BasicBlock *currentBB{};
+        std::vector<int> stack{};
+        std::unordered_map<const Value *, int> map{};
+        std::unordered_map<const Value *, int> phi{};
+
+        inline int getValue(const Value *value) const;
+    };
 }
 
 namespace mir {
@@ -114,7 +125,7 @@ namespace mir {
      */
     struct Function : Value {
         pType retType;
-        bool isPure = false;
+        bool isPure = false, noPostEffect = false;
         std::vector<Argument *> args; // owns
         std::list<BasicBlock *> bbs; // owns
         BasicBlock *exitBB = new BasicBlock(this);
@@ -191,6 +202,8 @@ namespace mir {
         }
 
         [[nodiscard]] Function *clone() const;
+
+        [[nodiscard]] int interpret(const std::vector<int> &_args_v) const;
     };
 
     /**
@@ -260,6 +273,8 @@ namespace mir {
         Instruction(Instruction &&) = default;
 
         [[nodiscard]] virtual Instruction *clone() const = 0;
+
+        virtual void interpret(Interpreter &interpreter) const = 0;
 
         template<InstrTy ty>
         struct _binary_instruction;
@@ -373,6 +388,14 @@ namespace mir {
     std::ostream &operator<<(std::ostream &os, const Literal &literal);
 
     std::ostream &operator<<(std::ostream &os, Instruction::InstrTy ty);
+
+    inline int Interpreter::getValue(const Value *value) const {
+        if (auto lit = dynamic_cast<const IntegerLiteral *>(value))
+            return lit->value;
+        if (auto lit = dynamic_cast<const BooleanLiteral *>(value))
+            return lit->value;
+        return map.at(value);
+    }
 }
 
 #ifdef DBG_ENABLE

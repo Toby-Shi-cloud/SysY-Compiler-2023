@@ -243,6 +243,20 @@ namespace mir {
         return substitute(select, result);
     }
 
+    inst_node_t constantFolding(Instruction::call *call) {
+        if (call->getFunction()->noPostEffect && !call->isValue()) return call->parent->erase(call);
+        if (!call->getFunction()->isPure) return call->node;
+        std::vector<int> args;
+        args.reserve(call->getNumArgs());
+        for (int i = 0; i < call->getNumArgs(); i++) {
+            if (auto lit = dynamic_cast<IntegerLiteral *>(call->getArg(i)))
+                args.push_back(lit->value);
+            else return call->node;
+        }
+        int ret = call->getFunction()->interpret(args);
+        return substitute(call, getIntegerLiteral(ret));
+    }
+
     inst_node_t constantFolding(Instruction *inst) {
 #define CASE(ty, cast) case Instruction::ty: return constantFolding(dynamic_cast<Instruction::cast *>(inst))
         switch (inst->instrTy) {
@@ -267,6 +281,7 @@ namespace mir {
             CASE(ICMP, icmp);
             CASE(PHI, phi);
             CASE(SELECT, select);
+            CASE(CALL, call);
             // ret, alloca, store, getelementptr, call
             default: return inst->node;
         }

@@ -79,23 +79,55 @@ namespace mir {
         }
     }
 
-    bool calcPure(Function *func) {
+    void calcPure(Function *func) {
+        if (func->isLiberal()) return;
         func->isPure = true;
-        if (func->isLiberal()) return func->isPure = false;
+        func->noPostEffect = true;
         for (auto &&arg: func->args)
             if (!arg->getType()->isIntegerTy())
-                return func->isPure = false;
+                func->isPure = false;
+        auto setAttr = [&func](auto &&inst) {
+            auto rt = getRootValue(inst);
+            if (dynamic_cast<const GlobalVar *>(rt))
+                func->noPostEffect = false;
+            if (dynamic_cast<const Argument *>(rt))
+                func->noPostEffect = false;
+        };
         for (auto bb: func->bbs)
             for (auto inst: bb->instructions) {
                 if (auto call = dynamic_cast<Instruction::call *>(inst)) {
-                    if (!call->getFunction()->isPure)
-                        return func->isPure = false;
-                    continue;
+                    func->isPure &= call->getFunction()->isPure;
+                    func->noPostEffect &= call->getFunction()->noPostEffect;
                 }
                 for (auto &&op: inst->getOperands())
                     if (dynamic_cast<GlobalVar *>(op))
-                        return func->isPure = false;
+                        func->isPure = false;
+                if (auto store = dynamic_cast<Instruction::store *>(inst))
+                    setAttr(store);
+                if (auto call = dynamic_cast<Instruction::call *>(inst); call && !call->getFunction()->noPostEffect)
+                    for (auto i = 0; i < call->getNumArgs(); i++)
+                        setAttr(call->getArg(i));
+                if (func->noPostEffect == false) return;
             }
-        return true;
     }
+
+    int Function::interpret(const std::vector<int> &_args_v) const {
+        assert(isPure);
+        Interpreter interpreter;
+        for (int i = 0; i < args.size(); i++)
+            interpreter.map[args[i]] = _args_v[i];
+        interpreter.currentBB = bbs.front();
+        while (interpreter.currentBB) {
+            for (auto &&inst: interpreter.currentBB->instructions) {
+                if (inst->node == interpreter.currentBB->beginner_end()) {
+                    for (auto &&[k, v]: interpreter.phi)
+                        interpreter.map[k] = v;
+                    interpreter.phi.clear();
+                }
+                inst->interpret(interpreter);
+            }
+        }
+        return interpreter.retValue;
+    }
+
 }

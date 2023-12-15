@@ -43,23 +43,16 @@ namespace mir {
         return variables[bb][key] = find(bb->idom, key);
     }
 
-    inline const Value *getRootValue(const Value *value) {
-        if (auto load = dynamic_cast<const Instruction::load *>(value))
-            return getRootValue(load->getPointerOperand());
-        if (auto store = dynamic_cast<const Instruction::store *>(value))
-            return getRootValue(store->getDest());
-        if (auto gep = dynamic_cast<const Instruction::getelementptr *>(value))
-            return getRootValue(gep->getPointerOperand());
-        return value;
-    }
-
     inline std::optional<Value *> isUseless(const BasicBlock *bb, const Instruction::load *current) {
         auto it = current->node;
         auto root = getRootValue(current);
         while (it != bb->instructions.begin()) {
             auto &&inst = *--it;
             if (isPureInst(inst)) continue;
-            if (inst->isCall()) return std::nullopt;
+            if (auto call = dynamic_cast<Instruction::call *>(inst)) {
+                if (call->getFunction()->noPostEffect) continue;
+                return std::nullopt;
+            }
             if (auto store = dynamic_cast<Instruction::store *>(inst)) {
                 if (store->getDest() == current->getPointerOperand())
                     return store->getSrc();
