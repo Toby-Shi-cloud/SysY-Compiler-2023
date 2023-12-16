@@ -5,6 +5,7 @@
 #ifndef COMPILER_OPT_H
 #define COMPILER_OPT_H
 
+#include <optional>
 #include "mem2reg.h"
 #include "functional.h"
 

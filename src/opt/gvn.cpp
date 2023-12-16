@@ -3,7 +3,6 @@
 //
 
 #include <set>
-#include <optional>
 #include <functional>
 #include "opt.h"
 
