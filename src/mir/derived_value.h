@@ -170,6 +170,7 @@ namespace mir {
          * Includes calcPreSuc, calcDominators and calcDF. <br>
          */
         void reCalcBBInfo() const {
+            clearBBInfo();
             calcPreSuc();
             calcDominators();
             calcDF();
