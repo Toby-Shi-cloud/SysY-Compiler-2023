@@ -23,7 +23,8 @@ namespace mir {
         return true;
     }
 
-    inline void substituteArray(const Value *array, const std::vector<Value *> &new_array) {
+    template<typename T>
+    inline void substituteArray(const Value *array, const std::vector<T> &new_array) {
         opt_infos.split_array()++;
         Interpreter interpreter;
         interpreter.map[array] = 0;
@@ -32,7 +33,7 @@ namespace mir {
                 gep->interpret(interpreter);
                 for (auto &&user: gep->users())
                     self(user, self);
-                auto new_value = new_array[interpreter.map.at(gep)];
+                Value *new_value = new_array.at(interpreter.map.at(gep));
                 substitute(gep, new_value);
             }
         };
@@ -44,14 +45,17 @@ namespace mir {
         if (alloca_->getType()->isIntegerTy()) return std::next(alloca_->node);
         if (!arrayCanSpilt(alloca_)) return std::next(alloca_->node);
         auto bb = alloca_->parent;
-        std::vector<Value *> new_alloca;
+        std::vector<Instruction::alloca_ *> new_alloca;
         new_alloca.reserve(alloca_->getType()->size() / 4);
         for (auto i = 0; i < alloca_->getType()->size() / 4; i++) {
             auto new_alloca_ = new Instruction::alloca_(Type::getI32Type());
             new_alloca.push_back(new_alloca_);
-            bb->insert(alloca_->node, new_alloca_);
         }
         substituteArray(alloca_, new_alloca);
+        for (auto &&new_alloca_: new_alloca)
+            if (new_alloca_->isUsed())
+                bb->insert(alloca_->node, new_alloca_);
+            else delete new_alloca_;
         return bb->erase(alloca_);
     }
 
@@ -59,7 +63,7 @@ namespace mir {
         if (global->getType()->isIntegerTy()) return;
         if (global->getType()->isStringTy()) return;
         if (!arrayCanSpilt(global)) return;
-        std::vector<Value *> new_global;
+        std::vector<GlobalVar *> new_global;
         new_global.reserve(global->getType()->size() / 4);
         auto dfs = [&](pType type, Literal *init, auto &&self) -> void {
             if (type->isIntegerTy()) {
@@ -69,7 +73,6 @@ namespace mir {
                         Type::getI32Type(), global->getName().substr(1) + "." + std::to_string(index),
                         lit, global->isConst());
                 new_global.push_back(_new_val);
-                mgr.globalVars.push_back(_new_val);
                 return;
             }
             auto arr = dynamic_cast<ArrayLiteral *>(init);
@@ -78,6 +81,10 @@ namespace mir {
         };
         dfs(global->getType(), global->init, dfs);
         substituteArray(global, new_global);
+        for (auto &&_new_val: new_global)
+            if (_new_val->isUsed())
+                mgr.globalVars.push_back(_new_val);
+            else delete _new_val;
     }
 
     void spiltArray(Manager &mgr) {
