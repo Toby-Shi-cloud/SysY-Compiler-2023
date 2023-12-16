@@ -112,7 +112,25 @@ namespace mir {
             return std::nullopt;
         };
 
-        Value *last_memory_inst = bb;
+        std::vector<Instruction *> memory_inst;
+        auto _last_relevant = [&](auto &&inst) -> Value * {
+            auto root = getRootValue(inst);
+            auto self = dynamic_cast<Instruction::call *>(inst);
+            for (auto it = memory_inst.rbegin(); it != memory_inst.rend(); ++it) {
+                auto &&other = *it;
+                if (auto load = dynamic_cast<Instruction::load *>(other))
+                    if (self && !self->getFunction()->noPostEffect || !irrelevant(getRootValue(load), root))
+                        return load;
+                if (auto store = dynamic_cast<Instruction::store *>(other))
+                    if (self || !irrelevant(getRootValue(other), root))
+                        return store;
+                if (auto call = dynamic_cast<Instruction::call *>(other))
+                    if (!call->getFunction()->noPostEffect || inst->instrTy == Instruction::STORE)
+                        return call;
+            }
+            return bb;
+        };
+
         for (auto it = bb->beginner_end(); it != std::prev(bb->instructions.cend());) {
             auto inst = *it;
             auto values = inst->getOperands();
@@ -123,8 +141,8 @@ namespace mir {
                 continue;
             }
             if (!isPureInst(inst)) {
-                values.push_back(last_memory_inst);
-                last_memory_inst = inst;
+                values.push_back(_last_relevant(inst));
+                memory_inst.push_back(inst);
             }
             if (auto icmp = dynamic_cast<Instruction::icmp *>(inst))
                 values.push_back(getIntegerLiteral(icmp->cond));
