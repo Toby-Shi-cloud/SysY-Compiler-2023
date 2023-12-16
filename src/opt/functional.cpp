@@ -87,7 +87,7 @@ namespace mir {
             if (!arg->getType()->isIntegerTy())
                 func->isPure = false;
         auto setAttr = [&func](auto &&inst) {
-            auto rt = getRootValue(inst);
+            auto rt = getRootValue(inst).first;
             if (dynamic_cast<const GlobalVar *>(rt))
                 func->noPostEffect = false;
             if (dynamic_cast<const Argument *>(rt))
@@ -107,7 +107,7 @@ namespace mir {
                 if (auto call = dynamic_cast<Instruction::call *>(inst); call && !call->getFunction()->noPostEffect)
                     for (auto i = 0; i < call->getNumArgs(); i++)
                         setAttr(call->getArg(i));
-                if (func->noPostEffect == false) return;
+                if (!func->noPostEffect) return;
             }
     }
 
@@ -129,5 +129,4 @@ namespace mir {
         }
         return interpreter.retValue;
     }
-
 }

@@ -42,14 +42,24 @@ namespace mir {
         return true;
     }
 
-    inline const Value *getRootValue(const Value *value) {
+    using root_value_t = std::pair<const Value *, std::optional<int>>;
+    inline root_value_t getRootValue(const Value *value) {
         if (auto load = dynamic_cast<const Instruction::load *>(value))
             return getRootValue(load->getPointerOperand());
         if (auto store = dynamic_cast<const Instruction::store *>(value))
             return getRootValue(store->getDest());
-        if (auto gep = dynamic_cast<const Instruction::getelementptr *>(value))
-            return getRootValue(gep->getPointerOperand());
-        return value;
+        if (auto gep = dynamic_cast<const Instruction::getelementptr *>(value)) {
+            auto ret = getRootValue(gep->getPointerOperand());
+            if (!ret.second) return ret;
+            try {
+                auto index = gep->getIndexOffset();
+                *ret.second += index;
+            } catch (std::out_of_range &) {
+                ret.second = std::nullopt;
+            }
+            return ret;
+        }
+        return {value, 0};
     }
 
     void constantFolding(const Function *func);

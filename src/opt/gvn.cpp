@@ -43,9 +43,15 @@ namespace mir {
         return variables[bb][key] = find(bb->idom, key);
     }
 
+    inline bool irrelevant(const root_value_t &x, const root_value_t &y) {
+        if (x.first != y.first) return true;
+        if (!x.second || !y.second) return false;
+        return *x.second != *y.second;
+    }
+
     inline std::optional<Value *> isUseless(const BasicBlock *bb, const Instruction::load *current) {
-        auto it = current->node;
         auto root = getRootValue(current);
+        auto it = current->node;
         while (it != bb->instructions.begin()) {
             auto &&inst = *--it;
             if (isPureInst(inst)) continue;
@@ -56,7 +62,7 @@ namespace mir {
             if (auto store = dynamic_cast<Instruction::store *>(inst)) {
                 if (store->getDest() == current->getPointerOperand())
                     return store->getSrc();
-                if (getRootValue(store) != root) continue;
+                if (irrelevant(getRootValue(store), root)) continue;
                 return std::nullopt;
             }
             auto other = dynamic_cast<Instruction::load *>(inst);
@@ -68,12 +74,23 @@ namespace mir {
 
     inline std::optional<Value *> isUseless(const BasicBlock *bb, const Instruction::store *current) {
         auto root = getRootValue(current);
-        for (auto it = std::next(current->node); it != bb->instructions.end(); ++it) {
+        auto it = current->node;
+        while (it != bb->instructions.begin()) {
+            auto &&inst = *--it;
+            if (auto load = dynamic_cast<Instruction::load *>(inst))
+                if (load->getPointerOperand() == current->getDest() && load == current->getSrc())
+                    return nullptr;
+            if (auto other = dynamic_cast<Instruction::store *>(inst))
+                if (!irrelevant(getRootValue(other), root))
+                    break;
+        }
+        it = std::next(current->node);
+        for (; it != bb->instructions.end(); ++it) {
             auto &&inst = *it;
             if (isPureInst(inst)) continue;
             if (inst->isCall()) return std::nullopt;
             if (auto load = dynamic_cast<Instruction::load *>(inst)) {
-                if (getRootValue(load) != root) continue;
+                if (irrelevant(getRootValue(load), root)) continue;
                 return std::nullopt;
             }
             auto other = dynamic_cast<Instruction::store *>(inst);

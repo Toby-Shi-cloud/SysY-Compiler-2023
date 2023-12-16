@@ -182,14 +182,18 @@ namespace mir {
 
         [[nodiscard]] Instruction *clone() const override { return new getelementptr(*this); }
 
-        void interpret(Interpreter &interpreter) const override {
-            int curPos = interpreter.getValue(getPointerOperand());
+        [[nodiscard]] int getIndexOffset(const Interpreter &interpreter = {}) const {
+            int curPos = 0;
             auto curType = indexTy;
             for (int i = 0; i < getNumIndices(); i++) {
                 if (i) curType = curType->getBase();
                 curPos += (int) curType->size() / 4 * interpreter.getValue(getIndexOperand(i));
             }
-            interpreter.map[this] = curPos;
+            return curPos;
+        }
+
+        void interpret(Interpreter &interpreter) const override {
+            interpreter.map[this] = interpreter.getValue(getPointerOperand()) + getIndexOffset(interpreter);
         }
 
         std::ostream &output(std::ostream &os) const override;
