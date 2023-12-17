@@ -43,6 +43,10 @@ namespace mir {
     }
 
     inline bool irrelevant(const root_value_t &x, const root_value_t &y) {
+        if (dynamic_cast<const Argument *>(x.first) && !dynamic_cast<const Instruction::alloca_ *>(y.first))
+            return false; // argument is always relevant to global variable and other arguments
+        if (dynamic_cast<const Argument *>(y.first) && !dynamic_cast<const Instruction::alloca_ *>(x.first))
+            return false;
         if (x.first != y.first) return true;
         if (!x.second || !y.second) return false;
         return *x.second != *y.second;
