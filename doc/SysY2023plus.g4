@@ -1,13 +1,13 @@
-grammar SysY2023;
+grammar SysY2023plus;
 
 options { language=Cpp; }
 
-compUnit: decl* funcDef* mainFuncDef;
+compUnit: (decl | funcDef)+;
 
 decl: constDecl | varDecl;
 
 constDecl: CONSTTK bType constDef (COMMA constDef)* SEMICN;
-bType: INTTK;
+bType: INTTK | FLOATTK;
 constDef: IDENFR (LBRACK constExp RBRACK)* ASSIGN constInitVal;
 constInitVal: constExp | LBRACE constInitVal (COMMA constInitVal)* RBRACE;
 
@@ -16,8 +16,7 @@ varDef: IDENFR (LBRACK constExp RBRACK)* (ASSIGN initVal)?;
 initVal: exp | LBRACE initVal (COMMA initVal)* RBRACE;
 
 funcDef: funcType IDENFR LPARENT funcFParams? RPARENT block;
-mainFuncDef: INTTK MAINTK LPARENT RPARENT block;
-funcType: INTTK | VOIDTK;
+funcType: INTTK | VOIDTK | FLOATTK;
 funcFParams: funcFParam (COMMA funcFParam)*;
 funcFParam: bType IDENFR (LBRACK RBRACK (LBRACK constExp RBRACK)*)?;
 
@@ -33,15 +32,13 @@ stmt: lVal ASSIGN exp SEMICN # assignStmt
     | BREAKTK SEMICN # breakStmt
     | CONTINUETK SEMICN # continueStmt
     | RETURNTK exp? SEMICN # returnStmt
-    | lVal ASSIGN GETINTTK LPARENT RPARENT SEMICN # getintStmt
-    | PRINTFTK LPARENT STRCON (COMMA exp)* RPARENT SEMICN # printfStmt
     ;
 forStmt: lVal ASSIGN exp;
 exp: addExp;
 cond: lOrExp;
 lVal: IDENFR (LBRACK exp RBRACK)*;
 primaryExp: LPARENT exp RPARENT | lVal | number;
-number: INTCON;
+number: INTCON | FLOATCON;
 unaryExp: primaryExp | IDENFR LPARENT funcRParams? RPARENT | unaryOp unaryExp;
 unaryOp: PLUS | MINU | NOT;
 funcRParams: exp (COMMA exp)*;
@@ -54,13 +51,23 @@ lOrExp: lAndExp (OR lAndExp)*;
 constExp: addExp;
 
 // literal
-INTCON: '0' | [1-9][0-9]*;
-STRCON: '"' .*? '"';
+INTCON: DecInt | OctInt | HexInt;
+DecInt: '0' | [1-9][0-9]*;
+OctInt: '0' [0-7]*;
+HexInt: '0' [xX] [a-fA-F0-9]+;
+
+FLOATCON: DecFloat | HexFloat;
+DecFloat: DecFloat1 | DecFloat2;
+DecFloat1: [0-9]*'.'[0-9]+ | [0-9]+'.';
+DecFloat2: (DecFloat1 | [0-9]+) [eE] [+-]? [0-9]+;
+HexFloat: HexFloat1 | HexFloat2;
+HexFloat1: '0' [xX] ([a-fA-F0-9]*'.'[a-fA-F0-9]+ | [a-fA-F0-9]+'.');
+HexFloat2: (HexFloat1 | '0' [xX] [a-fA-F0-9]+) [pP] [+-]? [0-9]+;
 
 // keywords
-MAINTK: 'main';
 CONSTTK: 'const';
 INTTK: 'int';
+FLOATTK: 'float';
 VOIDTK: 'void';
 BREAKTK: 'break';
 CONTINUETK: 'continue';
@@ -68,8 +75,6 @@ IFTK: 'if';
 ELSETK: 'else';
 WHILETK: 'while';
 FORTK: 'for';
-GETINTTK: 'getint';
-PRINTFTK: 'printf';
 RETURNTK: 'return';
 
 // operators
