@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
     frontend::lexer::Lexer lexer(src);
     frontend::parser::SysYParser parser(lexer, message_queue);
     parser.parse();
+    dbg(parser.comp_unit());
     frontend::visitor::SysYVisitor visitor(mir_manager, message_queue);
     visitor.visit(parser.comp_unit());
 
@@ -52,7 +53,7 @@ int main(int argc, char **argv) {
     }
     if (!message_queue.empty()) return 0;
 
-    mir_manager.optimize();
+//    mir_manager.optimize();
     mir_manager.allocName();
     mir_manager.output(fir);
 

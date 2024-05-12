@@ -9,14 +9,32 @@
 #include "derived_value.h"
 
 namespace mir {
-    Function *Function::getint = new Function(
+    Function Function::getint = Function(
         FunctionType::getFunctionType(Type::getI32Type(), {}), "getint");
-    Function *Function::putint = new Function(
+    Function Function::getch = Function(
+            FunctionType::getFunctionType(Type::getI8Type(), {}), "getch");
+    Function Function::getfloat = Function(
+            FunctionType::getFunctionType(Type::getFloatType(), {}), "getfloat");
+    Function Function::getarray = Function(
+            FunctionType::getFunctionType(Type::getI32Type(), {Type::getPointerType(Type::getI32Type())}), "getarray");
+    Function Function::getfarray = Function(
+            FunctionType::getFunctionType(Type::getI32Type(), {Type::getPointerType(Type::getFloatType())}), "getfarray");
+
+    Function Function::putint = Function(
         FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type()}), "putint");
-    Function *Function::putch = new Function(
+    Function Function::putch = Function(
         FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type()}), "putch");
-    Function *Function::putstr = new Function(
-        FunctionType::getFunctionType(Type::getVoidType(), {Type::getStringType()}), "putstr");
+    Function Function::putfloat = Function(
+        FunctionType::getFunctionType(Type::getVoidType(), {Type::getFloatType()}), "putfloat");
+    Function Function::putarray = Function(
+        FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type(), Type::getPointerType(Type::getI32Type())}), "putarray");
+    Function Function::putfarray = Function(
+        FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type(), Type::getPointerType(Type::getFloatType())}), "putfarray");
+
+    Function Function::starttime = Function(
+        FunctionType::getFunctionType(Type::getVoidType(), {}), "starttime");
+    Function Function::stoptime = Function(
+        FunctionType::getFunctionType(Type::getVoidType(), {}), "stoptime");
 }
 
 namespace mir {
@@ -148,24 +166,11 @@ namespace mir {
         return integerPool[value];
     }
 
-    IntegerLiteral operator+(const IntegerLiteral &lhs, const IntegerLiteral &rhs) {
-        return IntegerLiteral(lhs.value + rhs.value);
-    }
-
-    IntegerLiteral operator-(const IntegerLiteral &lhs, const IntegerLiteral &rhs) {
-        return IntegerLiteral(lhs.value - rhs.value);
-    }
-
-    IntegerLiteral operator*(const IntegerLiteral &lhs, const IntegerLiteral &rhs) {
-        return IntegerLiteral(lhs.value * rhs.value);
-    }
-
-    IntegerLiteral operator/(const IntegerLiteral &lhs, const IntegerLiteral &rhs) {
-        return IntegerLiteral(lhs.value / rhs.value);
-    }
-
-    IntegerLiteral operator%(const IntegerLiteral &lhs, const IntegerLiteral &rhs) {
-        return IntegerLiteral(lhs.value % rhs.value);
+    FloatLiteral *getFloatLiteral(float value) {
+        static std::unordered_map<float, FloatLiteral *> floatPool;
+        if (floatPool[value] == nullptr)
+            floatPool[value] = new FloatLiteral(value);
+        return floatPool[value];
     }
 
     static char hex(int x) {

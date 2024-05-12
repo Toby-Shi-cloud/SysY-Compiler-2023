@@ -10,8 +10,8 @@ namespace frontend::visitor {
     std::optional<message> SymbolTable::insert(std::string_view name, const store_type_t &value, const Token &token) {
         if (stack.back().count(name))
             return message{
-                message::ERROR, 'b', token.line, token.column,
-                "redefinition of '" + std::string(name) + "'"
+                    message::ERROR, 'b', token.line, token.column,
+                    "redefinition of '" + std::string(name) + "'"
             };
         stack.back()[name] = value;
         return std::nullopt;
@@ -41,45 +41,6 @@ namespace frontend::visitor {
     mir::Instruction *get_icmp_instruction(mir::Value *lhs, mir::Value *rhs) {
         return new mir::Instruction::icmp{cond, lhs, rhs};
     }
-
-    inline std::optional<message> check_valid(const Token &str_token) {
-        assert(str_token.type == token_type::STRCON);
-        using namespace std::string_literals;
-        bool backslash = false;
-        bool percent = false;
-        for (const char &ch: str_token.raw.substr(1, str_token.raw.size() - 2)) {
-            auto line = str_token.line;
-            auto column = str_token.column + (&ch - str_token.raw.data());
-            if (backslash) {
-                if (ch != 'n')
-                    return message{message::ERROR, 'a', line, column - 1, "invalid escape sequence '\\"s + ch + "'"};
-                backslash = false;
-            } else if (percent) {
-                if (ch != 'd')
-                    return message{message::ERROR, 'a', line, column - 1, "invalid format specifier '%"s + ch + "'"};
-                percent = false;
-            } else {
-                if (ch == '\\') {
-                    backslash = true;
-                } else if (ch == '%') {
-                    percent = true;
-                } else if (ch != 32 && ch != 33 && (ch < 40 || ch > 126)) {
-                    return message{message::ERROR, 'a', line, column, "invalid character '"s + ch + "'"};
-                }
-            }
-        }
-        if (backslash)
-            return message{
-                message::ERROR, 'a', str_token.line, str_token.column + str_token.raw.size() - 2,
-                "invalid escape sequence '\\'"
-            };
-        if (percent)
-            return message{
-                message::ERROR, 'a', str_token.line, str_token.column + str_token.raw.size() - 2,
-                "invalid format specifier '%'"
-            };
-        return std::nullopt;
-    }
 }
 
 // visitor: helper methods
@@ -100,7 +61,7 @@ namespace frontend::visitor {
             if (token_type == RBRACK) continue;
             assert(token_type == LBRACK);
             if (auto &exp = *(it - 1);
-                exp->type == Terminal) {
+                    exp->type == Terminal) {
                 result = mir::PointerType::getPointerType(result);
             } else {
                 assert(exp->type == ConstExp);
@@ -119,17 +80,17 @@ namespace frontend::visitor {
         using normal_operator = decltype(&get_binary_instruction<Instruction::add>);
         using icmp = Instruction::icmp;
         static std::unordered_map<token_type_t, std::pair<literal_operator, normal_operator>> call_table = {
-            {PLUS, {&mir::operator+, &get_binary_instruction<Instruction::add>}},
-            {MINU, {&mir::operator-, &get_binary_instruction<Instruction::sub>}},
-            {MULT, {&mir::operator*, &get_binary_instruction<Instruction::mul>}},
-            {DIV, {&mir::operator/, &get_binary_instruction<Instruction::sdiv>}},
-            {MOD, {&mir::operator%, &get_binary_instruction<Instruction::srem>}},
-            {LSS, {nullptr, &get_icmp_instruction<icmp::SLT>}},
-            {LEQ, {nullptr, &get_icmp_instruction<icmp::SLE>}},
-            {GRE, {nullptr, &get_icmp_instruction<icmp::SGT>}},
-            {GEQ, {nullptr, &get_icmp_instruction<icmp::SGE>}},
-            {EQL, {nullptr, &get_icmp_instruction<icmp::EQ>}},
-            {NEQ, {nullptr, &get_icmp_instruction<icmp::NE>}},
+                {PLUS, {&mir::operator+, &get_binary_instruction<Instruction::add>}},
+                {MINU, {&mir::operator-, &get_binary_instruction<Instruction::sub>}},
+                {MULT, {&mir::operator*, &get_binary_instruction<Instruction::mul>}},
+                {DIV,  {&mir::operator/, &get_binary_instruction<Instruction::sdiv>}},
+                {MOD,  {&mir::operator%, &get_binary_instruction<Instruction::srem>}},
+                {LSS,  {nullptr,         &get_icmp_instruction<icmp::SLT>}},
+                {LEQ,  {nullptr,         &get_icmp_instruction<icmp::SLE>}},
+                {GRE,  {nullptr,         &get_icmp_instruction<icmp::SGT>}},
+                {GEQ,  {nullptr,         &get_icmp_instruction<icmp::SGE>}},
+                {EQL,  {nullptr,         &get_icmp_instruction<icmp::EQ>}},
+                {NEQ,  {nullptr,         &get_icmp_instruction<icmp::NE>}},
         };
 
         auto [ret_val, ret_list] = visit(*node.children[0]);
@@ -138,12 +99,12 @@ namespace frontend::visitor {
             auto [value, list] = visit(*it[1]);
             ret_list.splice(ret_list.end(), list);
 
-            auto ret_literal = dynamic_cast<mir::IntegerLiteral *>(ret_val);
-            auto literal = dynamic_cast<mir::IntegerLiteral *>(value);
+            auto ret_literal = dynamic_cast<mir::Literal *>(ret_val);
+            auto literal = dynamic_cast<mir::Literal *>(value);
 
             if (auto [f, g] = call_table[token_type];
-                f && ret_literal && literal && ret_list.empty()) {
-                ret_literal = mir::getIntegerLiteral(f(*ret_literal, *literal).value);
+                    f && ret_literal && literal && ret_list.empty()) {
+                ret_literal = f(*ret_literal, *literal);
                 ret_val = ret_literal;
             } else {
                 if (ret_val->getType() != mir::Type::getI32Type()) {
@@ -262,9 +223,9 @@ namespace frontend::visitor {
         if (current_function->getType()->getFunctionRet() != mir::Type::getVoidType()) {
             if (cur == nullptr || cur->instructions.empty() || cur->instructions.back()->instrTy != Instruction::RET) {
                 message_queue.push_back({
-                    message::ERROR, 'g', end_token.line, end_token.column,
-                    "Non-void function does not return a value"
-                });
+                                                message::ERROR, 'g', end_token.line, end_token.column,
+                                                "Non-void function does not return a value"
+                                        });
             }
         } else {
             if (cur == nullptr) {
@@ -287,6 +248,17 @@ namespace frontend::visitor {
 
 // visitor: specific methods
 namespace frontend::visitor {
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<CompUnit>(const GrammarNode &node) {
+        for (auto func: mir::Function::libraryFunctions)
+            assert(symbol_table.insert(
+                    std::string_view(func->getName()).substr(1),
+                    {func, nullptr},
+                    Token()
+            ) == std::nullopt);
+        return visitChildren(node);
+    }
+
     template<>
     SysYVisitor::return_type SysYVisitor::visit<ConstDef>(const GrammarNode &node) {
         // IDENFR (LBRACK constExp RBRACK)* ASSIGN constInitVal
@@ -365,8 +337,8 @@ namespace frontend::visitor {
     SysYVisitor::return_type SysYVisitor::visit<FuncDef>(const GrammarNode &node) {
         // funcType IDENFR LPARENT funcFParams? RPARENT block
         auto funcRetType = node.children.front()->children.front()->getToken().type == VOIDTK
-                               ? mir::Type::getVoidType()
-                               : mir::Type::getI32Type();
+                           ? mir::Type::getVoidType()
+                           : mir::Type::getI32Type();
         auto &identifier = node.children[1]->getToken();
         decltype(token_buffer)().swap(token_buffer);
         value_list params_list = node.children.size() == 6 ? visit(*node.children[3]).second : value_list{};
@@ -403,17 +375,6 @@ namespace frontend::visitor {
         auto [_, list] = visit(*node.children.back());
         init_list.splice(init_list.end(), list);
         listToBB(init_list, node.children.back()->children.back()->getToken());
-        return {};
-    }
-
-    template<>
-    SysYVisitor::return_type SysYVisitor::visit<MainFuncDef>(const GrammarNode &node) {
-        // INTTK MAINTK LPARENT RPARENT block
-        auto func = new mir::Function(mir::FunctionType::getFunctionType(mir::Type::getI32Type(), {}), "main");
-        current_function = func;
-        manager.functions.push_back(func);
-        auto [_, list] = visit(*node.children.back());
-        listToBB(list, node.children.back()->children.back()->getToken());
         return {};
     }
 
@@ -541,8 +502,8 @@ namespace frontend::visitor {
         if (variable->isConst()) {
             auto &[ty, raw, line, column] = node.children[0]->children[0]->getToken();
             message_queue.push_back(message{
-                message::ERROR, 'h', line, column,
-                "cannot assign to const variable"
+                    message::ERROR, 'h', line, column,
+                    "cannot assign to const variable"
             });
             return {nullptr, list};
         }
@@ -557,8 +518,8 @@ namespace frontend::visitor {
         if (loop_stack.empty()) {
             auto &[ty, raw, line, column] = node.children[0]->getToken();
             message_queue.push_back(message{
-                message::ERROR, 'm', line, column,
-                "break statement not within a loop"
+                    message::ERROR, 'm', line, column,
+                    "break statement not within a loop"
             });
             return {nullptr, {}};
         }
@@ -571,8 +532,8 @@ namespace frontend::visitor {
         if (loop_stack.empty()) {
             auto &[ty, raw, line, column] = node.children[0]->getToken();
             message_queue.push_back(message{
-                message::ERROR, 'm', line, column,
-                "continue statement not within a loop"
+                    message::ERROR, 'm', line, column,
+                    "continue statement not within a loop"
             });
             return {nullptr, {}};
         }
@@ -585,87 +546,21 @@ namespace frontend::visitor {
         auto &[ty, raw, line, column] = node.children[0]->getToken();
         if (current_function->retType == mir::Type::getVoidType() && node.children.size() == 3) {
             message_queue.push_back(message{
-                message::ERROR, 'f', line, column,
-                "void function should not return a value"
+                    message::ERROR, 'f', line, column,
+                    "void function should not return a value"
             });
             return {nullptr, {}};
         }
         if (current_function->retType != mir::Type::getVoidType() && node.children.size() == 2) {
             message_queue.push_back(message{
-                message::ERROR, 'f', line, column,
-                "Non-void function should return a value"
+                    message::ERROR, 'f', line, column,
+                    "Non-void function should return a value"
             });
             return {nullptr, {}};
         }
         if (node.children.size() == 2) return {nullptr, {new Instruction::ret()}};
         auto [value, list] = visit(*node.children[1]);
         list.push_back(new Instruction::ret(value));
-        return {nullptr, list};
-    }
-
-    template<>
-    SysYVisitor::return_type SysYVisitor::visit<GetintStmt>(const GrammarNode &node) {
-        // lVal ASSIGN GETINTTK LPARENT RPARENT SEMICN
-        auto [variable, list] = visit(*node.children[0]);
-        auto call = new Instruction::call(mir::Function::getint, {});
-        list.push_back(call);
-        if (variable->isConst()) {
-            auto &[ty, raw, line, column] = node.children[0]->getToken();
-            message_queue.push_back(message{
-                message::ERROR, 'h', line, column,
-                "cannot assign to const variable"
-            });
-            return {nullptr, list};
-        }
-        auto store = new Instruction::store(call, variable);
-        list.push_back(store);
-        return {store, list};
-    }
-
-    template<>
-    SysYVisitor::return_type SysYVisitor::visit<PrintfStmt>(const GrammarNode &node) {
-        // PRINTFTK LPARENT STRCON (COMMA exp)* RPARENT SEMICN
-        auto &strcon = node.children[2]->getToken();
-        if (auto msg = check_valid(strcon)) {
-            message_queue.push_back(*msg);
-            return {};
-        }
-        if (auto count_params = std::count_if(node.children.begin(), node.children.end(), &is_specific_type<Exp>),
-                    count_format = std::count(strcon.raw.begin(), strcon.raw.end(), '%');
-            count_format != count_params) {
-            using namespace std::string_literals;
-            std::string msg =
-                    "too "s + (count_params < count_format ? "few" : "many") +
-                    " arguments for format " + std::string(strcon.raw) +
-                    ", expected " + std::to_string(count_format) +
-                    " but " + std::to_string(count_params) + " given";
-            auto &[ty, raw, line, column] = node.children[0]->getToken();
-            message_queue.push_back(message{message::ERROR, 'l', line, column, msg});
-            return {};
-        }
-        auto [exps, list] = visitExps(node.children.begin() + 3, node.children.end() - 2);
-        auto exps_it = exps.begin();
-        auto str = std::string(strcon.raw.substr(1, strcon.raw.size() - 2));
-        size_t pos;
-        while ((pos = str.find("\\n")) != std::string::npos) {
-            str.replace(pos, 2, "\n");
-        }
-        auto sv = std::string_view(str);
-        while (!sv.empty()) {
-            pos = sv.find("%d");
-            if (pos != 0) {
-                if (auto s = std::string(sv.substr(0, pos)); s.size() == 1) {
-                    auto literal = mir::getIntegerLiteral(s[0]);
-                    list.push_back(new Instruction::call(mir::Function::putch, {literal}));
-                } else {
-                    auto var = manager.getStringLiteral(s);
-                    list.push_back(new Instruction::call(mir::Function::putstr, {var}));
-                }
-            }
-            if (pos == std::string_view::npos) break;
-            list.push_back(new Instruction::call(mir::Function::putint, {*exps_it++}));
-            sv = sv.substr(pos + 2);
-        }
         return {nullptr, list};
     }
 
@@ -681,8 +576,8 @@ namespace frontend::visitor {
         auto [variable, literal] = symbol_table.lookup(raw);
         if (variable == nullptr) {
             message_queue.push_back(message{
-                message::ERROR, 'c', line, column,
-                "undefined symbol '" + std::string(raw) + "'"
+                    message::ERROR, 'c', line, column,
+                    "undefined symbol '" + std::string(raw) + "'"
             });
             return {undefined, {}};
         }
@@ -727,10 +622,17 @@ namespace frontend::visitor {
     template<>
     SysYVisitor::return_type SysYVisitor::visit<Number>(const GrammarNode &node) {
         // INTCON
-        auto &token_raw = node.children[0]->getToken().raw;
-        auto value = std::stoi(token_raw.data());
-        auto literal = mir::getIntegerLiteral(value);
-        return {literal, {}};
+        auto &token = node.children[0]->getToken();
+        auto &token_raw = token.raw;
+        if (token.type == INTCON) {
+            auto value = std::stoi(std::string{token_raw}, nullptr, 0);
+            auto literal = mir::getIntegerLiteral(value);
+            return {literal, {}};
+        } else {
+            auto value = std::stof(std::string{token_raw});
+            auto literal = mir::getFloatLiteral(value);
+            return {literal, {}};
+        }
     }
 
     template<>
@@ -742,16 +644,16 @@ namespace frontend::visitor {
             auto variable = symbol_table.lookup(raw).first;
             if (variable == nullptr) {
                 message_queue.push_back(message{
-                    message::ERROR, 'c', line, column,
-                    "undefined symbol '" + std::string(raw) + "'"
+                        message::ERROR, 'c', line, column,
+                        "undefined symbol '" + std::string(raw) + "'"
                 });
                 return {zero_value, {}};
             }
             auto function = dynamic_cast<mir::Function *>(variable);
             if (function == nullptr) {
                 message_queue.push_back(message{
-                    message::ERROR, 'c', line, column,
-                    "symbol '" + std::string(raw) + "' is not a function"
+                        message::ERROR, 'c', line, column,
+                        "symbol '" + std::string(raw) + "' is not a function"
                 });
                 return {zero_value, {}};
             }
@@ -759,8 +661,8 @@ namespace frontend::visitor {
             if (node.children.size() == 3) {
                 if (function->getType()->getFunctionParamCount() != 0)
                     message_queue.push_back(message{
-                        message::ERROR, 'd', line, column,
-                        "too few arguments for function '" + std::string(raw) + "'"
+                            message::ERROR, 'd', line, column,
+                            "too few arguments for function '" + std::string(raw) + "'"
                     });
                 auto call = new Instruction::call(function, {});
                 list.push_back(call);
@@ -770,18 +672,18 @@ namespace frontend::visitor {
             auto [value, l] = visitExps(node.children[2]->children.begin(), node.children[2]->children.end());
             if (function->getType()->getFunctionParamCount() != value.size()) {
                 message_queue.push_back(message{
-                    message::ERROR, 'd', line, column,
-                    std::string("too ") +
-                    (function->getType()->getFunctionParamCount() < value.size() ? "many" : "few") +
-                    " arguments for function '" + std::string(raw) + "'"
+                        message::ERROR, 'd', line, column,
+                        std::string("too ") +
+                        (function->getType()->getFunctionParamCount() < value.size() ? "many" : "few") +
+                        " arguments for function '" + std::string(raw) + "'"
                 });
             } else {
                 for (int i = 0; i < value.size(); i++) {
                     if (!value[i]->getType()->convertableTo(function->getType()->getFunctionParam(i))) {
                         message_queue.push_back(message{
-                            message::ERROR, 'e', line, column,
-                            std::string("incompatible type for the ") + std::to_string(i + 1) +
-                            "th argument of function '" + std::string(raw) + "'"
+                                message::ERROR, 'e', line, column,
+                                std::string("incompatible type for the ") + std::to_string(i + 1) +
+                                "th argument of function '" + std::string(raw) + "'"
                         });
                     }
                 }
@@ -794,10 +696,10 @@ namespace frontend::visitor {
         auto [value, list] = visit(*node.children[1]);
         auto unary_op_type = node.children[0]->children[0]->getToken().type;
         if (in_const_expr) {
-            auto literal = dynamic_cast<mir::IntegerLiteral *>(value);
+            auto literal = dynamic_cast<mir::Literal *>(value);
             assert(literal && list.empty());
             if (unary_op_type == MINU) {
-                literal = mir::getIntegerLiteral(-literal->value);
+                literal = std::visit([](auto v) { return mir::getLiteral(-v); }, literal->getValue());
             } else {
                 assert(unary_op_type == PLUS);
             }
@@ -874,8 +776,8 @@ namespace frontend::visitor {
             auto &lAndExp = *node.children[i * 2];
             mir::BasicBlock *false_block =
                     i + 1 == count
-                        ? cond_stack.top().false_block
-                        : new mir::BasicBlock(current_function);
+                    ? cond_stack.top().false_block
+                    : new mir::BasicBlock(current_function);
             cond_stack.push({cond_stack.top().true_block, false_block});
             auto [v, l] = visit(lAndExp);
             value = truncToI1(v, l);
@@ -898,29 +800,6 @@ namespace frontend::visitor {
 
 // visitor: default methods
 namespace frontend::visitor {
-    SysYVisitor::return_type SysYVisitor::visit(const GrammarNode &node) {
-        using namespace grammar_type;
-        static decltype(&SysYVisitor::visit<CompUnit>) methods[] =
-        {
-            &SysYVisitor::visit<CompUnit>, &SysYVisitor::visit<Decl>, &SysYVisitor::visit<ConstDecl>,
-            &SysYVisitor::visit<BType>, &SysYVisitor::visit<ConstDef>, &SysYVisitor::visit<ConstInitVal>,
-            &SysYVisitor::visit<VarDecl>, &SysYVisitor::visit<VarDef>, &SysYVisitor::visit<InitVal>,
-            &SysYVisitor::visit<FuncDef>, &SysYVisitor::visit<MainFuncDef>, &SysYVisitor::visit<FuncType>,
-            &SysYVisitor::visit<FuncFParams>, &SysYVisitor::visit<FuncFParam>, &SysYVisitor::visit<Block>,
-            &SysYVisitor::visit<BlockItem>, &SysYVisitor::visit<Stmt>, &SysYVisitor::visit<AssignStmt>,
-            &SysYVisitor::visit<ExpStmt>, &SysYVisitor::visit<BlockStmt>, &SysYVisitor::visit<IfStmt>,
-            &SysYVisitor::visit<WhileStmt>, &SysYVisitor::visit<ForLoopStmt>, &SysYVisitor::visit<BreakStmt>,
-            &SysYVisitor::visit<ContinueStmt>, &SysYVisitor::visit<ReturnStmt>, &SysYVisitor::visit<GetintStmt>,
-            &SysYVisitor::visit<PrintfStmt>, &SysYVisitor::visit<ForStmt>, &SysYVisitor::visit<Exp>,
-            &SysYVisitor::visit<Cond>, &SysYVisitor::visit<LVal>, &SysYVisitor::visit<PrimaryExp>,
-            &SysYVisitor::visit<Number>, &SysYVisitor::visit<UnaryExp>, &SysYVisitor::visit<UnaryOp>,
-            &SysYVisitor::visit<FuncRParams>, &SysYVisitor::visit<MulExp>, &SysYVisitor::visit<AddExp>,
-            &SysYVisitor::visit<RelExp>, &SysYVisitor::visit<EqExp>, &SysYVisitor::visit<LAndExp>,
-            &SysYVisitor::visit<LOrExp>, &SysYVisitor::visit<ConstExp>, &SysYVisitor::visit<Terminal>
-        };
-        return (this->*methods[node.type])(node);
-    }
-
     SysYVisitor::return_type SysYVisitor::visitChildren(const GrammarNode &node) {
         value_type value{};
         value_list list{};

@@ -58,11 +58,9 @@ namespace frontend::lexer {
 
         inline bool next_token_skip_comment();
 
-        inline token_opt next_token_try_word();
+        inline token_opt next_token_try_operator();
 
         inline token_opt next_token_try_number();
-
-        inline token_opt next_token_try_string();
 
         inline token_opt next_token_try_identifier();
 

@@ -129,10 +129,23 @@ namespace mir {
         std::vector<Argument *> args; // owns
         std::list<BasicBlock *> bbs; // owns
         BasicBlock *exitBB = new BasicBlock(this);
-        static Function *getint;
-        static Function *putint;
-        static Function *putch;
-        static Function *putstr;
+        static Function getint;
+        static Function getch;
+        static Function getfloat;
+        static Function getarray;
+        static Function getfarray;
+        static Function putint;
+        static Function putch;
+        static Function putfloat;
+        static Function putarray;
+        static Function putfarray;
+        static Function starttime;
+        static Function stoptime;
+        inline static std::array<Function *, 12> libraryFunctions = {
+                &getint, &getch, &getfloat, &getarray, &getfarray,
+                &putint, &putch, &putfloat, &putarray, &putfarray,
+                &starttime, &stoptime,
+        };
 
         explicit Function(pType type, const std::string &name) : Value(type), retType(type->getFunctionRet()) {
             setName("@" + name);
@@ -184,8 +197,9 @@ namespace mir {
 
         [[nodiscard]] bool isLeaf() const;
 
-        [[nodiscard]] bool isLiberal() const {
-            return this == getint || this == putint || this == putch || this == putstr;
+        [[nodiscard]] bool isLibrary() const {
+            return std::find(libraryFunctions.cbegin(), libraryFunctions.cend(), this)
+                   != libraryFunctions.cend();
         }
 
         [[nodiscard]] bool isRecursive() const;
@@ -215,12 +229,12 @@ namespace mir {
         const bool unnamed;
 
         explicit GlobalVar(pType type, std::string name, Literal *init, bool isConstant)
-            : Value(type, isConstant), init(init), unnamed(false) {
+                : Value(type, isConstant), init(init), unnamed(false) {
             setName("@" + std::move(name));
         }
 
         explicit GlobalVar(pType type, Literal *init, bool isConstant)
-            : Value(type, isConstant), init(init), unnamed(true) {}
+                : Value(type, isConstant), init(init), unnamed(true) {}
 
         GlobalVar(const GlobalVar &) = delete;
 
@@ -267,7 +281,7 @@ namespace mir {
         explicit Instruction(pType type, InstrTy instrTy, Args... args) : User(type, args...), instrTy(instrTy) {}
 
         explicit Instruction(pType type, InstrTy instrTy, const std::vector<Value *> &args) :
-            User(type, args), instrTy(instrTy) {}
+                User(type, args), instrTy(instrTy) {}
 
         Instruction(const Instruction &inst) : User(inst), instrTy(inst.instrTy) {}
 
@@ -319,6 +333,10 @@ namespace mir {
         explicit Literal(pType type, std::string name) : Value(type, true) {
             setName(std::move(name));
         }
+
+        using calculate_t = std::variant<int, float>;
+
+        [[nodiscard]] inline virtual calculate_t getValue() const { throw; }
     };
 
     struct BooleanLiteral : Literal {
@@ -326,9 +344,11 @@ namespace mir {
         static BooleanLiteral *trueLiteral;
         static BooleanLiteral *falseLiteral;
 
+        [[nodiscard]] inline calculate_t getValue() const override { return value; }
+
     private:
         explicit BooleanLiteral(bool value)
-            : Literal(Type::getI1Type(), std::to_string(value)), value(value) {}
+                : Literal(Type::getI1Type(), std::to_string(value)), value(value) {}
     };
 
     inline BooleanLiteral *BooleanLiteral::trueLiteral = new BooleanLiteral(true);
@@ -346,6 +366,8 @@ namespace mir {
 
         explicit IntegerLiteral(unsigned value)
             : IntegerLiteral(static_cast<int>(value)) {}
+
+        [[nodiscard]] inline calculate_t getValue() const override { return value; }
     };
 
     IntegerLiteral *getIntegerLiteral(int value);
@@ -354,15 +376,60 @@ namespace mir {
         return getIntegerLiteral(static_cast<int>(value));
     }
 
-    IntegerLiteral operator+(const IntegerLiteral &lhs, const IntegerLiteral &rhs);
+    inline Literal *getLiteral(int value) {
+        return getIntegerLiteral(value);
+    }
 
-    IntegerLiteral operator-(const IntegerLiteral &lhs, const IntegerLiteral &rhs);
+    struct FloatLiteral : Literal {
+        const float value;
 
-    IntegerLiteral operator*(const IntegerLiteral &lhs, const IntegerLiteral &rhs);
+        explicit FloatLiteral(float value)
+                : Literal(Type::getFloatType(), stringify(value)), value(value) {}
 
-    IntegerLiteral operator/(const IntegerLiteral &lhs, const IntegerLiteral &rhs);
+        [[nodiscard]] inline calculate_t getValue() const override { return value; }
 
-    IntegerLiteral operator%(const IntegerLiteral &lhs, const IntegerLiteral &rhs);
+        [[nodiscard]] inline static std::string stringify(float v) {
+            double d = static_cast<double>(v);
+            std::stringstream ss;
+            ss << std::scientific << v;
+            if (std::stod(ss.str()) == d)
+                return ss.str();
+            std::stringstream ss2;
+            ss2 << "0x" << std::setfill('0') << std::setw(16) << std::hex << std::uppercase
+               << *reinterpret_cast<uint64_t *>(&d);
+            return ss2.str();
+        }
+    };
+
+    FloatLiteral *getFloatLiteral(float value);
+
+    inline Literal *getLiteral(float value) {
+        return getFloatLiteral(value);
+    }
+
+#define BIN_OP(op) \
+    inline Literal *operator op (const Literal &lhs, const Literal &rhs) { \
+        return std::visit([](auto v) -> Literal * { \
+            return getLiteral(v); \
+        }, std::visit([](auto v1, auto v2) -> Literal::calculate_t { \
+            return v1 op v2; \
+        }, lhs.getValue(), rhs.getValue())); \
+    }
+
+    BIN_OP(+)
+    BIN_OP(-)
+    BIN_OP(*)
+    BIN_OP(/)
+
+    inline Literal *operator%(const Literal &lhs, const Literal &rhs) {
+        return std::visit([](auto v) -> Literal * {
+            return getLiteral(v);
+        }, std::visit([](auto v1, auto v2) -> Literal::calculate_t {
+            return (int) v1 % (int) v2;
+        }, lhs.getValue(), rhs.getValue()));
+    }
+
+#undef BIN_OP
 
     struct StringLiteral : Literal {
         const std::string value;

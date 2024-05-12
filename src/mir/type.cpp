@@ -28,6 +28,15 @@ namespace mir {
         return IntegerType::getIntegerType(32);
     }
 
+    pType Type::getFloatType() {
+        static Type type(FLOAT);
+        return &type;
+    }
+
+    pPointerType Type::getPointerType(pType base) {
+        return PointerType::getPointerType(base);
+    }
+
     pPointerType Type::getStringType() {
         return PointerType::getPointerType(getI8Type());
     }
@@ -88,7 +97,7 @@ namespace mir {
 
     bool Type::convertableTo(pType other) const {
         if (this == other) return true;
-        if (isIntegerTy()) return other->isIntegerTy();
+        if (isIntegerTy() || isFloatTy()) return other->isIntegerTy() || other->isFloatTy();
         if (isArrayTy() && other->isPointerTy()) return getArrayBase() == other->getPointerBase();
         return false;
     }
@@ -100,6 +109,8 @@ namespace mir {
     ssize_t Type::ssize() const {
         if (isIntegerTy())
             return (getIntegerBits() + 7) / 8;
+        if (isFloatTy())
+            return 4;
         if (isPointerTy() || isFunctionTy())
             return 4;
         if (isArrayTy())
@@ -113,6 +124,8 @@ namespace mir {
             return "<label>"s;
         if (isVoidTy())
             return "void"s;
+        if (isFloatTy())
+            return "float"s;
         if (isIntegerTy())
             return "i" + std::to_string(getIntegerBits());
         if (isPointerTy())

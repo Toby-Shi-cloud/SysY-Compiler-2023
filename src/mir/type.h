@@ -31,7 +31,7 @@ namespace mir {
      */
     struct Type {
         enum TypeID {
-            VOID, LABEL, INTEGER, POINTER, ARRAY, FUNCTION
+            VOID, LABEL, INTEGER, FLOAT, POINTER, ARRAY, FUNCTION
         } type;
 
         Type() = delete;
@@ -54,6 +54,10 @@ namespace mir {
 
         static pIntegerType getI32Type();
 
+        static pType getFloatType();
+
+        static pPointerType getPointerType(pType base);
+
         static pPointerType getStringType();
 
         static pArrayType getStringType(int size);
@@ -67,6 +71,8 @@ namespace mir {
         [[nodiscard]] bool isLabelTy() const { return type == LABEL; }
 
         [[nodiscard]] bool isIntegerTy() const { return type == INTEGER; }
+
+        [[nodiscard]] bool isFloatTy() const { return type == FLOAT; }
 
         [[nodiscard]] bool isPointerTy() const { return type == POINTER; }
 

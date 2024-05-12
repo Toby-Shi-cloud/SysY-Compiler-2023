@@ -113,7 +113,9 @@ namespace frontend::visitor {
          * This method will no nothing but call the corresponding method according
          * to the type of the node.
          */
-        return_type visit(const GrammarNode &node);
+        return_type visit(const GrammarNode &node) {
+            return (this->*visitor_methods[node.type])(node);
+        }
 
         /* Helper methods */
     private:
@@ -156,6 +158,27 @@ namespace frontend::visitor {
          * A helper method to convert a value to I1.
          */
         value_type truncToI1(value_type value, value_list &list) const;
+
+        using visitor_method_t = decltype(&SysYVisitor::visit<grammar_type_t::CompUnit>);
+        inline static std::array<visitor_method_t, magic_enum::detail::enum_count<grammar_type_t>()> visitor_methods{};
+
+        template<grammar_type_t t>
+        constexpr static auto getVisitorMethod() -> visitor_method_t {
+            return &SysYVisitor::visit<t>;
+        }
+
+        template<size_t idx>
+        inline static void initVisitorMethodArray() {
+            if constexpr (idx != visitor_methods.size()) {
+                visitor_methods[idx] = getVisitorMethod<static_cast<grammar_type_t>(idx)>();
+                return initVisitorMethodArray<idx + 1>();
+            }
+        }
+
+        [[maybe_unused]] inline static auto _init_visitor_methods = []() {
+            initVisitorMethodArray<0>();
+            return 0;
+        }();
     };
 }
 

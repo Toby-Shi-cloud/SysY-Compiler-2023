@@ -11,11 +11,11 @@ namespace frontend::parser {
 
     template<>
     pGrammarNode SysYParser::parse_impl<CompUnit>() {
-        auto gen = (generator<FuncDef>() | generator<Decl>()) * MANY + generator<MainFuncDef>();
-        if (auto result = grammarNode(CompUnit, gen)) {
-            return result;
-        }
-        throw std::runtime_error("Error while parsing CompUnit");
+        auto gen = (generator<FuncDef>() | generator<Decl>()) * MANY;
+        auto result = grammarNode(CompUnit, gen);
+        if (current != tokens.end())
+            throw std::runtime_error("Error while parsing CompUnit");
+        return result;
     }
 
     template<>
@@ -34,7 +34,7 @@ namespace frontend::parser {
 
     template<>
     pGrammarNode SysYParser::parse_impl<BType>() {
-        auto gen = generator<INTTK>();
+        auto gen = generator<INTTK>() | generator<FLOATTK>();
         return grammarNode(BType, gen);
     }
 
@@ -86,15 +86,8 @@ namespace frontend::parser {
     }
 
     template<>
-    pGrammarNode SysYParser::parse_impl<MainFuncDef>() {
-        auto gen = generator<INTTK>() + generator<MAINTK>() + generator<LPARENT>() +
-                   generator<RPARENT>('j') + generator<Block>();
-        return grammarNode(MainFuncDef, gen);
-    }
-
-    template<>
     pGrammarNode SysYParser::parse_impl<FuncType>() {
-        auto gen = generator<VOIDTK>() | generator<INTTK>();
+        auto gen = generator<VOIDTK>() | generator<INTTK>() | generator<FLOATTK>();
         return grammarNode(FuncType, gen);
     }
 
@@ -128,8 +121,7 @@ namespace frontend::parser {
     pGrammarNode SysYParser::parse_impl<Stmt>() {
         auto gen = generator<AssignStmt>() | generator<BlockStmt>() | generator<IfStmt>() |
                    generator<WhileStmt>() | generator<ForLoopStmt>() | generator<BreakStmt>() |
-                   generator<ContinueStmt>() | generator<ReturnStmt>() | generator<GetintStmt>() |
-                   generator<PrintfStmt>() | generator<ExpStmt>();
+                   generator<ContinueStmt>() | generator<ReturnStmt>() | generator<ExpStmt>();
         return grammarNode(Stmt, gen);
     }
 
@@ -192,20 +184,6 @@ namespace frontend::parser {
     }
 
     template<>
-    pGrammarNode SysYParser::parse_impl<GetintStmt>() {
-        auto gen = generator<LVal>() + generator<ASSIGN>() + generator<GETINTTK>() +
-                   generator<LPARENT>() + generator<RPARENT>('j') + generator<SEMICN>('i');
-        return grammarNode(GetintStmt, gen);
-    }
-
-    template<>
-    pGrammarNode SysYParser::parse_impl<PrintfStmt>() {
-        auto gen = generator<PRINTFTK>() + generator<LPARENT>() + generator<STRCON>() +
-                   (generator<COMMA>() + generator<Exp>()) * MANY + generator<RPARENT>('j') + generator<SEMICN>('i');
-        return grammarNode(PrintfStmt, gen);
-    }
-
-    template<>
     pGrammarNode SysYParser::parse_impl<ForStmt>() {
         auto gen = generator<LVal>() + generator<ASSIGN>() + generator<Exp>();
         return grammarNode(ForStmt, gen);
@@ -238,7 +216,7 @@ namespace frontend::parser {
 
     template<>
     pGrammarNode SysYParser::parse_impl<Number>() {
-        auto gen = generator<INTCON>();
+        auto gen = generator<INTCON>() | generator<FLOATCON>();
         return grammarNode(Number, gen);
     }
 
@@ -324,7 +302,7 @@ namespace frontend::parser {
                     message::ERROR, error_code, line, column,
                     "missing token '"s + raw[type] + "'"
                 });
-            return std::make_unique<TerminalNode>(lexer::Token{type, ""sv, line, column});
+            return std::make_unique<TerminalNode>(lexer::Token{type, "", line, column});
         }
         return nullptr;
     }

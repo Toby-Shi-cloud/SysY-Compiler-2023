@@ -10,7 +10,7 @@ namespace mir {
             auto &&bb = *bb_it;
             for (auto inst_it = bb->instructions.begin(); inst_it != bb->instructions.end(); ++inst_it) {
                 auto &&call = dynamic_cast<Instruction::call *>(*inst_it);
-                if (!call || call->getFunction()->isRecursive() || call->getFunction()->isLiberal()) continue;
+                if (!call || call->getFunction()->isRecursive() || call->getFunction()->isLibrary()) continue;
                 // 1. clone function & replace args
                 auto callee = call->getFunction()->clone();
                 for (int i = 0; i < call->getNumArgs(); i++)
@@ -80,7 +80,7 @@ namespace mir {
     }
 
     void calcPure(Function *func) {
-        if (func->isLiberal()) return;
+        if (func->isLibrary()) return;
         func->isPure = true;
         func->noPostEffect = true;
         for (auto &&arg: func->args)

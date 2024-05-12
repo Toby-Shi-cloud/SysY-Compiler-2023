@@ -335,38 +335,25 @@ namespace backend {
     }
 
     void Translator::translateCallInst(const mir::Instruction::call *callInst) {
-        if (auto func = callInst->getFunction(); func == mir::Function::getint) {
+        if (auto func = callInst->getFunction(); func == &mir::Function::getint) {
             auto dst = curFunc->newVirRegister();
             curBlock->push_back(mips::SyscallInst::syscall(
                 mips::SyscallInst::SyscallId::ReadInteger));
             curBlock->push_back(std::make_unique<mips::MoveInst>(
                 dst, mips::PhyRegister::get("$v0")));
             put(callInst, dst);
-        } else if (func == mir::Function::putint) {
+        } else if (func == &mir::Function::putint) {
             auto src = getRegister(callInst->getArg(0));
             curBlock->push_back(std::make_unique<mips::MoveInst>(
                 mips::PhyRegister::get("$a0"), src));
             curBlock->push_back(mips::SyscallInst::syscall(
                 mips::SyscallInst::SyscallId::PrintInteger));
-        } else if (func == mir::Function::putch) {
+        } else if (func == &mir::Function::putch) {
             auto src = getRegister(callInst->getArg(0));
             curBlock->push_back(std::make_unique<mips::MoveInst>(
                 mips::PhyRegister::get("$a0"), src));
             curBlock->push_back(mips::SyscallInst::syscall(
                 mips::SyscallInst::SyscallId::PrintCharacter));
-        } else if (func == mir::Function::putstr) {
-            if (auto src = getRegister(callInst->getArg(0))) {
-                curBlock->push_back(std::make_unique<mips::MoveInst>(
-                    mips::PhyRegister::get("$a0"), src));
-            } else if (auto addr = getAddress(callInst->getArg(0))) {
-                auto reg = addressCompute(addr);
-                curBlock->push_back(std::make_unique<mips::MoveInst>(
-                    mips::PhyRegister::get("$a0"), reg));
-            } else {
-                assert(false);
-            }
-            curBlock->push_back(mips::SyscallInst::syscall(
-                mips::SyscallInst::SyscallId::PrintString));
         } else {
             auto callee = fMap[func];
             unsigned stack_arg_cnt = std::max(0, static_cast<int>(callInst->getNumArgs()) - 4);

@@ -18,10 +18,10 @@ namespace frontend::grammar::grammar_type {
         CompUnit, Decl,
         ConstDecl, BType, ConstDef, ConstInitVal,
         VarDecl, VarDef, InitVal,
-        FuncDef, MainFuncDef, FuncType, FuncFParams, FuncFParam,
+        FuncDef, FuncType, FuncFParams, FuncFParam,
         Block, BlockItem,
         Stmt, AssignStmt, ExpStmt, BlockStmt, IfStmt, WhileStmt, ForLoopStmt,
-        BreakStmt, ContinueStmt, ReturnStmt, GetintStmt, PrintfStmt,
+        BreakStmt, ContinueStmt, ReturnStmt,
         ForStmt, Exp, Cond, LVal, PrimaryExp, Number, UnaryExp, UnaryOp,
         FuncRParams, MulExp, AddExp, RelExp, EqExp, LAndExp, LOrExp, ConstExp,
         Terminal
