@@ -97,6 +97,9 @@ jobs:
           echo "## Functional Test Summary:" >> $GITHUB_STEP_SUMMARY
           echo "| Test Name | Passed | Failed |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
-          cat ${{github.workspace}}/tests/functional.log >> $GITHUB_STEP_SUMMARY || true
-          cat ${{github.workspace}}/tests/hidden_functional.log >> $GITHUB_STEP_SUMMARY || true
+          sed -n 1p ${{github.workspace}}/tests/functional.log >> $GITHUB_STEP_SUMMARY || true
+          sed -n 1p ${{github.workspace}}/tests/hidden_functional.log >> $GITHUB_STEP_SUMMARY || true
+          echo '' >> $GITHUB_STEP_SUMMARY
+          sed -n 2p ${{github.workspace}}/tests/functional.log >> $GITHUB_STEP_SUMMARY || true
+          sed -n 2p ${{github.workspace}}/tests/hidden_functional.log >> $GITHUB_STEP_SUMMARY || true
           echo '' >> $GITHUB_STEP_SUMMARY

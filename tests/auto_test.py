@@ -39,6 +39,7 @@ def run_suit(test_dir):
         t.join()
     with open(f"{test_dir}.log", 'w') as f:
         print(f"| {test_dir} | {len(correct_list)} | {len(wrong_list)} |", file=f)
+        print(f"{test_dir} failed on: {wrong_list}", file=f)
     if len(wrong_list) != 0:
         exit(1)
 
