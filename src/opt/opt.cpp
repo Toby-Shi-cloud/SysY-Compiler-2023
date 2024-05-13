@@ -53,8 +53,6 @@ namespace mir {
         decltype(globalVars) newGlobalVars;
         for (auto &&var: globalVars) {
             if (!var->isUsed()) {
-                if (auto str = dynamic_cast<StringLiteral *>(var->init))
-                    stringPool.erase(str->value);
                 delete var;
             } else newGlobalVars.push_back(var);
         }

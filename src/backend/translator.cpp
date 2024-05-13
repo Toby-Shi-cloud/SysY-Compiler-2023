@@ -51,11 +51,8 @@ namespace backend {
         constexpr std::pair<mips::Instruction::Ty, mips::Instruction::Ty> mipsTys[] = {
             {mips::Instruction::Ty::ADDU, mips::Instruction::Ty::ADDIU},
             {mips::Instruction::Ty::SUBU, mips::Instruction::Ty::ADDIU},
-            {/* MUL */},
-            {/* UDIV */},
-            {/* SDIV */},
-            {/* UREM */},
-            {/* SREM */},
+            {/* MUL */}, {/* UDIV */}, {/* SDIV */}, {/* UREM */}, {/* SREM */},
+            {/* FADD */}, {/* FSUB */}, {/* FMUL */}, {/* FDIV */}, {/* FREM */},
             {mips::Instruction::Ty::SLLV, mips::Instruction::Ty::SLL},
             {mips::Instruction::Ty::SRLV, mips::Instruction::Ty::SRL},
             {mips::Instruction::Ty::SRAV, mips::Instruction::Ty::SRA},
@@ -335,20 +332,20 @@ namespace backend {
     }
 
     void Translator::translateCallInst(const mir::Instruction::call *callInst) {
-        if (auto func = callInst->getFunction(); func == &mir::Function::getint) {
+        if (auto func = callInst->getFunction(); func == mir::Function::getint()) {
             auto dst = curFunc->newVirRegister();
             curBlock->push_back(mips::SyscallInst::syscall(
                 mips::SyscallInst::SyscallId::ReadInteger));
             curBlock->push_back(std::make_unique<mips::MoveInst>(
                 dst, mips::PhyRegister::get("$v0")));
             put(callInst, dst);
-        } else if (func == &mir::Function::putint) {
+        } else if (func == mir::Function::putint()) {
             auto src = getRegister(callInst->getArg(0));
             curBlock->push_back(std::make_unique<mips::MoveInst>(
                 mips::PhyRegister::get("$a0"), src));
             curBlock->push_back(mips::SyscallInst::syscall(
                 mips::SyscallInst::SyscallId::PrintInteger));
-        } else if (func == &mir::Function::putch) {
+        } else if (func == mir::Function::putch()) {
             auto src = getRegister(callInst->getArg(0));
             curBlock->push_back(std::make_unique<mips::MoveInst>(
                 mips::PhyRegister::get("$a0"), src));

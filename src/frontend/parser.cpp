@@ -14,7 +14,7 @@ namespace frontend::parser {
         auto gen = (generator<FuncDef>() | generator<Decl>()) * MANY;
         auto result = grammarNode(CompUnit, gen);
         if (current != tokens.end())
-            throw std::runtime_error("Error while parsing CompUnit");
+            throw (dbg(*result, *current), std::runtime_error("Error while parsing CompUnit"));
         return result;
     }
 

@@ -33,13 +33,61 @@ namespace frontend::visitor {
     }
 
     template<typename T>
-    mir::Instruction *get_binary_instruction(mir::Value *lhs, mir::Value *rhs) {
+    mir::Instruction *constructor_wrapper(mir::Value *lhs, mir::Value *rhs) {
         return new T{lhs, rhs};
     }
 
     template<mir::Instruction::icmp::Cond cond>
-    mir::Instruction *get_icmp_instruction(mir::Value *lhs, mir::Value *rhs) {
+    mir::Instruction *constructor_wrapper(mir::Value *lhs, mir::Value *rhs) {
         return new mir::Instruction::icmp{cond, lhs, rhs};
+    }
+
+    template<mir::Instruction::fcmp::Cond cond>
+    mir::Instruction *constructor_wrapper(mir::Value *lhs, mir::Value *rhs) {
+        return new mir::Instruction::fcmp{cond, lhs, rhs};
+    }
+
+    auto convert_to(mir::Value *value, mir::pType ty, bool sgn, /*out*/ std::list<mir::Value *> &list) {
+        if (!value->getType()->isNumberTy()) return value;
+        if (value->getType() == ty) return value;
+        mir::Value *ret;
+        if (value->getType()->isIntegerTy()) {
+            if (ty->isIntegerTy()) {
+                if (value->getType()->getIntegerBits() > ty->getIntegerBits()) {
+                    ret = new mir::Instruction::trunc(ty, value);
+                } else {
+                    ret = sgn ? (mir::Instruction *) new mir::Instruction::sext(ty, value)
+                              : (mir::Instruction *) new mir::Instruction::zext(ty, value);
+                }
+            } else {
+                ret = sgn ? (mir::Instruction *) new mir::Instruction::sitofp(ty, value)
+                          : (mir::Instruction *) new mir::Instruction::uitofp(ty, value);
+            }
+        } else {
+            if (ty->isIntegerTy()) {
+                ret = sgn ? (mir::Instruction *) new mir::Instruction::fptosi(ty, value)
+                          : (mir::Instruction *) new mir::Instruction::fptoui(ty, value);
+            } else {
+                __builtin_unreachable();
+            }
+        }
+        list.push_back(ret);
+        return ret;
+    }
+
+    auto convert_to_bool(mir::Value *value, bool neg, /*out*/ std::list<mir::Value *> &list) {
+        if (value->getType() == mir::Type::getI1Type()) return value;
+        mir::Value *cmp;
+        if (value->getType()->isIntegerTy()) {
+            using icmp = mir::Instruction::icmp;
+            cmp = new icmp(neg ? icmp::EQ : icmp::NE, value, mir::getLiteral(0));
+        } else {
+            assert(value->getType()->isFloatTy());
+            using fcmp = mir::Instruction::fcmp;
+            cmp = new fcmp(neg ? fcmp::OEQ : fcmp::ONE, value, mir::getLiteral(.0f));
+        }
+        list.push_back(cmp);
+        return cmp;
     }
 }
 
@@ -52,7 +100,7 @@ namespace frontend::visitor {
     static const pcGrammarNode nullptr_node{nullptr};
 
     mir::pType SysYVisitor::getVarType(GrammarIterator begin, GrammarIterator end) {
-        mir::pType result = mir::Type::getI32Type();
+        mir::pType result = current_btype;
 
         for (auto it = std::reverse_iterator(end); it != std::reverse_iterator(begin); ++it) {
             auto &node = *it;
@@ -76,21 +124,22 @@ namespace frontend::visitor {
     }
 
     SysYVisitor::return_type SysYVisitor::visitBinaryExp(const GrammarNode &node) {
-        using literal_operator = decltype(&mir::operator+);
-        using normal_operator = decltype(&get_binary_instruction<Instruction::add>);
-        using icmp = Instruction::icmp;
-        static std::unordered_map<token_type_t, std::pair<literal_operator, normal_operator>> call_table = {
-                {PLUS, {&mir::operator+, &get_binary_instruction<Instruction::add>}},
-                {MINU, {&mir::operator-, &get_binary_instruction<Instruction::sub>}},
-                {MULT, {&mir::operator*, &get_binary_instruction<Instruction::mul>}},
-                {DIV,  {&mir::operator/, &get_binary_instruction<Instruction::sdiv>}},
-                {MOD,  {&mir::operator%, &get_binary_instruction<Instruction::srem>}},
-                {LSS,  {nullptr,         &get_icmp_instruction<icmp::SLT>}},
-                {LEQ,  {nullptr,         &get_icmp_instruction<icmp::SLE>}},
-                {GRE,  {nullptr,         &get_icmp_instruction<icmp::SGT>}},
-                {GEQ,  {nullptr,         &get_icmp_instruction<icmp::SGE>}},
-                {EQL,  {nullptr,         &get_icmp_instruction<icmp::EQ>}},
-                {NEQ,  {nullptr,         &get_icmp_instruction<icmp::NE>}},
+        using lit_op = mir::Literal *(*)(const mir::Literal &, const mir::Literal &);
+        using constructor = mir::Instruction *(*)(mir::Value *, mir::Value *);
+        static std::unordered_map<token_type_t, std::tuple<lit_op, constructor, constructor>> call_table = {
+#define WRAP(op) (&constructor_wrapper<mir::Instruction::op>)
+                {PLUS, {&mir::operator+, WRAP(add), WRAP(fadd)}},
+                {MINU, {&mir::operator-, WRAP(sub), WRAP(fsub)}},
+                {MULT, {&mir::operator*, WRAP(mul), WRAP(fmul)}},
+                {DIV, {&mir::operator/, WRAP(sdiv), WRAP(fdiv)}},
+                {MOD, {&mir::operator%, WRAP(srem), WRAP(frem)}},
+                {LSS, {&mir::operator<, WRAP(icmp::SLT), WRAP(fcmp::OLT)}},
+                {LEQ, {&mir::operator<=, WRAP(icmp::SLE), WRAP(fcmp::OLE)}},
+                {GRE, {&mir::operator>, WRAP(icmp::SGT), WRAP(fcmp::OGT)}},
+                {GEQ, {&mir::operator>=, WRAP(icmp::SGE), WRAP(fcmp::OGE)}},
+                {EQL, {&mir::operator==, WRAP(icmp::EQ), WRAP(fcmp::OEQ)}},
+                {NEQ, {&mir::operator!=, WRAP(icmp::NE), WRAP(fcmp::ONE)}},
+#undef WRAP
         };
 
         auto [ret_val, ret_list] = visit(*node.children[0]);
@@ -102,20 +151,19 @@ namespace frontend::visitor {
             auto ret_literal = dynamic_cast<mir::Literal *>(ret_val);
             auto literal = dynamic_cast<mir::Literal *>(value);
 
-            if (auto [f, g] = call_table[token_type];
-                    f && ret_literal && literal && ret_list.empty()) {
-                ret_literal = f(*ret_literal, *literal);
+            auto [lit, funci, funcf] = call_table[token_type];
+            if (ret_literal && literal && ret_list.empty()) {
+                ret_literal = lit(*ret_literal, *literal);
                 ret_val = ret_literal;
+            } else if (ret_val->getType()->isFloatTy() || value->getType()->isFloatTy()) {
+                ret_val = convert_to(ret_val, mir::Type::getFloatType(), true, ret_list);
+                value = convert_to(value, mir::Type::getFloatType(), true, ret_list);
+                ret_val = funcf(ret_val, value);
+                ret_list.push_back(ret_val);
             } else {
-                if (ret_val->getType() != mir::Type::getI32Type()) {
-                    ret_val = new Instruction::zext{mir::Type::getI32Type(), ret_val};
-                    ret_list.push_back(ret_val);
-                }
-                if (value->getType() != mir::Type::getI32Type()) {
-                    value = new Instruction::zext{mir::Type::getI32Type(), value};
-                    ret_list.push_back(value);
-                }
-                ret_val = g(ret_val, value);
+                ret_val = convert_to(ret_val, mir::Type::getI32Type(), true, ret_list);
+                value = convert_to(value, mir::Type::getI32Type(), true, ret_list);
+                ret_val = funci(ret_val, value);
                 ret_list.push_back(ret_val);
             }
         }
@@ -143,11 +191,11 @@ namespace frontend::visitor {
                                 std::vector<value_type>::iterator initVal,
                                 std::vector<value_type> *index) {
         static value_vector _idx = std::vector<value_type>{zero_value};
-        if (index == nullptr && type == mir::Type::getI32Type()) {
+        if (index == nullptr && type->isNumberTy()) {
             auto store = new Instruction::store(*initVal, var);
             return {store};
         }
-        if (type == mir::Type::getI32Type()) {
+        if (type->isNumberTy()) {
             assert(index);
             auto ptr = new Instruction::getelementptr(type, var, *index);
             auto store = new Instruction::store(*initVal, ptr);
@@ -220,29 +268,13 @@ namespace frontend::visitor {
             }
         }
 
-        if (current_function->getType()->getFunctionRet() != mir::Type::getVoidType()) {
-            if (cur == nullptr || cur->instructions.empty() || cur->instructions.back()->instrTy != Instruction::RET) {
-                message_queue.push_back({
-                                                message::ERROR, 'g', end_token.line, end_token.column,
-                                                "Non-void function does not return a value"
-                                        });
-            }
-        } else {
-            if (cur == nullptr) {
-                cur = new mir::BasicBlock(current_function);
-                current_function->bbs.push_back(cur);
-                cur->push_back(new Instruction::ret());
-            } else if (cur->instructions.empty() || !cur->instructions.back()->isTerminator()) {
-                cur->push_back(new Instruction::ret());
-            }
+        if (cur == nullptr) {
+            cur = new mir::BasicBlock(current_function);
+            current_function->bbs.push_back(cur);
+            cur->push_back(Instruction::ret::default_t(current_function->retType));
+        } else if (cur->instructions.empty() || !cur->instructions.back()->isTerminator()) {
+            cur->push_back(Instruction::ret::default_t(current_function->retType));
         }
-    }
-
-    SysYVisitor::value_type SysYVisitor::truncToI1(value_type value, value_list &list) const {
-        if (value->getType() == mir::Type::getI1Type()) return value;
-        auto icmp = new Instruction::icmp(Instruction::icmp::NE, value, zero_value);
-        list.push_back(icmp);
-        return icmp;
     }
 }
 
@@ -250,13 +282,27 @@ namespace frontend::visitor {
 namespace frontend::visitor {
     template<>
     SysYVisitor::return_type SysYVisitor::visit<CompUnit>(const GrammarNode &node) {
-        for (auto func: mir::Function::libraryFunctions)
-            assert(symbol_table.insert(
+        for (auto func: mir::Function::getLibrary()) {
+            auto msg = symbol_table.insert(
                     std::string_view(func->getName()).substr(1),
                     {func, nullptr},
                     Token()
-            ) == std::nullopt);
+            );
+            assert(msg == std::nullopt);
+        }
         return visitChildren(node);
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<BType>(const frontend::grammar::GrammarNode &node) {
+        if (node.children[0]->getToken().type == INTTK) {
+            current_btype = mir::Type::getI32Type();
+        } else if (node.children[0]->getToken().type == FLOATTK) {
+            current_btype = mir::Type::getFloatType();
+        } else {
+            __builtin_unreachable();
+        }
+        return {};
     }
 
     template<>
@@ -336,9 +382,9 @@ namespace frontend::visitor {
     template<>
     SysYVisitor::return_type SysYVisitor::visit<FuncDef>(const GrammarNode &node) {
         // funcType IDENFR LPARENT funcFParams? RPARENT block
-        auto funcRetType = node.children.front()->children.front()->getToken().type == VOIDTK
-                           ? mir::Type::getVoidType()
-                           : mir::Type::getI32Type();
+        auto &retType = node.children.front()->children.front()->getToken().type;
+        auto funcRetType = retType == VOIDTK ? mir::Type::getVoidType() :
+                           retType == FLOATTK ? mir::Type::getFloatType() : mir::Type::getI32Type();
         auto &identifier = node.children[1]->getToken();
         decltype(token_buffer)().swap(token_buffer);
         value_list params_list = node.children.size() == 6 ? visit(*node.children[3]).second : value_list{};
@@ -361,8 +407,8 @@ namespace frontend::visitor {
         for (; it1 != params_list.end(); ++it1, ++it2) {
             auto arg = func->addArgument((*it1)->getType());
             mir::Value *val = arg;
-            if (arg->getType() == mir::Type::getI32Type()) {
-                auto alloca_ = new Instruction::alloca_(mir::Type::getI32Type());
+            if (arg->getType()->isNumberTy()) {
+                auto alloca_ = new Instruction::alloca_(arg->getType());
                 auto store_ = new Instruction::store(arg, alloca_);
                 init_list.push_back(alloca_);
                 init_list.push_back(store_);
@@ -381,6 +427,7 @@ namespace frontend::visitor {
     template<>
     SysYVisitor::return_type SysYVisitor::visit<FuncFParam>(const GrammarNode &node) {
         // bType IDENFR (LBRACK RBRACK (LBRACK constExp RBRACK)*)?
+        visit(*node.children[0]);
         auto &identifier = node.children[1]->getToken();
         auto type = getVarType(node.children.begin() + 2, node.children.end());
         auto virtual_value = new mir::Value(type);
@@ -560,7 +607,7 @@ namespace frontend::visitor {
         }
         if (node.children.size() == 2) return {nullptr, {new Instruction::ret()}};
         auto [value, list] = visit(*node.children[1]);
-        list.push_back(new Instruction::ret(value));
+        list.push_back(new Instruction::ret(convert_to(value, current_function->retType, true, list)));
         return {nullptr, list};
     }
 
@@ -612,8 +659,8 @@ namespace frontend::visitor {
         // LPARENT exp RPARENT | lVal | number
         if (in_const_expr) return visitChildren(node);
         auto [value, list] = visitChildren(node);
-        if (node.children[0]->type == LVal && value->getType() == mir::Type::getI32Type()) {
-            value = new Instruction::load(mir::Type::getI32Type(), value);
+        if (node.children[0]->type == LVal && value->getType()->isNumberTy()) {
+            value = new Instruction::load(value->getType(), value);
             list.push_back(value);
         }
         return {value, list};
@@ -670,6 +717,7 @@ namespace frontend::visitor {
             }
             // visit funcRParams
             auto [value, l] = visitExps(node.children[2]->children.begin(), node.children[2]->children.end());
+            list.splice(list.end(), l);
             if (function->getType()->getFunctionParamCount() != value.size()) {
                 message_queue.push_back(message{
                         message::ERROR, 'd', line, column,
@@ -686,9 +734,9 @@ namespace frontend::visitor {
                                 "th argument of function '" + std::string(raw) + "'"
                         });
                     }
+                    value[i] = convert_to(value[i], function->getType()->getFunctionParam(i), true, list);
                 }
             }
-            list.splice(list.end(), l);
             auto call = new Instruction::call(function, value);
             list.push_back(call);
             return {call, list};
@@ -699,7 +747,7 @@ namespace frontend::visitor {
             auto literal = dynamic_cast<mir::Literal *>(value);
             assert(literal && list.empty());
             if (unary_op_type == MINU) {
-                literal = std::visit([](auto v) { return mir::getLiteral(-v); }, literal->getValue());
+                literal = std::visit([](auto v) { return mir::getLiteral(-v); }, literal->getValue().value);
             } else {
                 assert(unary_op_type == PLUS);
             }
@@ -709,14 +757,12 @@ namespace frontend::visitor {
             case PLUS:
                 break;
             case MINU:
-                value = new Instruction::sub(zero_value, value);
+                if (value->getType()->isIntegerTy()) value = new Instruction::sub(zero_value, value);
+                else value = new Instruction::fneg(value);
                 list.push_back(value);
                 break;
             case NOT:
-                value = new Instruction::icmp(Instruction::icmp::EQ, value, zero_value);
-                list.push_back(value);
-                value = new Instruction::zext(mir::Type::getI32Type(), value);
-                list.push_back(value);
+                value = convert_to_bool(value, true, list);
                 break;
             default:
                 assert(false);
@@ -752,14 +798,14 @@ namespace frontend::visitor {
     SysYVisitor::return_type SysYVisitor::visit<LAndExp>(const GrammarNode &node) {
         // eqExp (AND eqExp)*
         auto [value, list] = visit(*node.children[0]);
-        value = truncToI1(value, list);
+        value = convert_to_bool(value, false, list);
         for (auto it = node.children.begin() + 1; it != node.children.end(); ++it) {
             if ((*it)->type == Terminal) continue;
             auto bb = new mir::BasicBlock(current_function);
             list.push_back(new Instruction::br(value, bb, cond_stack.top().false_block));
             list.push_back(bb);
             auto [v, l] = visit(**it);
-            value = truncToI1(v, l);
+            value = convert_to_bool(v, false, l);
             list.splice(list.end(), l);
         }
         list.push_back(new Instruction::br(value, cond_stack.top().true_block, cond_stack.top().false_block));
@@ -780,7 +826,7 @@ namespace frontend::visitor {
                     : new mir::BasicBlock(current_function);
             cond_stack.push({cond_stack.top().true_block, false_block});
             auto [v, l] = visit(lAndExp);
-            value = truncToI1(v, l);
+            value = convert_to_bool(v, false, l);
             list.splice(list.end(), l);
             if (i + 1 != count) list.push_back(false_block);
             cond_stack.pop();
@@ -800,6 +846,10 @@ namespace frontend::visitor {
 
 // visitor: default methods
 namespace frontend::visitor {
+    SysYVisitor::return_type SysYVisitor::visit(const GrammarNode &node) {
+        return (this->*visitor_methods[node.type])(node);
+    }
+
     SysYVisitor::return_type SysYVisitor::visitChildren(const GrammarNode &node) {
         value_type value{};
         value_list list{};

@@ -3,6 +3,7 @@
 //
 
 #include <algorithm>
+#include <unordered_map>
 #include "lexer.h"
 
 namespace frontend::lexer {
@@ -77,11 +78,14 @@ namespace frontend::lexer {
         const auto start = current;
         const auto _column = column();
 
-        if (current[0] == '0' && std::tolower(current[1]) == 'x')
+        bool hex = false;
+        if (current[0] == '0' && std::tolower(current[1]) == 'x') {
+            hex = true;
             current = current.substr(2);
+        }
 
-        auto _len1 = std::find_if(current.cbegin(), current.cend(), [](char ch) {
-            return !std::isdigit(ch) && ch != '.';
+        auto _len1 = std::find_if(current.cbegin(), current.cend(), [hex](char ch) {
+            return !(::isdigit(ch) || ch == '.' || hex && ::tolower(ch) >= 'a' && ::tolower(ch) <= 'f');
         });
         auto _part1 = start.substr(0, _len1 - start.cbegin());
 

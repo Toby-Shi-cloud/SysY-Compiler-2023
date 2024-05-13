@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
     }
     if (!message_queue.empty()) return 0;
 
-//    mir_manager.optimize();
+    mir_manager.optimize();
     mir_manager.allocName();
     mir_manager.output(fir);
 

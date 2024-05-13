@@ -37,6 +37,10 @@ namespace mir {
         return os << "br label " << getTarget()->getName();
     }
 
+    std::ostream &Instruction::fneg::output(std::ostream &os) const {
+        return os << getName() << " = fneg " << getOperand();
+    }
+
     std::ostream &Instruction::alloca_::output(std::ostream &os) const {
         return os << getName() << " = alloca " << getType() << ", align 4";
     }
@@ -65,6 +69,10 @@ namespace mir {
 
     std::ostream &Instruction::icmp::output(std::ostream &os) const {
         return os << getName() << " = icmp " << cond << " " << getLhs() << ", " << getRhs()->getName();
+    }
+
+    std::ostream &Instruction::fcmp::output(std::ostream &os) const {
+        return os << getName() << " = fcmp " << cond << " " << getLhs() << ", " << getRhs()->getName();
     }
 
     Instruction::phi::phi(const std::vector<incominng_pair> &values)

@@ -9,32 +9,77 @@
 #include "derived_value.h"
 
 namespace mir {
-    Function Function::getint = Function(
-        FunctionType::getFunctionType(Type::getI32Type(), {}), "getint");
-    Function Function::getch = Function(
-            FunctionType::getFunctionType(Type::getI8Type(), {}), "getch");
-    Function Function::getfloat = Function(
-            FunctionType::getFunctionType(Type::getFloatType(), {}), "getfloat");
-    Function Function::getarray = Function(
-            FunctionType::getFunctionType(Type::getI32Type(), {Type::getPointerType(Type::getI32Type())}), "getarray");
-    Function Function::getfarray = Function(
-            FunctionType::getFunctionType(Type::getI32Type(), {Type::getPointerType(Type::getFloatType())}), "getfarray");
+    Function *Function::getint() {
+        const static Function _f(FunctionType::getFunctionType(
+                Type::getI32Type(), {}), "getint");
+        return const_cast<Function *>(&_f);
+    }
 
-    Function Function::putint = Function(
-        FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type()}), "putint");
-    Function Function::putch = Function(
-        FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type()}), "putch");
-    Function Function::putfloat = Function(
-        FunctionType::getFunctionType(Type::getVoidType(), {Type::getFloatType()}), "putfloat");
-    Function Function::putarray = Function(
-        FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type(), Type::getPointerType(Type::getI32Type())}), "putarray");
-    Function Function::putfarray = Function(
-        FunctionType::getFunctionType(Type::getVoidType(), {Type::getI32Type(), Type::getPointerType(Type::getFloatType())}), "putfarray");
+    Function *Function::getch() {
+        const static Function _f(FunctionType::getFunctionType(
+                Type::getI8Type(), {}), "getch");
+        return const_cast<Function *>(&_f);
+    }
 
-    Function Function::starttime = Function(
-        FunctionType::getFunctionType(Type::getVoidType(), {}), "starttime");
-    Function Function::stoptime = Function(
-        FunctionType::getFunctionType(Type::getVoidType(), {}), "stoptime");
+    Function *Function::getfloat() {
+        const static Function _f(FunctionType::getFunctionType(
+                Type::getFloatType(), {}), "getfloat");
+        return const_cast<Function *>(&_f);
+    }
+
+    Function *Function::getarray() {
+        const static Function _f(FunctionType::getFunctionType(
+                Type::getI32Type(), {Type::getPointerType(Type::getI32Type())}), "getarray");
+        return const_cast<Function *>(&_f);
+    }
+
+    Function *Function::getfarray() {
+        const static Function _f(FunctionType::getFunctionType(
+                Type::getI32Type(), {Type::getPointerType(Type::getFloatType())}), "getfarray");
+        return const_cast<Function *>(&_f);
+    }
+
+    Function *Function::putint() {
+        const static Function _f(FunctionType::getFunctionType(
+                Type::getVoidType(), {Type::getI32Type()}), "putint");
+        return const_cast<Function *>(&_f);
+    }
+
+    Function *Function::putch() {
+        const static Function _f(FunctionType::getFunctionType(
+                Type::getVoidType(), {Type::getI32Type()}), "putch");
+        return const_cast<Function *>(&_f);
+    }
+
+    Function *Function::putfloat() {
+        const static Function _f(FunctionType::getFunctionType(
+                Type::getVoidType(), {Type::getFloatType()}), "putfloat");
+        return const_cast<Function *>(&_f);
+    }
+
+    Function *Function::putarray() {
+        const static Function _f(FunctionType::getFunctionType(
+                Type::getVoidType(), {Type::getI32Type(), Type::getPointerType(Type::getI32Type())}), "putarray");
+        return const_cast<Function *>(&_f);
+    }
+
+    Function *Function::putfarray() {
+        const static Function _f(FunctionType::getFunctionType(
+                Type::getVoidType(), {Type::getI32Type(), Type::getPointerType(Type::getFloatType())}), "putfarray");
+        return const_cast<Function *>(&_f);
+    }
+
+    Function *Function::starttime() {
+        const static Function _f(FunctionType::getFunctionType(
+                Type::getVoidType(), {}), "starttime");
+        return const_cast<Function *>(&_f);
+    }
+
+    Function *Function::stoptime() {
+        const static Function _f(FunctionType::getFunctionType(
+                Type::getVoidType(), {}), "stoptime");
+        return const_cast<Function *>(&_f);
+    }
 }
 
 namespace mir {
@@ -155,7 +200,7 @@ namespace mir {
 
     GlobalVar::~GlobalVar() {
         // IntegerLiteral is owned by pool.
-        if (getType()->isIntegerTy()) return;
+        if (getType()->isNumberTy()) return;
         delete init;
     }
 
@@ -240,6 +285,7 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, const Function &func) {
+        assert(!func.isLibrary());
         func.allocName();
         func.calcPreSuc();
         os << "define dso_local " << func.retType << " " << func.getName() << "(";

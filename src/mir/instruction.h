@@ -16,6 +16,13 @@ namespace mir {
 
         explicit ret(Value *value) : Instruction(Type::getVoidType(), RET, value) {}
 
+        static ret *default_t(pType ty) {
+            if (ty->isVoidTy()) return new ret();
+            if (ty->isFloatTy()) return new ret(getFloatLiteral(0));
+            if (ty->isIntegerTy()) return new ret(getIntegerLiteral(0));
+            throw std::runtime_error("unknown type for ret");
+        }
+
         [[nodiscard]] Value *getReturnValue() const {
             return getNumOperands() == 0 ? nullptr : getOperand(0);
         }
@@ -72,6 +79,8 @@ namespace mir {
 
     template<Instruction::InstrTy ty>
     struct Instruction::_binary_instruction : Instruction {
+        static_assert(ty >= ADD && ty <= XOR);
+
         explicit _binary_instruction(Value *lhs, Value *rhs) : Instruction(lhs->getType(), ty, lhs, rhs) {
             assert(lhs->getType() == rhs->getType());
         }
@@ -89,6 +98,11 @@ namespace mir {
                 if constexpr (ty == SDIV) return (int) lhs / (int) rhs;
                 if constexpr (ty == UREM) return lhs % rhs;
                 if constexpr (ty == SREM) return (int) lhs % (int) rhs;
+                if constexpr (ty == FADD) return lhs + rhs;
+                if constexpr (ty == FSUB) return lhs - rhs;
+                if constexpr (ty == FMUL) return lhs * rhs;
+                if constexpr (ty == FDIV) return lhs / rhs;
+                if constexpr (ty == FREM) return lhs % rhs;
                 if constexpr (ty == SHL) return lhs << rhs;
                 if constexpr (ty == LSHR) return lhs >> rhs;
                 if constexpr (ty == ASHR) return (int) lhs >> (int) rhs;
@@ -118,6 +132,20 @@ namespace mir {
         std::ostream &output(std::ostream &os) const override {
             return os << getName() << " = " << ty << " " << getLhs() << ", " << getRhs()->getName();
         }
+    };
+
+    struct Instruction::fneg : Instruction {
+        explicit fneg(Value *value) : Instruction(value->getType(), FNEG, value) {
+            assert(value->getType()->isFloatTy());
+        }
+
+        [[nodiscard]] auto getOperand() const { return Instruction::getOperand(0); }
+
+        [[nodiscard]] Instruction *clone() const override { return new fneg(*this); }
+
+        void interpret(Interpreter &interpreter) const override { /*todo...*/ }
+
+        std::ostream &output(std::ostream &os) const override;
     };
 
     struct Instruction::alloca_ : Instruction {
@@ -201,6 +229,8 @@ namespace mir {
 
     template<Instruction::InstrTy ty>
     struct Instruction::_conversion_instruction : Instruction {
+        static_assert(ty >= TRUNC && ty <= SITOFP);
+
         explicit _conversion_instruction(pType type, Value *value) : Instruction(type, ty, value) {}
 
         [[nodiscard]] Value *getValueOperand() const { return getOperand(0); }
@@ -220,6 +250,10 @@ namespace mir {
         enum Cond {
             EQ, NE, UGT, UGE, ULT, ULE, SGT, SGE, SLT, SLE
         } cond;
+
+        inline friend std::ostream &operator<<(std::ostream &os, Instruction::icmp::Cond c) {
+            return os << magic_enum::enum_to_string_lower(c);
+        }
 
         explicit icmp(Cond cond, Value *lhs, Value *rhs) :
             Instruction(Type::getI1Type(), ICMP, lhs, rhs), cond(cond) {
@@ -255,9 +289,34 @@ namespace mir {
         std::ostream &output(std::ostream &os) const override;
     };
 
-    inline std::ostream &operator<<(std::ostream &os, Instruction::icmp::Cond cond) {
-        return os << magic_enum::enum_to_string_lower(cond);
-    }
+    struct Instruction::fcmp : Instruction {
+        enum Cond {
+            FALSE,
+            OEQ, OGT, OGE, OLT, OLE, ONE, ORD,
+            UEQ, UGT, UGE, ULT, ULE, UNE, UNO,
+            TRUE,
+        } cond;
+
+        inline friend std::ostream &operator<<(std::ostream &os, Instruction::fcmp::Cond c) {
+            return os << magic_enum::enum_to_string_lower(c);
+        }
+
+        explicit fcmp(Cond cond, Value *lhs, Value *rhs) :
+                Instruction(Type::getI1Type(), FCMP, lhs, rhs), cond(cond) {
+            assert(lhs->getType() == rhs->getType());
+            assert(lhs->getType()->isFloatTy());
+        }
+
+        [[nodiscard]] Value *getLhs() const { return getOperand(0); }
+
+        [[nodiscard]] Value *getRhs() const { return getOperand(1); }
+
+        [[nodiscard]] Instruction *clone() const override { return new fcmp(*this); }
+
+        void interpret(Interpreter &interpreter) const override { /*todo!*/ }
+
+        std::ostream &output(std::ostream &os) const override;
+    };
 
     struct Instruction::phi : Instruction {
         using incominng_pair = std::pair<Value *, BasicBlock *>;

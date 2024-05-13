@@ -8,6 +8,8 @@
 #include <set>
 #include <list>
 #include <memory>
+#include <variant>
+#include <iomanip>
 #include <algorithm>
 #include <unordered_set>
 #include "value.h"
@@ -30,6 +32,7 @@ namespace mir {
     using bb_pos_t = std::list<BasicBlock *>::const_iterator;
 
     struct Interpreter {
+        //todo!! float support
         int retValue{};
         const BasicBlock *lastBB{};
         const BasicBlock *currentBB{};
@@ -129,23 +132,28 @@ namespace mir {
         std::vector<Argument *> args; // owns
         std::list<BasicBlock *> bbs; // owns
         BasicBlock *exitBB = new BasicBlock(this);
-        static Function getint;
-        static Function getch;
-        static Function getfloat;
-        static Function getarray;
-        static Function getfarray;
-        static Function putint;
-        static Function putch;
-        static Function putfloat;
-        static Function putarray;
-        static Function putfarray;
-        static Function starttime;
-        static Function stoptime;
-        inline static std::array<Function *, 12> libraryFunctions = {
-                &getint, &getch, &getfloat, &getarray, &getfarray,
-                &putint, &putch, &putfloat, &putarray, &putfarray,
-                &starttime, &stoptime,
-        };
+
+        static Function *getint();
+        static Function *getch();
+        static Function *getfloat();
+        static Function *getarray();
+        static Function *getfarray();
+        static Function *putint();
+        static Function *putch();
+        static Function *putfloat();
+        static Function *putarray();
+        static Function *putfarray();
+        static Function *starttime();
+        static Function *stoptime();
+
+        static const auto &getLibrary() {
+            const static std::array<Function *, 12> funcs = {
+                getint(), getch(), getfloat(), getarray(), getfarray(),
+                putint(), putch(), putfloat(), putarray(), putfarray(),
+                starttime(), stoptime(),
+            };
+            return funcs;
+        }
 
         explicit Function(pType type, const std::string &name) : Value(type), retType(type->getFunctionRet()) {
             setName("@" + name);
@@ -198,8 +206,7 @@ namespace mir {
         [[nodiscard]] bool isLeaf() const;
 
         [[nodiscard]] bool isLibrary() const {
-            return std::find(libraryFunctions.cbegin(), libraryFunctions.cend(), this)
-                   != libraryFunctions.cend();
+            return std::find(getLibrary().cbegin(), getLibrary().cend(), this) != getLibrary().cend();
         }
 
         [[nodiscard]] bool isRecursive() const;
@@ -250,14 +257,17 @@ namespace mir {
             RET, BR,
             // Binary Operations
             ADD, SUB, MUL, UDIV, SDIV, UREM, SREM,
+            FADD, FSUB, FMUL, FDIV, FREM,
             // Bitwise Binary Operations
             SHL, LSHR, ASHR, AND, OR, XOR,
+            // Unary Operators
+            FNEG,
             // Memory Access and Addressing Operations
             ALLOCA, LOAD, STORE, GETELEMENTPTR,
             // Conversion Operations
-            TRUNC, ZEXT, SEXT,
+            TRUNC, ZEXT, SEXT, FPTOUI, FPTOSI, UITOFP, SITOFP,
             // Other Operations
-            ICMP, PHI, SELECT, CALL
+            ICMP, FCMP, PHI, SELECT, CALL
         } instrTy;
 
         BasicBlock *parent = nullptr;
@@ -305,12 +315,18 @@ namespace mir {
         using sdiv = _binary_instruction<SDIV>;
         using urem = _binary_instruction<UREM>;
         using srem = _binary_instruction<SREM>;
+        using fadd = _binary_instruction<FADD>;
+        using fsub = _binary_instruction<FSUB>;
+        using fmul = _binary_instruction<FMUL>;
+        using fdiv = _binary_instruction<FDIV>;
+        using frem = _binary_instruction<FREM>;
         using shl = _binary_instruction<SHL>;
         using lshr = _binary_instruction<LSHR>;
         using ashr = _binary_instruction<ASHR>;
         using and_ = _binary_instruction<AND>;
         using or_ = _binary_instruction<OR>;
         using xor_ = _binary_instruction<XOR>;
+        struct fneg;
         struct alloca_;
         struct load;
         struct store;
@@ -318,11 +334,20 @@ namespace mir {
         using trunc = _conversion_instruction<TRUNC>;
         using zext = _conversion_instruction<ZEXT>;
         using sext = _conversion_instruction<SEXT>;
+        using fptoui = _conversion_instruction<FPTOUI>;
+        using fptosi = _conversion_instruction<FPTOSI>;
+        using uitofp = _conversion_instruction<UITOFP>;
+        using sitofp = _conversion_instruction<SITOFP>;
         struct icmp;
+        struct fcmp;
         struct phi;
         struct select;
         struct call;
     };
+
+    typedef struct CalculateType {
+        std::variant<int, float> value;
+    } calculate_t;
 
     /**
      * Literal is a constant value. <br>
@@ -334,9 +359,9 @@ namespace mir {
             setName(std::move(name));
         }
 
-        using calculate_t = std::variant<int, float>;
-
-        [[nodiscard]] inline virtual calculate_t getValue() const { throw; }
+        [[nodiscard]] inline virtual calculate_t getValue() const {
+            throw std::runtime_error("Cannot get " + getName() + "'s value");
+        }
     };
 
     struct BooleanLiteral : Literal {
@@ -344,7 +369,7 @@ namespace mir {
         static BooleanLiteral *trueLiteral;
         static BooleanLiteral *falseLiteral;
 
-        [[nodiscard]] inline calculate_t getValue() const override { return value; }
+        [[nodiscard]] inline calculate_t getValue() const override { return {value}; }
 
     private:
         explicit BooleanLiteral(bool value)
@@ -367,7 +392,7 @@ namespace mir {
         explicit IntegerLiteral(unsigned value)
             : IntegerLiteral(static_cast<int>(value)) {}
 
-        [[nodiscard]] inline calculate_t getValue() const override { return value; }
+        [[nodiscard]] inline calculate_t getValue() const override { return {value}; }
     };
 
     IntegerLiteral *getIntegerLiteral(int value);
@@ -386,10 +411,10 @@ namespace mir {
         explicit FloatLiteral(float value)
                 : Literal(Type::getFloatType(), stringify(value)), value(value) {}
 
-        [[nodiscard]] inline calculate_t getValue() const override { return value; }
+        [[nodiscard]] inline calculate_t getValue() const override { return {value}; }
 
         [[nodiscard]] inline static std::string stringify(float v) {
-            double d = static_cast<double>(v);
+            double d = v;
             std::stringstream ss;
             ss << std::scientific << v;
             if (std::stod(ss.str()) == d)
@@ -407,27 +432,46 @@ namespace mir {
         return getFloatLiteral(value);
     }
 
-#define BIN_OP(op) \
+#define BIN_CALC_OP(op) \
+    inline calculate_t operator op (const calculate_t &lhs, const calculate_t &rhs) { \
+        return std::visit([](auto v1, auto v2) -> calculate_t { \
+            return {v1 op v2}; \
+        }, lhs.value, rhs.value); \
+    }
+
+#define BIN_LIT_OP(op) \
     inline Literal *operator op (const Literal &lhs, const Literal &rhs) { \
         return std::visit([](auto v) -> Literal * { \
             return getLiteral(v); \
-        }, std::visit([](auto v1, auto v2) -> Literal::calculate_t { \
-            return v1 op v2; \
-        }, lhs.getValue(), rhs.getValue())); \
+        }, (lhs.getValue() op rhs.getValue()).value); \
     }
+
+#define BIN_OP(op) BIN_CALC_OP(op) BIN_LIT_OP(op)
 
     BIN_OP(+)
     BIN_OP(-)
     BIN_OP(*)
     BIN_OP(/)
+    BIN_OP(>)
+    BIN_OP(>=)
+    BIN_OP(<)
+    BIN_OP(<=)
+    BIN_OP(==)
+    BIN_OP(!=)
 
-    inline Literal *operator%(const Literal &lhs, const Literal &rhs) {
-        return std::visit([](auto v) -> Literal * {
-            return getLiteral(v);
-        }, std::visit([](auto v1, auto v2) -> Literal::calculate_t {
-            return (int) v1 % (int) v2;
-        }, lhs.getValue(), rhs.getValue()));
+    inline calculate_t operator%(const calculate_t &lhs, const calculate_t &rhs) { \
+        return std::visit([](auto v1, auto v2) -> calculate_t {
+            if constexpr (std::is_same_v<decltype(v1), float> || std::is_same_v<decltype(v2), float>) {
+                using namespace std::literals::string_literals;
+                throw std::runtime_error("Cannot apply operator % between "s +
+                                         typeid(v1).name() + " and " + typeid(v2).name());
+            } else {
+                return {v1 % v2};
+            }
+        }, lhs.value, rhs.value);
     }
+
+    BIN_LIT_OP(%)
 
 #undef BIN_OP
 

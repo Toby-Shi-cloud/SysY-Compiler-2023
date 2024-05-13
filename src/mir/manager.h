@@ -13,25 +13,14 @@ namespace mir {
     struct Manager {
         std::vector<Function *> functions;
         std::vector<GlobalVar *> globalVars;
-        std::unordered_map<std::string, GlobalVar *> stringPool;
 
         ~Manager() {
+            return; //todo!
             for (auto function: functions)
                 delete function;
             for (auto globalVar: globalVars)
                 delete globalVar;
             // stringPool is a subset of globalVars
-        }
-
-        GlobalVar *getStringLiteral(const std::string &value) {
-            if (stringPool.find(value) == stringPool.end()) {
-                auto str = new StringLiteral(value);
-                auto var = new GlobalVar(str->getType(), str, true);
-                var->setName("@.str");
-                globalVars.push_back(var);
-                stringPool[value] = var;
-            }
-            return stringPool[value];
         }
 
         void allocName() const {
@@ -63,10 +52,14 @@ namespace mir {
             for (auto globalVar: globalVars)
                 os << globalVar << std::endl;
             os << std::endl;
-            os << "declare dso_local i32 @getint()" << std::endl;
-            os << "declare dso_local void @putint(i32)" << std::endl;
-            os << "declare dso_local void @putch(i32)" << std::endl;
-            os << "declare dso_local void @putstr(ptr)" << std::endl;
+            for (auto func: Function::getLibrary()) {
+                os << "declare dso_local " << func->retType << " " << func->getName() << "(";
+                for (auto i = 0; i < func->getType()->getFunctionParamCount(); i++) {
+                    if (i) os << ", ";
+                    os << func->getType()->getFunctionParam(i);
+                }
+                os << ")" << std::endl;
+            }
             os << std::endl;
             for (auto function: functions)
                 os << function << std::endl;

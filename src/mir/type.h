@@ -74,6 +74,8 @@ namespace mir {
 
         [[nodiscard]] bool isFloatTy() const { return type == FLOAT; }
 
+        [[nodiscard]] bool isNumberTy() const { return isIntegerTy() || isFloatTy(); }
+
         [[nodiscard]] bool isPointerTy() const { return type == POINTER; }
 
         [[nodiscard]] bool isArrayTy() const { return type == ARRAY; }
