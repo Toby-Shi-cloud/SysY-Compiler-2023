@@ -89,7 +89,7 @@ jobs:
         run: |
           chmod +x ${{github.workspace}}/tests/*.sh
           chmod +x ${{github.workspace}}/tests/*.py
-          ctest -C ${{env.BUILD_TYPE}} -L functional --output-on-failure
+          ctest -C ${{env.BUILD_TYPE}} -R Functional-*
 
       - name: Summary
         if: always()
@@ -97,6 +97,6 @@ jobs:
           echo "## Functional Test Summary:" >> $GITHUB_STEP_SUMMARY
           echo "| Test Name | Passed | Failed |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
-          cat ${{github.workspace}}/tests/functional.log >> $GITHUB_STEP_SUMMARY
-          cat ${{github.workspace}}/tests/hidden_functional.log >> $GITHUB_STEP_SUMMARY
+          cat ${{github.workspace}}/tests/functional.log >> $GITHUB_STEP_SUMMARY || true
+          cat ${{github.workspace}}/tests/hidden_functional.log >> $GITHUB_STEP_SUMMARY || true
           echo '' >> $GITHUB_STEP_SUMMARY

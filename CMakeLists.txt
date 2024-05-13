@@ -17,12 +17,12 @@ add_executable(Compiler ${SRC_DIR})
 
 if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     enable_testing()
-    add_test(NAME Function-LLVM
+    add_test(NAME Functional-LLVM
             COMMAND ./auto_test.py llvm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d functional
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../tests)
-    add_test(NAME Function-LLVM-HIDDEN
+    add_test(NAME Functional-LLVM-HIDDEN
             COMMAND ./auto_test.py llvm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d hidden_functional
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../tests)
-    set_tests_properties(Function-LLVM Function-LLVM-HIDDEN
+    set_tests_properties(Functional-LLVM Functional-LLVM-HIDDEN
             PROPERTIES TIMEOUT 600)
 endif ()
