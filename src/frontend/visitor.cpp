@@ -47,9 +47,18 @@ namespace frontend::visitor {
         return new mir::Instruction::fcmp{cond, lhs, rhs};
     }
 
-    auto convert_to(mir::Value *value, mir::pType ty, bool sgn, /*out*/ std::list<mir::Value *> &list) {
-        if (!value->getType()->isNumberTy()) return value;
+    mir::Value *convert_to(mir::Value *value, mir::pType ty, bool sgn, /*out*/ std::list<mir::Value *> &list) {
         if (value->getType() == ty) return value;
+        while (auto arr = dynamic_cast<mir::ArrayValue *>(value))
+            value = arr->values[0];
+        if (!value->getType()->isNumberTy()) return value;
+        if (auto lit = dynamic_cast<mir::Literal *>(value)) {
+            if (ty->isIntegerTy()) {
+                return mir::getIntegerLiteral(std::visit([](auto v) { return (int) v; }, lit->getValue().value));
+            } else {
+                return mir::getFloatLiteral(std::visit([](auto v) { return (float ) v; }, lit->getValue().value));
+            }
+        }
         mir::Value *ret;
         if (value->getType()->isIntegerTy()) {
             if (ty->isIntegerTy()) {
@@ -75,8 +84,13 @@ namespace frontend::visitor {
         return ret;
     }
 
-    auto convert_to_bool(mir::Value *value, bool neg, /*out*/ std::list<mir::Value *> &list) {
-        if (value->getType() == mir::Type::getI1Type()) return value;
+    mir::Value *convert_to_bool(mir::Value *value, bool neg, /*out*/ std::list<mir::Value *> &list) {
+        if (value->getType() == mir::Type::getI1Type()) {
+            if (!neg) return value;
+            auto inst = new mir::Instruction::xor_(value, mir::getBooleanLiteral(true));
+            list.push_back(inst);
+            return inst;
+        }
         mir::Value *cmp;
         if (value->getType()->isIntegerTy()) {
             using icmp = mir::Instruction::icmp;
@@ -186,51 +200,75 @@ namespace frontend::visitor {
         return {indices, list};
     }
 
-    SysYVisitor::value_list
-    SysYVisitor::storeInitValue(value_type var, mir::pType type,
-                                std::vector<value_type>::iterator initVal,
-                                std::vector<value_type> *index) {
+    SysYVisitor::value_list SysYVisitor::storeInitValue(
+            value_type var, mir::pType type, value_type initVal, value_vector *indices) {
         static value_vector _idx = std::vector<value_type>{zero_value};
-        if (index == nullptr && type->isNumberTy()) {
-            auto store = new Instruction::store(*initVal, var);
-            return {store};
-        }
         if (type->isNumberTy()) {
-            assert(index);
-            auto ptr = new Instruction::getelementptr(type, var, *index);
-            auto store = new Instruction::store(*initVal, ptr);
-            return {ptr, store};
+            value_list list{};
+            initVal = convert_to(initVal, type, true, list);
+            if (indices) {
+                var = new Instruction::getelementptr(type, var, *indices);
+                list.push_back(var);
+            }
+            auto store = new Instruction::store(initVal, var);
+            list.push_back(store);
+            return list;
         }
-        index = index ? index : &_idx;
-        auto base = type->getArrayBase();
-        auto ele_size = base->ssize() / 4;
-        value_list ret = {};
+        auto [v, list] = array_cast(dynamic_cast<mir::ArrayValue *>(initVal), type);
+        auto arr = dynamic_cast<mir::ArrayValue *>(v);
+        assert(arr);
+        indices = indices ? indices : &_idx;
         for (int i = 0; i < type->getArraySize(); i++) {
-            auto l = mir::getIntegerLiteral(i);
-            index->push_back(l);
-            auto list = storeInitValue(var, base, initVal + i * ele_size, index);
-            ret.splice(ret.end(), list);
-            index->pop_back();
+            auto lit = mir::getIntegerLiteral(i);
+            indices->push_back(lit);
+            auto _l = storeInitValue(var, type->getArrayBase(), arr->values[i], indices);
+            list.splice(list.end(), _l);
+            indices->pop_back();
         }
-        return ret;
+        return list;
     }
 
-    std::pair<SysYVisitor::value_vector, SysYVisitor::value_list>
-    SysYVisitor::visitInitVal(const GrammarNode &node) {
-        // exp | LBRACE initVal (COMMA initVal)* RBRACE
-        if (node.children.size() == 1) {
-            auto [value, list] = visit(*node.children[0]);
-            return {{value}, list};
+    template<typename ArrTy, typename ValTy>
+    SysYVisitor::return_type SysYVisitor::array_cast(ArrTy *arr, mir::pType ty) {
+        std::vector<ValTy> new_values{};
+        new_values.reserve(ty->getArraySize());
+        auto base = ty->getBaseRecursively();
+        auto base_ele_cnt = ty->getArrayBase()->size() / base->size();
+        value_list list{};
+        if (!ty->getArrayBase()->isArrayTy()) {
+            for (auto val: arr->values) {
+                new_values.push_back(dynamic_cast<ValTy>(convert_to(val, base, true, list)));
+            }
+            auto zero = convert_to(mir::getLiteral(0), base, true, list);
+            new_values.resize(ty->getArraySize(), dynamic_cast<ValTy>(zero));
+            return {new ArrTy(std::move(new_values)), list};
         }
-        value_vector values;
-        value_list lists;
-        for (auto &child: node.children) {
-            if (child->type == Terminal) continue;
-            auto [value, list] = visitInitVal(*child);
-            values.insert(values.end(), value.begin(), value.end());
-            lists.splice(lists.end(), list);
+
+        bool single = false;
+        std::vector<ValTy> slide = {};
+        for (auto val: arr->values) {
+            if (!val->getType()->isArrayTy()) single = true;
+            if (single) {
+                slide.push_back(dynamic_cast<ValTy>(convert_to(val, base, true, list)));
+                if (slide.size() == base_ele_cnt) {
+                    new_values.push_back(new ArrTy(std::move(slide)));
+                    slide = {};
+                }
+            } else {
+                new_values.push_back(val);
+            }
         }
-        return {values, lists};
+        if (!slide.empty()) new_values.push_back(new ArrTy(std::move(slide)));
+        while (new_values.size() != ty->getArraySize())
+            new_values.push_back(new ArrTy({}));
+        new_values.resize(ty->getArraySize());
+
+        for (auto &val: new_values) {
+            auto [v, l] = array_cast(dynamic_cast<ArrTy *>(val), ty->getArrayBase());
+            val = dynamic_cast<ValTy>(v);
+            list.splice(list.end(), l);
+        }
+        return {new ArrTy(std::move(new_values)), list};
     }
 
     void SysYVisitor::listToBB(value_list &list, const Token &end_token) const {
@@ -313,6 +351,16 @@ namespace frontend::visitor {
         auto [value, list] = visit(*node.children.back());
         auto literal = dynamic_cast<mir::Literal *>(value);
         assert(literal && list.empty());
+        if (type->isNumberTy()) {
+            value_list _l{};
+            auto _r = convert_to(literal, type, true, _l);
+            literal = dynamic_cast<mir::Literal *>(_r);
+            assert(literal && _l.empty());
+        } else {
+            auto [_r, _l] = array_cast(dynamic_cast<mir::ArrayLiteral *>(literal), type);
+            literal = dynamic_cast<mir::Literal *>(_r);
+            assert(literal && _l.empty());
+        }
         // always global
         mir::GlobalVar *variable;
         if (current_function) {
@@ -358,9 +406,9 @@ namespace frontend::visitor {
                 message_queue.push_back(*msg);
             }
             if (initVal == nullptr) return {nullptr, {alloca_}};
-            auto [vec, list] = visitInitVal(*initVal);
+            auto [val, list] = visit(*initVal);
             list.push_back(alloca_);
-            list.splice(list.end(), storeInitValue(alloca_, type, vec.begin()));
+            list.splice(list.end(), storeInitValue(alloca_, type, val));
             return {nullptr, list};
         }
         mir::Literal *literal;
@@ -377,6 +425,21 @@ namespace frontend::visitor {
             message_queue.push_back(*msg);
         }
         return {};
+    }
+
+    template<>
+    SysYVisitor::return_type SysYVisitor::visit<InitVal>(const GrammarNode &node) {
+        // exp | LBRACE initVal (COMMA initVal)* RBRACE
+        if (node.children.size() == 1) return visit(*node.children.front());
+        value_vector values{};
+        value_list list{};
+        for (auto &child: node.children) {
+            if (child->type == Terminal) continue;
+            auto [v, l] = visit<InitVal>(*child);
+            list.splice(list.end(), l);
+            values.push_back(v);
+        }
+        return {new mir::ArrayValue(std::move(values)), {}};
     }
 
     template<>
@@ -554,7 +617,7 @@ namespace frontend::visitor {
             });
             return {nullptr, list};
         }
-        auto store = new Instruction::store(value, variable);
+        auto store = new Instruction::store(convert_to(value, variable->getType(), true, list), variable);
         list.push_back(store);
         return {store, list};
     }

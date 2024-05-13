@@ -143,10 +143,13 @@ namespace frontend::visitor {
          * A visitor helper for store init value to a variable. <br>
          */
         value_list storeInitValue(value_type var, mir::pType type,
-                                  std::vector<value_type>::iterator initVal,
-                                  std::vector<value_type> *index = nullptr);
+                                  value_type initVal, value_vector *indices = nullptr);
 
-        std::pair<value_vector, value_list> visitInitVal(const GrammarNode &node);
+        /**
+         * cast ArrayLiteral or ArrayValue to standard format
+         */
+        template<typename ArrTy, typename ValTy = std::decay_t<decltype(std::declval<ArrTy>().values.front())>>
+        SysYVisitor::return_type array_cast(ArrTy *arr, mir::pType ty);
 
         /**
          * A helper method to convert a list of values to bbs, and add to current function.

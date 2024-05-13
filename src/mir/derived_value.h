@@ -474,6 +474,8 @@ namespace mir {
     BIN_LIT_OP(%)
 
 #undef BIN_OP
+#undef BIN_CALC_OP
+#undef BIN_LIT_OP
 
     struct StringLiteral : Literal {
         const std::string value;
@@ -486,7 +488,7 @@ namespace mir {
 
         explicit ArrayLiteral(std::vector<Literal *> values);
 
-        ~ArrayLiteral() override;
+        [[nodiscard]] inline calculate_t getValue() const override {return values[0]->getValue(); }
     };
 
     std::ostream &operator<<(std::ostream &os, const BasicBlock &bb);
@@ -508,6 +510,12 @@ namespace mir {
             return lit->value;
         return map.at(value);
     }
+
+    struct ArrayValue : Value {
+        const std::vector<Value *> values;
+
+        explicit ArrayValue(std::vector<Value *> values);
+    };
 }
 
 #ifdef DBG_ENABLE

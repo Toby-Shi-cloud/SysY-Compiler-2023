@@ -258,13 +258,6 @@ namespace mir {
         setName(std::move(s));
     }
 
-    ArrayLiteral::~ArrayLiteral() {
-        // IntegerLiteral is owned by pool.
-        if (getType()->getArrayBase()->isIntegerTy()) return;
-        for (auto value: values)
-            delete value;
-    }
-
     std::ostream &operator<<(std::ostream &os, const BasicBlock &bb) {
         if (bb.parent->bbs.front() != &bb) {
             os << bb.getName().substr(1) << ":";
@@ -323,4 +316,8 @@ namespace mir {
     std::ostream &operator<<(std::ostream &os, Instruction::InstrTy ty) {
         return os << magic_enum::enum_to_string_lower(ty);
     }
+
+    ArrayValue::ArrayValue(std::vector<Value *> values)
+        : Value(ArrayType::getArrayType(values.size(), values[0]->getType())),
+          values(std::move(values)) {}
 }
