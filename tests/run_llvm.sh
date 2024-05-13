@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-./Compiler "$1" -no-S -emit-llvm "$2" \
+./Compiler "$1" -no-S -emit-llvm "$2" $5 \
 && llvm-link -o "$2".bc "$2" libsysy/libsysy.ll
 if [[ $? -ne 0 ]]; then
     exit 1

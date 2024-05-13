@@ -6,6 +6,7 @@ from threading import Thread
 run_sh = ''
 correct_list = []
 wrong_list = []
+opt_level = 2
 
 
 def usage():
@@ -16,11 +17,12 @@ def usage():
 def run_test(test_file, input_file, output_file):
     obj_file = test_file + '.o'
     ans_file = test_file + '.ans'
-    ret = os.system(f'{run_sh} {test_file} {obj_file} {input_file} {ans_file} && diff {output_file} {ans_file}')
+    ret = os.system(f'{run_sh} {test_file} {obj_file} {input_file} {ans_file} -O{opt_level} && diff {output_file} {ans_file}')
+    uid = os.path.basename(test_file)[:2]
     if ret == 0:
-        correct_list.append(test_file)
+        correct_list.append(uid)
     else:
-        wrong_list.append(test_file)
+        wrong_list.append(uid)
 
 
 def run_suit(test_dir):
@@ -38,8 +40,7 @@ def run_suit(test_dir):
     for t in thd:
         t.join()
     with open(f"{test_dir}.log", 'w') as f:
-        print(f"| {test_dir} | {len(correct_list)} | {len(wrong_list)} |", file=f)
-        print(f"{test_dir} failed on: {wrong_list}", file=f)
+        print(f"| {test_dir} | {len(correct_list)} | {len(wrong_list)} | {','.join(wrong_list[:5])} |", file=f)
     if len(wrong_list) != 0:
         exit(1)
 
@@ -49,7 +50,7 @@ if len(sys.argv) < 2:
 
 if __name__ == '__main__':
     try:
-        opts = getopt.getopt(sys.argv[2:], "s:d:")
+        opts = getopt.getopt(sys.argv[2:], "s:d:O:")
     except getopt.GetoptError as e:
         print("Error:", e)
         usage()
@@ -66,6 +67,8 @@ if __name__ == '__main__':
             path_to_compiler = arg
         elif opt == '-d':
             test_suit.append(arg)
+        elif opt == '-O':
+            opt_level = int(arg)
 
     if path_to_compiler != '':
         os.system('rm -f ./Compiler')
