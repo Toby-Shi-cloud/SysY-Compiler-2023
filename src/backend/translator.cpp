@@ -504,6 +504,8 @@ namespace backend {
                 return translateSelectInst(dynamic_cast<const mir::Instruction::select *>(mirInst));
             case mir::Instruction::CALL:
                 return translateCallInst(dynamic_cast<const mir::Instruction::call *>(mirInst));
+            default:
+                throw std::runtime_error("not implement!");
         }
     }
 
