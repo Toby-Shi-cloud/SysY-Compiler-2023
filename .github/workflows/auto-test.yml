@@ -1,0 +1,102 @@
+# This starter workflow is for a CMake project running on a single platform. There is a different starter workflow if you need cross-platform coverage.
+# See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-multi-platform.yml
+name: Auto Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Release
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Cache CMake
+        id: cache-cmake
+        uses: actions/cache@v3
+        with:
+          path: ${{github.workspace}}/build
+          key: ${{ runner.os }}-cmake-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-cmake-
+
+      - name: Install LLVM and Clang
+        if: steps.cache-cmake.outputs.cache-hit != 'true'
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: "10.0"
+
+      - name: CMake Build
+        if: steps.cache-cmake.outputs.cache-hit != 'true'
+        run: |
+          cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+                -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++
+          cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+  functional-test:
+    needs: compile
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          sparse-checkout: |
+            tests
+
+      - name: Restore Build Cache
+        id: cache-cmake
+        uses: actions/cache@v3
+        with:
+          path: ${{github.workspace}}/build
+          key: ${{ runner.os }}-cmake-${{ github.sha }}
+  
+      - name: If Cache Missed
+        if: steps.cache-cmake.outputs.cache-hit != 'true'
+        run: exit 1
+
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: "16.0"
+
+      - name: Cache Test Data
+        id: cache-testdata
+        uses: actions/cache@v3
+        with:
+          path: ${{github.workspace}}/tests
+          key: testdata-functional
+
+      - name: Download Test Data
+        if: steps.cache-testdata.outputs.cache-hit != 'true'
+        working-directory: ${{github.workspace}}/tests
+        run: |
+          wget https://github.com/Tobisc-V/sysy-testdata/releases/download/Compiler2022/functional.tar.gz
+          tar -xzf functional.tar.gz
+          wget https://github.com/Tobisc-V/sysy-testdata/releases/download/Compiler2022/hidden_functional.tar.gz
+          tar -xzf hidden_functional.tar.gz
+
+      - name: Test
+        working-directory: ${{github.workspace}}/build
+        run: |
+          chmod +x ${{github.workspace}}/tests/*.sh
+          chmod +x ${{github.workspace}}/tests/*.py
+          ctest -C ${{env.BUILD_TYPE}} -L functional --output-on-failure
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Functional Test Summary:" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Name | Passed | Failed |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+          cat ${{github.workspace}}/tests/functional.log >> $GITHUB_STEP_SUMMARY
+          cat ${{github.workspace}}/tests/hidden_functional.log >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY

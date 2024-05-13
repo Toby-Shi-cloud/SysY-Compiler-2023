@@ -1,3 +1,7 @@
+# testfile
+/*
+!/libsysy
+
 # LLVM IR
 *.ll
 *.bc

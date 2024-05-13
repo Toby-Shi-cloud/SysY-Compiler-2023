@@ -17,26 +17,12 @@ add_executable(Compiler ${SRC_DIR})
 
 if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     enable_testing()
-    add_test(NAME LLVM-IR-Test-1
-            COMMAND ./auto_test.py llvm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d C1 -d B1 -d A1
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(NAME LLVM-IR-Test-2
-            COMMAND ./auto_test.py llvm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d C2 -d B2 -d A2
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(NAME LLVM-IR-Test-3
-            COMMAND ./auto_test.py llvm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d D1 -d D2
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(NAME MIPS-Test-1
-            COMMAND ./auto_test.py mips -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d C1 -d B1 -d A1
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(NAME MIPS-Test-2
-            COMMAND ./auto_test.py mips -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d C2 -d B2 -d A2
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(NAME MIPS-Test-3
-            COMMAND ./auto_test.py mips -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d D1 -d D2
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    set_tests_properties(LLVM-IR-Test-1 LLVM-IR-Test-2 LLVM-IR-Test-3
-            PROPERTIES TIMEOUT 60)
-    set_tests_properties(MIPS-Test-1 MIPS-Test-2 MIPS-Test-3
-            PROPERTIES TIMEOUT 120)
+    add_test(NAME Function-LLVM
+            COMMAND ./auto_test.py llvm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d functional
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../tests)
+    add_test(NAME Function-LLVM-HIDDEN
+            COMMAND ./auto_test.py llvm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d hidden_functional
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../tests)
+    set_tests_properties(Function-LLVM Function-LLVM-HIDDEN
+            PROPERTIES TIMEOUT 600)
 endif ()

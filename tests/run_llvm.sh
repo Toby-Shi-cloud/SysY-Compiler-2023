@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 
-./Compiler testfile.txt -no-S -emit-llvm testfile.ll \
-&& llvm-link -o testfile.sylib.bc testfile.ll libsysy/libsysy.ll \
-&& lli testfile.sylib.bc < input.txt > testfile.out \
-&& rm -f testfile.sylib.bc
+./Compiler "$1" -no-S -emit-llvm "$2" \
+&& llvm-link -o "$2".bc "$2" libsysy/libsysy.ll
+if [[ $? -ne 0 ]]; then
+    exit 1
+fi
+
+lli "$2".bc < "$3" > "$4"
+echo $? >> "$4"
+
+rm -f "$2".bc

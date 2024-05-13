@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
 import os, sys, getopt
+from threading import Thread
 
 run_sh = ''
+correct_list = []
+wrong_list = []
 
 
 def usage():
@@ -11,39 +14,33 @@ def usage():
 
 
 def run_test(test_file, input_file, output_file):
-    os.system('cp {} ./testfile.txt'.format(test_file))
-    os.system('cp {} ./input.txt'.format(input_file))
-    os.system('cp {} ./output.txt'.format(output_file))
-    ret = os.system(run_sh + ' && diff output.txt testfile.out')
-    if ret != 0:
-        print('Test {} failed'.format(test_file), flush=True)
-        exit(1)
-    print('Test {} passed'.format(test_file), flush=True)
-
-
-def run_test_e(test_file, error_file):
-    os.system('cp {} ./testfile.txt'.format(test_file))
-    os.system('cp {} ./stderr.txt'.format(error_file))
-    ret = os.system('./Compiler && diff stderr.txt error.txt')
-    if ret != 0:
-        print('Test {} failed'.format(test_file), flush=True)
-        exit(1)
-    print('Test {} passed'.format(test_file), flush=True)
+    obj_file = test_file + '.o'
+    ans_file = test_file + '.ans'
+    ret = os.system(f'{run_sh} {test_file} {obj_file} {input_file} {ans_file} && diff {output_file} {ans_file}')
+    if ret == 0:
+        correct_list.append(test_file)
+    else:
+        wrong_list.append(test_file)
 
 
 def run_suit(test_dir):
-    print('====={}====='.format(test_dir), flush=True)
-    for test_id in range(1, 31):
-        test_file = os.path.join(test_dir, 'testfile' + str(test_id) + '.txt')
-        input_file = os.path.join(test_dir, 'input' + str(test_id) + '.txt')
-        output_file = os.path.join(test_dir, 'output' + str(test_id) + '.txt')
-        error_file = os.path.join(test_dir, 'error' + str(test_id) + '.txt')
-        if not os.path.isfile(test_file):
-            continue
-        if os.path.isfile(error_file):
-            run_test_e(test_file, error_file)
-        else:
-            run_test(test_file, input_file, output_file)
+    thd = []
+    for file in os.listdir(test_dir):
+        if file.endswith('.sy') and not file.startswith('.'):
+            test_file = os.path.join(test_dir, file)
+            input_file = os.path.join(test_dir, file[:-3] + '.in')
+            if not os.path.exists(input_file):
+                input_file = "/dev/null"
+            output_file = os.path.join(test_dir, file[:-3] + '.out')
+            t = Thread(target=run_test, args=(test_file, input_file, output_file))
+            thd.append(t)
+            t.start()
+    for t in thd:
+        t.join()
+    with open(f"{test_dir}.log", 'w') as f:
+        print(f"| {test_dir} | {len(correct_list)} | {len(wrong_list)} |", file=f)
+    if len(wrong_list) != 0:
+        exit(1)
 
 
 if len(sys.argv) < 2:
@@ -73,7 +70,7 @@ if __name__ == '__main__':
         os.system('rm -f ./Compiler')
         os.system('ln -s {} ./Compiler'.format(path_to_compiler))
     if not test_suit:
-        test_suit = ['A1', 'B1', 'C1', 'D1', 'A2', 'B2', 'C2', 'D2']
+        usage()
 
     os.system('clang -emit-llvm -c libsysy/libsysy.c -S -o libsysy/libsysy.ll')
     for suit in test_suit:
