@@ -89,7 +89,7 @@ jobs:
         run: |
           chmod +x ${{github.workspace}}/tests/*.sh
           chmod +x ${{github.workspace}}/tests/*.py
-          ctest -C ${{env.BUILD_TYPE}} -R Functional-LLVM-O0-* --output-on-failure
+          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-LLVM-O0-*
 
       - name: Summary
         if: always()

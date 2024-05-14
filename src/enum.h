@@ -12,6 +12,8 @@ namespace magic_enum {
     using std::underlying_type_t;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wenum-constexpr-conversion"
 namespace magic_enum::detail {
     template<size_t N>
     struct static_string {
@@ -98,6 +100,7 @@ namespace magic_enum::detail {
 
 #undef STATIC_STRING
 }
+#pragma GCC diagnostic pop
 
 namespace magic_enum {
     template<typename Enum>

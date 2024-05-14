@@ -4,16 +4,17 @@ import os, sys, getopt
 import subprocess
 import multiprocessing
 
-run_sh = ''
-
 
 def usage():
     print('Usage: ./auto_test.py <llvm/mips> [-s path_to_compiler] {-d test_suit}')
     exit(-1)
 
 
-def run_test(args) -> (int, str):
-    (test_file, input_file, output_file, opt_level) = args
+def test_runner(args):
+    return run_test(*args[0], *args[1])
+
+
+def run_test(run_sh, opt_level, test_file, input_file, output_file) -> (int, str):
     obj_file = test_file + '.o'
     ans_file = test_file + '.ans'
     err_file = test_file + '.err'
@@ -32,7 +33,7 @@ def run_test(args) -> (int, str):
     return True, t
 
 
-def run_suit(test_dir, opt_level):
+def run_suit(test_dir, run_sh, opt_level):
     tasks = []
     for file in os.listdir(test_dir):
         if file.endswith('.sy') and not file.startswith('.'):
@@ -41,9 +42,9 @@ def run_suit(test_dir, opt_level):
             if not os.path.exists(input_file):
                 input_file = "/dev/null"
             output_file = os.path.join(test_dir, file[:-3] + '.out')
-            tasks.append((test_file, input_file, output_file, opt_level, ))
+            tasks.append((test_file, input_file, output_file, ))
     pool = multiprocessing.Pool()
-    results = pool.map(run_test, tasks)
+    results = pool.map(test_runner, map(lambda t: ((run_sh, opt_level), t), tasks))
     pool.close()
     pool.join()
     passed = sum(map(lambda res: 1 if res[0] else 0, results))
@@ -51,12 +52,16 @@ def run_suit(test_dir, opt_level):
         print(f"| {test_dir} | {passed} | {len(results) - passed} |", file=f)
     if len(results) - passed == 0:
         return
-    for idx, res in enumerate(results):
+    results = map(lambda x: (os.path.basename(x[1][0])[:2], x[0]), zip(results, tasks))
+    results = sorted(results, key=lambda x: x[0])
+    for idx, res in results:
         if res[0]: continue
         print('**********')
         msg = [f"Failed on {idx}"] + res[1].split('\n')
         print('\n\t'.join(msg))
         print()
+    print('**********')
+    print(f"Passed: {passed} / {len(results)}")
     exit(1)
 
 
@@ -73,7 +78,6 @@ def main():
         print("Error: invalid test type:", sys.argv[1])
         usage()
 
-    global run_sh
     run_sh = f"./run_{sys.argv[1]}.sh"
     path_to_compiler = ''
     test_suit = []
@@ -94,7 +98,7 @@ def main():
 
     os.system('clang -emit-llvm -c libsysy/libsysy.c -S -o libsysy/libsysy.ll')
     for suit in test_suit:
-        run_suit(suit, opt_level)
+        run_suit(suit, run_sh, opt_level)
 
 
 if __name__ == '__main__':

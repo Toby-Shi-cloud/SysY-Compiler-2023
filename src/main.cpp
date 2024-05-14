@@ -12,10 +12,9 @@ mir::Manager mir_manager;
 mips::Module mips_module;
 
 bool no_mips = false;
-const char *source_file = "testfile.txt";
-const char *llvm_ir_file = "llvm_ir.txt";
-const char *mips_file = "mips.txt";
-const char *error_file = "error.txt";
+const char *source_file = "testfile.sy";
+const char *llvm_ir_file = "testfile.ll";
+const char *mips_file = "testfile.asm";
 
 int main(int argc, char **argv) {
     set_optimize_level(2); // as default
@@ -33,7 +32,6 @@ int main(int argc, char **argv) {
     std::ifstream fin(source_file);
     std::ofstream fir(llvm_ir_file);
     std::ofstream fmips(mips_file);
-    std::ofstream ferr(error_file);
 
     std::string src, s;
     while (std::getline(fin, s)) {
@@ -49,7 +47,6 @@ int main(int argc, char **argv) {
     sort_by_line(message_queue);
     for (auto &message: message_queue) {
         std::cout << message << std::endl;
-        ferr << message.line << " " << (char)message.code << std::endl;
     }
     if (!message_queue.empty()) return 0;
 

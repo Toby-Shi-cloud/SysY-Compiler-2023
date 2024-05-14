@@ -10,6 +10,7 @@
 #include <memory>
 #include <variant>
 #include <iomanip>
+#include <sstream>
 #include <algorithm>
 #include <unordered_set>
 #include "value.h"
@@ -490,6 +491,19 @@ namespace mir {
 
         [[nodiscard]] inline calculate_t getValue() const override {return values[0]->getValue(); }
     };
+
+    struct ZeroInitializer : Literal {
+        explicit ZeroInitializer(pType type) : Literal(type, "zeroinitializer") {}
+
+        [[nodiscard]] inline calculate_t getValue() const override { return {0}; }
+    };
+
+    inline Literal *getZero(pType type) {
+        if (type->isIntegerTy()) return getIntegerLiteral(0);
+        if (type->isFloatTy()) return getFloatLiteral(0);
+        assert(type->isArrayTy());
+        return new ZeroInitializer(type);
+    }
 
     std::ostream &operator<<(std::ostream &os, const BasicBlock &bb);
 

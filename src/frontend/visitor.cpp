@@ -218,6 +218,10 @@ namespace frontend::visitor {
             return list;
         }
         auto [v, list] = array_cast(dynamic_cast<mir::ArrayValue *>(initVal), type);
+        if (auto _ = dynamic_cast<mir::ZeroInitializer *>(v)) {
+            v = new mir::ArrayValue(
+                    std::vector<mir::Value *>(type->getArraySize(), mir::getZero(type->getArrayBase())));
+        }
         auto arr = dynamic_cast<mir::ArrayValue *>(v);
         assert(arr);
         indices = indices ? indices : &_idx;
@@ -233,45 +237,48 @@ namespace frontend::visitor {
 
     template<typename ArrTy, typename ValTy>
     SysYVisitor::return_type SysYVisitor::array_cast(ArrTy *arr, mir::pType ty) {
-        std::vector<ValTy> new_values{};
-        new_values.reserve(ty->getArraySize());
-        auto base = ty->getBaseRecursively();
-        auto base_ele_cnt = ty->getArrayBase()->size() / base->size();
+        using vec_t = std::vector<ValTy>;
+        if (arr == nullptr || arr->values.empty()) {
+            return {mir::getZero(ty), {}};
+        }
         value_list list{};
-        if (!ty->getArrayBase()->isArrayTy()) {
-            for (auto val: arr->values) {
-                new_values.push_back(dynamic_cast<ValTy>(convert_to(val, base, true, list)));
-            }
-            auto zero = convert_to(mir::getLiteral(0), base, true, list);
-            new_values.resize(ty->getArraySize(), dynamic_cast<ValTy>(zero));
-            return {new ArrTy(std::move(new_values)), list};
+        if (!ty->isArrayTy()) {
+            auto val = convert_to(arr, ty, true, list);
+            return {val, list};
         }
 
-        bool single = false;
-        std::vector<ValTy> slide = {};
+        std::vector<mir::pType> tys{ ty };
+        std::vector<int> sizes{ ty->getArraySize() };
+        std::vector<std::unique_ptr<vec_t>> stack{};
+        stack.emplace_back(new vec_t{});
         for (auto val: arr->values) {
-            if (!val->getType()->isArrayTy()) single = true;
-            if (single) {
-                slide.push_back(dynamic_cast<ValTy>(convert_to(val, base, true, list)));
-                if (slide.size() == base_ele_cnt) {
-                    new_values.push_back(new ArrTy(std::move(slide)));
-                    slide = {};
-                }
+            if (val->getType()->isArrayTy()) {
+                auto [v, l] = array_cast(dynamic_cast<ArrTy *>(val), ty->getArrayBase());
+                list.splice(list.end(), l);
+                stack.back()->push_back((ValTy) v);
             } else {
-                new_values.push_back(val);
+                while (tys.back()->getArrayBase()->isArrayTy()) {
+                    tys.push_back(tys.back()->getArrayBase());
+                    sizes.push_back(tys.back()->getArraySize());
+                    stack.emplace_back(new vec_t{});
+                }
+                stack.back()->push_back(val);
+            }
+            while (stack.back()->size() == sizes.back()) {
+                auto v = new ArrTy(*stack.back().release());
+                stack.pop_back(), sizes.pop_back(), tys.pop_back();
+                if (stack.empty()) return {v, list};
+                stack.back()->push_back(v);
             }
         }
-        if (!slide.empty()) new_values.push_back(new ArrTy(std::move(slide)));
-        while (new_values.size() != ty->getArraySize())
-            new_values.push_back(new ArrTy({}));
-        new_values.resize(ty->getArraySize());
-
-        for (auto &val: new_values) {
-            auto [v, l] = array_cast(dynamic_cast<ArrTy *>(val), ty->getArrayBase());
-            val = dynamic_cast<ValTy>(v);
-            list.splice(list.end(), l);
+        while (true) {
+            auto ptr = stack.back().release();
+            ptr->resize(sizes.back(), mir::getZero(tys.back()->getArrayBase()));
+            auto v = new ArrTy(std::move(*ptr));
+            stack.pop_back(), sizes.pop_back(), tys.pop_back();
+            if (stack.empty()) return {v, list};
+            stack.back()->push_back(v);
         }
-        return {new ArrTy(std::move(new_values)), list};
     }
 
     void SysYVisitor::listToBB(value_list &list, const Token &end_token) const {
@@ -420,6 +427,11 @@ namespace frontend::visitor {
             auto [value, list] = visit<ConstInitVal>(*initVal);
             literal = dynamic_cast<mir::Literal *>(value);
             assert(literal && list.empty());
+            if (auto arr = dynamic_cast<mir::ArrayLiteral *>(literal)) {
+                auto [v, l] = array_cast(arr, type);
+                literal = dynamic_cast<mir::Literal *>(v);
+                assert(literal && l.empty());
+            }
         } else {
             literal = nullptr;
         }
