@@ -7,6 +7,10 @@ if [[ $? -ne 0 ]]; then
 fi
 
 lli "$2".bc < "$3" > "$4" 2> "$5"
-echo $? >> "$4"
+code=$?
+if [ ! -z $(cat "$4") ] && [ $(tail -n1 "$4" | wc -l) -eq 0 ]; then
+    echo '' >> "$4"
+fi
+echo $code >> "$4"
 
 rm -f "$2".bc

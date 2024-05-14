@@ -14,7 +14,7 @@ def test_runner(args):
     return run_test(*args[0], *args[1])
 
 
-def run_test(run_sh, opt_level, test_file, input_file, output_file) -> (int, str):
+def run_test(run_sh, opt_level, test_file, input_file, output_file):
     obj_file = test_file + '.o'
     ans_file = test_file + '.ans'
     err_file = test_file + '.err'

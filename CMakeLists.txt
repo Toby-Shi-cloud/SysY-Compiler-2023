@@ -12,7 +12,7 @@ if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
 endif ()
 
 file(GLOB_RECURSE SRC_DIR "src/*.cpp")
-set_property(SOURCE ${SRC_DIR} PROPERTY COMPILE_FLAGS "-Werror -g")
+set_property(SOURCE ${SRC_DIR} PROPERTY COMPILE_FLAGS "-Werror -Wno-enum-constexpr-conversion")
 add_executable(Compiler ${SRC_DIR})
 
 if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
