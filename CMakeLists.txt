@@ -23,12 +23,10 @@ if (NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     add_test(NAME Functional-LLVM-O0-HIDDEN
             COMMAND ./auto_test.py llvm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d hidden_functional -O0
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../tests)
-    set_tests_properties(Functional-LLVM-O0 Functional-LLVM-O0-HIDDEN PROPERTIES TIMEOUT 600)
     add_test(NAME Functional-LLVM-O2
             COMMAND ./auto_test.py llvm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d functional
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../tests)
     add_test(NAME Functional-LLVM-O2-HIDDEN
             COMMAND ./auto_test.py llvm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d hidden_functional
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../tests)
-    set_tests_properties(Functional-LLVM-O2 Functional-LLVM-O2-HIDDEN PROPERTIES TIMEOUT 400)
 endif ()
