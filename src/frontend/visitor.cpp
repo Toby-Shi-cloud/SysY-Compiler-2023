@@ -501,6 +501,7 @@ namespace frontend::visitor {
         auto [_, list] = visit(*node.children.back());
         init_list.splice(init_list.end(), list);
         listToBB(init_list, node.children.back()->children.back()->getToken());
+        current_function = nullptr;
         return {};
     }
 

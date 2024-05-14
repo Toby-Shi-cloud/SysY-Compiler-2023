@@ -36,6 +36,7 @@ namespace frontend::lexer {
             _last_newline = current.begin();
             current = current.substr(1);
         } else if (current.substr(0, 2) == "/*") {
+            current = current.substr(2);
             auto end = current.find("*/");
             auto comment = current.substr(0, end);
             if (auto count = std::count(comment.begin(), comment.end(), '\n')) {

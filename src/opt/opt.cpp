@@ -22,6 +22,7 @@ namespace mir {
     }
 
     void Manager::optimize() {
+        if (opt_settings.force_no_opt) return;
         clearUnused();
         OptInfos _sum = {};
         opt_infos = { 1 };

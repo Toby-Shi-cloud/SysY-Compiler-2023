@@ -6,7 +6,7 @@ import multiprocessing
 
 
 def usage():
-    print('Usage: ./auto_test.py <llvm/mips> [-s path_to_compiler] {-d test_suit}')
+    print('Usage: ./auto_test.py <llvm/mips> [-O opt_level] [-s path_to_compiler] {-d test_suit}')
     exit(-1)
 
 
