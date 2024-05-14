@@ -9,11 +9,11 @@ decl: constDecl | varDecl;
 constDecl: CONSTTK bType constDef (COMMA constDef)* SEMICN;
 bType: INTTK | FLOATTK;
 constDef: IDENFR (LBRACK constExp RBRACK)* ASSIGN constInitVal;
-constInitVal: constExp | LBRACE constInitVal (COMMA constInitVal)* RBRACE;
+constInitVal: constExp | LBRACE (constInitVal (COMMA constInitVal)*)? RBRACE;
 
 varDecl: bType varDef (COMMA varDef)* SEMICN;
 varDef: IDENFR (LBRACK constExp RBRACK)* (ASSIGN initVal)?;
-initVal: exp | LBRACE initVal (COMMA initVal)* RBRACE;
+initVal: exp | LBRACE (initVal (COMMA initVal)*)? RBRACE;
 
 funcDef: funcType IDENFR LPARENT funcFParams? RPARENT block;
 funcType: INTTK | VOIDTK | FLOATTK;

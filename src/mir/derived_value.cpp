@@ -245,7 +245,8 @@ namespace mir {
     }
 
     ArrayLiteral::ArrayLiteral(std::vector<Literal *> values)
-        : Literal(ArrayType::getArrayType(values.size(), values[0]->getType())),
+        : Literal(ArrayType::getArrayType(
+              (int) values.size(), values.empty() ? Type::getI32Type() : values[0]->getType())),
           values(std::move(values)) {
         std::string s = "[";
         for (size_t i = 0; i < this->values.size(); i++) {
@@ -318,6 +319,7 @@ namespace mir {
     }
 
     ArrayValue::ArrayValue(std::vector<Value *> values)
-        : Value(ArrayType::getArrayType(values.size(), values[0]->getType())),
+        : Value(ArrayType::getArrayType(
+                (int) values.size(), values.empty() ? Type::getI32Type() : values[0]->getType())),
           values(std::move(values)) {}
 }

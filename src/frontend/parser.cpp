@@ -47,8 +47,8 @@ namespace frontend::parser {
 
     template<>
     pGrammarNode SysYParser::parse_impl<ConstInitVal>() {
-        auto gen = generator<ConstExp>() |
-                   generator<LBRACE>() + generator<ConstInitVal>() +
+        auto gen = generator<ConstExp>() | generator<LBRACE>() + generator<RBRACE>() |
+        generator<LBRACE>() + generator<ConstInitVal>() +
                    (generator<COMMA>() + generator<ConstInitVal>()) * MANY +
                    generator<RBRACE>();
         return grammarNode(ConstInitVal, gen);
@@ -71,7 +71,7 @@ namespace frontend::parser {
 
     template<>
     pGrammarNode SysYParser::parse_impl<InitVal>() {
-        auto gen = generator<Exp>() |
+        auto gen = generator<Exp>() | generator<LBRACE>() + generator<RBRACE>() |
                    generator<LBRACE>() + generator<InitVal>() +
                    (generator<COMMA>() + generator<InitVal>()) * MANY +
                    generator<RBRACE>();

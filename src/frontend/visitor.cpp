@@ -51,6 +51,7 @@ namespace frontend::visitor {
         if (value->getType() == ty) return value;
         while (auto arr = dynamic_cast<mir::ArrayValue *>(value))
             value = arr->values[0];
+        if (value->getType() == ty) return value;
         if (!value->getType()->isNumberTy()) return value;
         if (auto lit = dynamic_cast<mir::Literal *>(value)) {
             if (ty->isIntegerTy()) {
@@ -62,6 +63,7 @@ namespace frontend::visitor {
         mir::Value *ret;
         if (value->getType()->isIntegerTy()) {
             if (ty->isIntegerTy()) {
+                assert(value->getType()->getIntegerBits() != ty->getIntegerBits());
                 if (value->getType()->getIntegerBits() > ty->getIntegerBits()) {
                     ret = new mir::Instruction::trunc(ty, value);
                 } else {
@@ -381,8 +383,9 @@ namespace frontend::visitor {
 
     template<>
     SysYVisitor::return_type SysYVisitor::visit<ConstInitVal>(const GrammarNode &node) {
-        // constExp | LBRACE constInitVal (COMMA constInitVal)* RBRACE
-        if (node.children[0]->type != Terminal) return visit<ConstExp>(*node.children[0]);
+        // constExp | LBRACE (constInitVal (COMMA constInitVal)*) RBRACE
+        if (node.children.size() == 1) return visit<ConstExp>(*node.children[0]);
+        if (node.children.size() == 2) return {new mir::ArrayLiteral({}), {}};
         std::vector<mir::Literal *> literals;
         for (auto &child: node.children) {
             if (child->type == Terminal) continue;
@@ -429,8 +432,9 @@ namespace frontend::visitor {
 
     template<>
     SysYVisitor::return_type SysYVisitor::visit<InitVal>(const GrammarNode &node) {
-        // exp | LBRACE initVal (COMMA initVal)* RBRACE
-        if (node.children.size() == 1) return visit(*node.children.front());
+        // exp | LBRACE (initVal (COMMA initVal)*)? RBRACE
+        if (node.children.size() == 1) return visit<Exp>(*node.children.front());
+        if (node.children.size() == 2) return {new mir::ArrayValue({}), {}};
         value_vector values{};
         value_list list{};
         for (auto &child: node.children) {
@@ -439,7 +443,7 @@ namespace frontend::visitor {
             list.splice(list.end(), l);
             values.push_back(v);
         }
-        return {new mir::ArrayValue(std::move(values)), {}};
+        return {new mir::ArrayValue(std::move(values)), list};
     }
 
     template<>
