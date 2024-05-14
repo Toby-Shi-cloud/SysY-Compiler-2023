@@ -19,7 +19,7 @@ def run_test(args) -> (int, str):
     err_file = test_file + '.err'
     try:
         p = subprocess.run([run_sh, test_file, obj_file, input_file, ans_file, err_file, f'-O{opt_level}'],
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120, check=True)
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=40, check=True)
         t = p.stderr.decode()
     except subprocess.CalledProcessError as err:
         return False, err.stdout.decode() + '\n' + err.stderr.decode()
