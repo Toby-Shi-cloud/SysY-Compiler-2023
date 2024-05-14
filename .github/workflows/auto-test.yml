@@ -72,15 +72,7 @@ jobs:
         with:
           version: "16.0"
 
-      - name: Cache Test Data
-        id: cache-testdata
-        uses: actions/cache@v3
-        with:
-          path: ${{github.workspace}}/tests
-          key: testdata-functional
-
       - name: Download Test Data
-        if: steps.cache-testdata.outputs.cache-hit != 'true'
         working-directory: ${{github.workspace}}/tests
         run: |
           wget https://github.com/Tobisc-V/sysy-testdata/releases/download/Compiler2022/functional.tar.gz
