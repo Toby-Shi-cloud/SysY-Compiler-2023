@@ -8,7 +8,7 @@ fi
 
 lli "$2".bc < "$3" > "$4" 2> "$5"
 code=$?
-if [ ! -z $(cat "$4") ] && [ $(tail -n1 "$4" | wc -l) -eq 0 ]; then
+if [ ! -z "$(cat "$4")" ] && [ $(tail -n1 "$4" | wc -l) -eq 0 ]; then
     echo '' >> "$4"
 fi
 echo $code >> "$4"

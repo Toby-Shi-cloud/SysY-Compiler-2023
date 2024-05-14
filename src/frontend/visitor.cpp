@@ -217,14 +217,17 @@ namespace frontend::visitor {
             list.push_back(store);
             return list;
         }
+        indices = indices ? indices : &_idx;
         auto [v, list] = array_cast(dynamic_cast<mir::ArrayValue *>(initVal), type);
         if (auto _ = dynamic_cast<mir::ZeroInitializer *>(v)) {
-            v = new mir::ArrayValue(
-                    std::vector<mir::Value *>(type->getArraySize(), mir::getZero(type->getArrayBase())));
+            auto ptr = new Instruction::getelementptr(type, var, *indices);
+            auto init = new Instruction::store(v, ptr);
+            list.push_back(ptr);
+            list.push_back(init);
+            return list;
         }
         auto arr = dynamic_cast<mir::ArrayValue *>(v);
         assert(arr);
-        indices = indices ? indices : &_idx;
         for (int i = 0; i < type->getArraySize(); i++) {
             auto lit = mir::getIntegerLiteral(i);
             indices->push_back(lit);
@@ -253,7 +256,7 @@ namespace frontend::visitor {
         stack.emplace_back(new vec_t{});
         for (auto val: arr->values) {
             if (val->getType()->isArrayTy()) {
-                auto [v, l] = array_cast(dynamic_cast<ArrTy *>(val), ty->getArrayBase());
+                auto [v, l] = array_cast(dynamic_cast<ArrTy *>(val), tys.back()->getArrayBase());
                 list.splice(list.end(), l);
                 stack.back()->push_back((ValTy) v);
             } else {
@@ -455,6 +458,11 @@ namespace frontend::visitor {
             auto [v, l] = visit<InitVal>(*child);
             list.splice(list.end(), l);
             values.push_back(v);
+        }
+        if (std::all_of(values.begin(), values.end(), [](auto val) {
+            return val == mir::getIntegerLiteral(0) || val == mir::getFloatLiteral(0.0f);
+        })) {
+            return {new mir::ArrayValue({}), list};
         }
         return {new mir::ArrayValue(std::move(values)), list};
     }
