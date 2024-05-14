@@ -434,14 +434,13 @@ namespace backend {
         // reformat blocks & alloca registers
         assert((curFunc->allocName(), true));
         optimizeBeforeAlloc();
-        log(curFunc);
         register_alloca(curFunc);
 
         // save registers before function & restore registers
         if (isMain) curFunc->shouldSave.clear(); // save nothing
         compute_func_start();
         compute_func_exit();
-        optimizAfterAlloc();
+        optimizeAfterAlloc();
     }
 
     void Translator::translateBasicBlock(const mir::BasicBlock *mirBlock) {
@@ -697,7 +696,7 @@ namespace backend {
         clearDeadCode(curFunc);
     }
 
-    void Translator::optimizAfterAlloc() const {
+    void Translator::optimizeAfterAlloc() const {
         if (!opt_settings.force_no_opt) clearDuplicateInst(curFunc);
         if (opt_settings.using_block_relocation) relocateBlock(curFunc);
     }
@@ -708,14 +707,3 @@ namespace backend {
         translateFunctions();
     }
 }
-
-#ifdef DBG_ENABLE
-
-void backend::Translator::log(const mips::Function *func) {
-    static std::ofstream out("log.txt");
-    out << *func << std::endl;
-}
-
-#else
-void backend::Translator::log(const mips::Function *) {}
-#endif

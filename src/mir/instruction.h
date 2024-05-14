@@ -7,7 +7,6 @@
 
 #include <sstream>
 #include <algorithm>
-#include "../enum.h"
 #include "derived_value.h"
 
 namespace mir {
@@ -251,10 +250,6 @@ namespace mir {
             EQ, NE, UGT, UGE, ULT, ULE, SGT, SGE, SLT, SLE
         } cond;
 
-        inline friend std::ostream &operator<<(std::ostream &os, Instruction::icmp::Cond c) {
-            return os << magic_enum::enum_to_string_lower(c);
-        }
-
         explicit icmp(Cond cond, Value *lhs, Value *rhs) :
             Instruction(Type::getI1Type(), ICMP, lhs, rhs), cond(cond) {
             assert(lhs->getType() == rhs->getType());
@@ -296,10 +291,6 @@ namespace mir {
             UEQ, UGT, UGE, ULT, ULE, UNE, UNO,
             TRUE,
         } cond;
-
-        inline friend std::ostream &operator<<(std::ostream &os, Instruction::fcmp::Cond c) {
-            return os << magic_enum::enum_to_string_lower(c);
-        }
 
         explicit fcmp(Cond cond, Value *lhs, Value *rhs) :
                 Instruction(Type::getI1Type(), FCMP, lhs, rhs), cond(cond) {

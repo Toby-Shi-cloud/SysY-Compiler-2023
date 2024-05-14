@@ -515,8 +515,6 @@ namespace mir {
 
     std::ostream &operator<<(std::ostream &os, const Literal &literal);
 
-    std::ostream &operator<<(std::ostream &os, Instruction::InstrTy ty);
-
     inline int Interpreter::getValue(const Value *value) const {
         if (auto lit = dynamic_cast<const IntegerLiteral *>(value))
             return lit->value;

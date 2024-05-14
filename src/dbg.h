@@ -5,40 +5,15 @@
 #ifndef COMPILER_DBG_H
 #define COMPILER_DBG_H
 
-#ifdef _DEBUG_
-
-#include <fstream>
-
-inline std::ofstream flog1("log1.txt"), flog2("log2.txt");
-
-#define dbg_file(file, ...) do{ \
-    auto buf = std::cerr.rdbuf(file.rdbuf()); \
-    dbg(__VA_ARGS__); \
-    std::cerr.rdbuf(buf); \
-}while(0)
-
-#define dbg1(...) dbg_file(flog1, __VA_ARGS__)
-#define dbg2(...) dbg_file(flog2, __VA_ARGS__)
-
+#if defined(_DEBUG_)
 #define DBG_ENABLE
-#if __has_include(<dbg.h>) // has_include(...)
-#include <dbg.h>
-#elif __has_include("../lib/dbg.h")
-#include "../lib/dbg.h"
+#define DBG_MACRO_NO_WARNING
+#include <dbg_macro/dbg.h>
+#undef DBG_MACRO_NO_WARNING
 #else
 #undef DBG_ENABLE
-#endif // has_include(...)
-#else
-#ifndef NDEBUG
-#define NDEBUG
-#endif
-#endif // _DEBUG_
-
-#ifndef DBG_ENABLE
 #define dbg(...) ((void)0)
-#define dbg1(...) ((void)0)
-#define dbg2(...) ((void)0)
-#endif
+#endif // _DEBUG_
 
 #include <cassert>
 #include <iostream>

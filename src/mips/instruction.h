@@ -6,7 +6,6 @@
 #define COMPILER_MIPS_INSTRUCTION_H
 
 #include "operand.h"
-#include "../enum.h"
 
 namespace mips {
     struct Instruction {
@@ -79,10 +78,6 @@ namespace mips {
         [[nodiscard]] virtual rLabel getJumpLabel() const { return nullptr; }
 
         virtual void setJumpLabel(rLabel newLabel) {}
-
-        friend std::ostream &operator<<(std::ostream &os, Ty t) {
-            return os << magic_enum::enum_to_string_lower(t);
-        }
 
         virtual std::ostream &output(std::ostream &os) const { return os << ty; }
 

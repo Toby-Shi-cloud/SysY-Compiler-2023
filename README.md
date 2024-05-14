@@ -12,7 +12,14 @@ BUAA Compiler Course Project 2023 by Toby Shi.
 
 - c++ compiler = clang 10.0.0
 - c++ standard = c++17
-- using ["dbg.h"](https://github.com/sharkdp/dbg-macro) for debug
+
+### Library
+- ["dbg.h"](https://github.com/sharkdp/dbg-macro) for debug (no need for release mode)
+- ["magic_enum"](https://github.com/Neargye/magic_enum) for enum reflection
+
+You can download this library manually or use `download.py` (`gh` needed) to install them.
+
+```shell
 
 ## Usage
 

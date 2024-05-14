@@ -11,6 +11,7 @@
 #include "../enum.h"
 
 namespace frontend {
+    using magic_enum::operator<<;
     struct message {
         enum type_t {
             INFO, WARNING, ERROR
@@ -29,10 +30,6 @@ namespace frontend {
             return a.line < b.line;
         });
     }
-}
-
-inline std::ostream &operator<<(std::ostream &os, frontend::message::type_t type) {
-    return os << magic_enum::enum_to_string(type);
 }
 
 inline std::ostream &operator<<(std::ostream &os, const frontend::message &msg) {

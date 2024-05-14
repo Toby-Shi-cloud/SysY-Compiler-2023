@@ -1,16 +1,10 @@
 #!/usr/bin/env bash
 
-if [[ $1 == clean ]]
-then
-    rm -f testfile.c testfile.s testfile.ll
-    exit 0
-fi
+echo '#include"libsysy/libsysy.h"' > testfile.c
+cat testfile.sy >> testfile.c
 
-printf 'int getint() { int x; scanf("%%d", &x); return x; } \n' > testfile.c
-cat testfile.txt >> testfile.c
-
-clang --target=mips -Wno-implicit-function-declaration "$@" -std=c89 -S -emit-llvm testfile.c
-llc -march=mips -mcpu=mips32 testfile.ll -o testfile.s
+clang testfile.c -std=c99 -emit-llvm -S -o testfile.std.ll "$@"
+llc testfile.std.ll -o testfile.std.asm
 
 rm -f testfile.c
 

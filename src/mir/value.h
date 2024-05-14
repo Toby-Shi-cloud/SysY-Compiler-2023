@@ -12,6 +12,7 @@
 #include <unordered_set>
 #include <unordered_map>
 #include "type.h"
+#include "../enum.h"
 
 // Use List
 namespace mir {
@@ -28,6 +29,7 @@ namespace mir {
     };
 
     using value_map_t = std::unordered_map<const Value *, Value *>;
+    using magic_enum::lowercase::operator<<;
 }
 
 // Values

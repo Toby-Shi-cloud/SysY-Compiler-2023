@@ -157,7 +157,7 @@ namespace frontend::visitor {
         void listToBB(value_list &list, const Token &end_token) const;
 
         using visitor_method_t = return_type (SysYVisitor::*)(const GrammarNode &);
-        inline static std::array<visitor_method_t, magic_enum::detail::enum_count<grammar_type_t>()> visitor_methods{};
+        inline static std::array<visitor_method_t, magic_enum::enum_count<grammar_type_t>()> visitor_methods{};
 
         template<grammar_type_t t>
         constexpr static auto getVisitorMethod() -> visitor_method_t {

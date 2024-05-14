@@ -12,6 +12,7 @@
 #include "../enum.h"
 
 namespace frontend::token::token_type {
+    using magic_enum::operator<<;
     enum _token_type {
         ERRORTOKEN,
         INTCON, FLOATCON,
@@ -22,10 +23,6 @@ namespace frontend::token::token_type {
         LPARENT, RPARENT, LBRACK, RBRACK, LBRACE, RBRACE,
         IDENFR
     };
-
-    inline std::ostream &operator<<(std::ostream &os, _token_type type) {
-        return os << magic_enum::enum_to_string(type);
-    }
 
     constexpr const char *raw[] = {
         "<ERROR>",

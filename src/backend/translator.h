@@ -114,9 +114,7 @@ namespace backend {
 
         void optimizeBeforeAlloc() const;
 
-        void optimizAfterAlloc() const;
-
-        static void log(const mips::Function *func);
+        void optimizeAfterAlloc() const;
 
     public:
         explicit Translator(mir::Manager *mirManager, mips::rModule mipsModule)

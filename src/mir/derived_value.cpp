@@ -4,7 +4,6 @@
 
 #include <sstream>
 #include <unordered_map>
-#include "../enum.h"
 #include "instruction.h"
 #include "derived_value.h"
 
@@ -312,10 +311,6 @@ namespace mir {
     std::ostream &operator<<(std::ostream &os, const Literal &literal) {
         os << literal.getType() << " " << literal.getName();
         return os;
-    }
-
-    std::ostream &operator<<(std::ostream &os, Instruction::InstrTy ty) {
-        return os << magic_enum::enum_to_string_lower(ty);
     }
 
     ArrayValue::ArrayValue(std::vector<Value *> values)

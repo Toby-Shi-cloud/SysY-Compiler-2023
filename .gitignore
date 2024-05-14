@@ -8,6 +8,7 @@
 /out
 /bin
 /lib
+/include
 /build
 /cmake-build*
 

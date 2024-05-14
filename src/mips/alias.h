@@ -7,6 +7,7 @@
 
 #include <list>
 #include <memory>
+#include "../enum.h"
 
 /**
  * @brief Define alias for pointer and reference of a type. <br>
@@ -18,6 +19,8 @@
 
 // operand.h
 namespace mips {
+    using magic_enum::lowercase::operator<<;
+
     def(Operand);
     def(Register);
     def(Label);

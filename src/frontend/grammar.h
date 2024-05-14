@@ -14,6 +14,7 @@
 
 // Grammar type
 namespace frontend::grammar::grammar_type {
+    using magic_enum::operator<<;
     enum _grammar_type {
         CompUnit, Decl,
         ConstDecl, BType, ConstDef, ConstInitVal,
@@ -26,10 +27,6 @@ namespace frontend::grammar::grammar_type {
         FuncRParams, MulExp, AddExp, RelExp, EqExp, LAndExp, LOrExp, ConstExp,
         Terminal
     };
-
-    inline std::ostream &operator<<(std::ostream &os, _grammar_type type) {
-        return os << magic_enum::enum_to_string(type);
-    }
 }
 
 // Forward declaration
