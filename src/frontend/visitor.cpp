@@ -53,6 +53,7 @@ namespace frontend::visitor {
             value = arr->values[0];
         if (value->getType() == ty) return value;
         if (!value->getType()->isNumberTy()) return value;
+        if (value->getType() == mir::Type::getI1Type()) sgn = false; // bool is unsigned
         if (auto lit = dynamic_cast<mir::Literal *>(value)) {
             if (ty->isIntegerTy()) {
                 return mir::getIntegerLiteral(std::visit([](auto v) { return (int) v; }, lit->getValue().value));
@@ -824,7 +825,9 @@ namespace frontend::visitor {
             case PLUS:
                 break;
             case MINU:
-                if (value->getType()->isIntegerTy()) value = new Instruction::sub(zero_value, value);
+                if (value->getType()->isIntegerTy())
+                    value = new Instruction::sub(
+                            zero_value, convert_to(value, mir::Type::getI32Type(), false, list));
                 else value = new Instruction::fneg(value);
                 list.push_back(value);
                 break;
