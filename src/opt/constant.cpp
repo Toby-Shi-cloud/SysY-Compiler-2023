@@ -146,7 +146,7 @@ namespace mir {
     inst_node_t constantFolding(Instruction::load *load) {
         constexpr auto calc = [](Value *ptr, auto &&self) -> Literal *const *{
             if (auto var = dynamic_cast<GlobalVar *>(ptr))
-                return var->isConst() && var->init ? &var->init : nullptr;
+                return var->isConstLVal() && var->init ? &var->init : nullptr;
             if (auto gep = dynamic_cast<Instruction::getelementptr *>(ptr)) {
                 auto var = self(gep->getPointerOperand(), self);
                 if (!var) return nullptr;

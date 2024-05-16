@@ -635,7 +635,7 @@ namespace frontend::visitor {
         auto [variable, list] = visit(*node.children[0]);
         auto [value, l] = visit(*node.children[2]);
         list.splice(list.end(), l);
-        if (variable->isConst()) {
+        if (variable->isConstLVal()) {
             auto &[ty, raw, line, column] = node.children[0]->children[0]->getToken();
             message_queue.push_back(message{
                     message::ERROR, 'h', line, column,
@@ -733,11 +733,9 @@ namespace frontend::visitor {
         value_list list = {};
         if (node.children.size() > 1) {
             list.splice(list.end(), l);
-            bool isConst = variable->isConst();
             auto ty = variable->getType();
             for (int i = 1; i < indices.size(); i++) ty = ty->getBase();
             variable = new Instruction::getelementptr(ty, variable, indices);
-            variable->setConst(isConst);
             list.push_back(variable);
         }
         return {variable, list};

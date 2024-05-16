@@ -195,6 +195,8 @@ namespace mir {
 
         explicit getelementptr(pType type, Value *ptr, const std::vector<Value *> &idxs);
 
+        [[nodiscard]] bool isConstLVal() const override { return getPointerOperand()->isConstLVal(); }
+
         [[nodiscard]] Value *getPointerOperand() const { return getOperand(0); }
 
         [[nodiscard]] Value *getIndexOperand(int i) const { return getOperand(i + 1); }

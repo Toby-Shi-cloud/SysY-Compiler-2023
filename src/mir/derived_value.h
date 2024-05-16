@@ -233,13 +233,16 @@ namespace mir {
     struct GlobalVar : Value {
         Literal *init; // nullptr if we should use ZeroInitializer
         const bool unnamed;
+        const bool isConst;
 
-        explicit GlobalVar(pType type, std::string name, Literal *init, bool isConstant)
-                : Value(type, "@" + std::move(name), isConstant), init(init), unnamed(false) {
+        explicit GlobalVar(pType type, std::string name, Literal *init, bool isConst)
+                : Value(type, "@" + std::move(name)), init(init), unnamed(false), isConst(isConst) {
         }
 
-        explicit GlobalVar(pType type, Literal *init, bool isConstant)
-                : Value(type, "", isConstant), init(init), unnamed(true) {}
+        explicit GlobalVar(pType type, Literal *init, bool isConst)
+                : Value(type), init(init), unnamed(true), isConst(isConst) {}
+
+        [[nodiscard]] bool isConstLVal() const override { return isConst; }
 
         GlobalVar(const GlobalVar &) = delete;
 
@@ -351,11 +354,11 @@ namespace mir {
      * Literal is a constant value. <br>
      */
     struct Literal : Value {
-        explicit Literal(pType type) : Value(type, "", true) {}
+        explicit Literal(pType type) : Value(type) {}
 
-        explicit Literal(pType type, std::string name) : Value(type, std::move(name), true) {}
+        explicit Literal(pType type, std::string name) : Value(type, std::move(name)) {}
 
-        [[nodiscard]] inline virtual calculate_t getValue() const {
+        [[nodiscard]] virtual calculate_t getValue() const {
             throw std::runtime_error("Cannot get " + name + "'s value");
         }
     };

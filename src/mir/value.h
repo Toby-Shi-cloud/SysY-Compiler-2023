@@ -46,12 +46,6 @@ namespace mir {
         pType type;
 
         /**
-         * To mark the value as constant, set isConstant to true. <br>
-         * False by default.
-         */
-        bool isConstant;
-
-        /**
          * Use shared pointer here to avoid 'use after delete'. <br>
          */
         std::shared_ptr<Use> use;
@@ -60,14 +54,11 @@ namespace mir {
         std::string name;
 
     public:
-        Value(pType type, std::string name, bool isConstant)
-                : type(type), name(std::move(name)), isConstant(isConstant), use(new Use{this}) {}
+        Value(pType type, std::string name) : type(type), name(std::move(name)), use(new Use{this}) {}
 
-        explicit Value(pType type) : Value(type, "<anonymous>", false) {}
+        explicit Value(pType type) : Value(type, "<anonymous>") {}
 
-        Value(pType type, std::string name) : Value(type, std::move(name), false) {}
-
-        Value(const Value &value) : Value(value.type, value.name, value.isConstant) {}
+        Value(const Value &value) : Value(value.type, value.name) {}
 
         Value(Value &&) = default;
 
@@ -77,13 +68,11 @@ namespace mir {
 
         Value &operator=(Value &&) = delete;
 
-        void setConst(bool constant = true) { isConstant = constant; }
+        [[nodiscard]] virtual bool isConstLVal() const { return false; }
 
         [[nodiscard]] pType getType() const { return type; }
 
         [[nodiscard]] inline bool isUsed() const;
-
-        [[nodiscard]] bool isConst() const { return isConstant; }
 
         [[nodiscard]] auto getId() const { return std::stoi(name.c_str() + 1); }
 

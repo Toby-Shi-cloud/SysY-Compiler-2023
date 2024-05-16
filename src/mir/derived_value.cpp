@@ -297,7 +297,7 @@ namespace mir {
     std::ostream &operator<<(std::ostream &os, const GlobalVar &var) {
         os << var.name << " = ";
         os << (var.unnamed ? "private unnamed_addr " : "dso_local ");
-        os << (var.isConst() ? "constant " : "global ");
+        os << (var.isConstLVal() ? "constant " : "global ");
         if (var.init) os << var.init;
         else os << var.getType() << (var.getType()->isIntegerTy() ? " 0" : " zeroinitializer");
         os << ", align " << (var.getType()->isStringTy() ? 1 : 4);
