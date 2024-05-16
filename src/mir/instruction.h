@@ -5,6 +5,8 @@
 #ifndef COMPILER_MIR_INSTRUCTION_H
 #define COMPILER_MIR_INSTRUCTION_H
 
+#include <cmath>
+#include <cstring>
 #include <sstream>
 #include <algorithm>
 #include "derived_value.h"
