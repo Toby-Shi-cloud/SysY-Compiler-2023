@@ -94,6 +94,8 @@ namespace mir {
 
         [[nodiscard]] pType getBase() const;
 
+        [[nodiscard]] pType getBaseRecursive() const;
+
         [[nodiscard]] pType getFunctionRet() const;
 
         [[nodiscard]] const std::vector<pType> &getFunctionParams() const;

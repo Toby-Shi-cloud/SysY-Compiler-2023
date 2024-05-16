@@ -65,6 +65,16 @@ namespace mir {
                 os << function << std::endl;
             os << "declare void @llvm.memset.p0.i32(ptr, i8, i32, i1 immarg)" << std::endl;
         }
+
+#ifdef DBG_ENABLE
+
+        [[maybe_unused]]
+        void output(const char *log_name) const {
+            std::ofstream ofs(log_name);
+            output(ofs);
+        }
+
+#endif
     };
 }
 

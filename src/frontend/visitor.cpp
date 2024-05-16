@@ -56,9 +56,9 @@ namespace frontend::visitor {
         if (value->type == mir::Type::getI1Type()) sgn = false; // bool is unsigned
         if (auto lit = dynamic_cast<mir::Literal *>(value)) {
             if (ty->isIntegerTy()) {
-                return mir::getIntegerLiteral(std::visit([](auto v) { return (int) v; }, lit->getValue().value));
+                return mir::getIntegerLiteral(int(lit->getValue()));
             } else {
-                return mir::getFloatLiteral(std::visit([](auto v) { return (float ) v; }, lit->getValue().value));
+                return mir::getFloatLiteral(float(lit->getValue()));
             }
         }
         mir::Value *ret;
@@ -206,6 +206,11 @@ namespace frontend::visitor {
     SysYVisitor::value_list SysYVisitor::storeInitValue(
             value_type var, mir::pType type, value_type initVal, value_vector *indices) {
         static value_vector _idx = std::vector<value_type>{zero_value};
+        if (auto zero = dynamic_cast<mir::ZeroInitializer *>(initVal)) {
+            auto ptr = new Instruction::getelementptr(type, var, indices ? *indices : value_vector{zero_value});
+            auto init = new Instruction::memset(ptr, 0, (int) zero->type->ssize());
+            return {ptr, init};
+        }
         if (type->isNumberTy()) {
             value_list list{};
             initVal = convert_to(initVal, type, true, list);
@@ -219,19 +224,31 @@ namespace frontend::visitor {
         }
         indices = indices ? indices : &_idx;
         auto [v, list] = array_cast(dynamic_cast<mir::ArrayValue *>(initVal), type);
-        if (auto _ = dynamic_cast<mir::ZeroInitializer *>(v)) {
+        if (auto zero = dynamic_cast<mir::ZeroInitializer *>(v)) {
             auto ptr = new Instruction::getelementptr(type, var, *indices);
-            auto init = new Instruction::store(v, ptr);
+            auto init = new Instruction::memset(ptr, 0, (int) zero->type->ssize());
             list.push_back(ptr);
             list.push_back(init);
             return list;
         }
         auto arr = dynamic_cast<mir::ArrayValue *>(v);
         assert(arr);
+        auto vec = arr->values;
         for (int i = 0; i < type->getArraySize(); i++) {
+            if (mir::isZero(vec[i])) {
+                int j = i + 1;
+                for (; j < type->getArraySize(); j++)
+                    if (mir::isZero(vec[j])) vec[j] = nullptr;
+                    else break;
+                vec[i] = mir::getZero(mir::ArrayType::getArrayType(j - i, type->getArrayBase()));
+                i = j;
+            }
+        }
+        for (int i = 0; i < type->getArraySize(); i++) {
+            if (vec[i] == nullptr) continue;
             auto lit = mir::getIntegerLiteral(i);
             indices->push_back(lit);
-            auto _l = storeInitValue(var, type->getArrayBase(), arr->values[i], indices);
+            auto _l = storeInitValue(var, type->getArrayBase(), vec[i], indices);
             list.splice(list.end(), _l);
             indices->pop_back();
         }
@@ -837,7 +854,7 @@ namespace frontend::visitor {
             auto literal = dynamic_cast<mir::Literal *>(value);
             assert(literal && list.empty());
             if (unary_op_type == MINU) {
-                literal = std::visit([](auto v) { return mir::getLiteral(-v); }, literal->getValue().value);
+                literal = std::visit([](auto v) { return mir::getLiteral(-v); }, literal->getValue());
             } else {
                 assert(unary_op_type == PLUS);
             }

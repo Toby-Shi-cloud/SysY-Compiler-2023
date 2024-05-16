@@ -50,11 +50,6 @@ namespace mir {
     }
 
     std::ostream &Instruction::store::output(std::ostream &os) const {
-        if (dynamic_cast<ZeroInitializer *>(getSrc())) {
-            return os << "call void @llvm.memset.p0.i32(" << getDest()
-                      << ", i8 0, i32 " << getSrc()->type->size()
-                      << ", i1 false)";
-        }
         return os << "store " << getSrc() << ", ptr " << getDest()->name;
     }
 
@@ -111,5 +106,12 @@ namespace mir {
         }
         os << ")";
         return os;
+    }
+
+    std::ostream &Instruction::memset::output(std::ostream &os) const {
+        return os << "call void @llvm.memset.p0.i32(ptr " << getBase()->name
+                  << ", i8 " << val
+                  << ", i32 " << size
+                  << ", i1 false)";
     }
 }

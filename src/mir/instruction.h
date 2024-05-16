@@ -89,34 +89,30 @@ namespace mir {
         [[nodiscard]] Value *getRhs() const { return getOperand(1); }
 
         void interpret(Interpreter &interpreter) const override {
-            constexpr auto calcFunc = [] (unsigned lhs, unsigned rhs) {
-                if constexpr (ty == ADD) return lhs + rhs;
-                if constexpr (ty == SUB) return lhs - rhs;
-                if constexpr (ty == MUL) return lhs * rhs;
-                if constexpr (ty == UDIV) return lhs / rhs;
-                if constexpr (ty == SDIV) return (int) lhs / (int) rhs;
-                if constexpr (ty == UREM) return lhs % rhs;
-                if constexpr (ty == SREM) return (int) lhs % (int) rhs;
-                if constexpr (ty == FADD) return lhs + rhs;
-                if constexpr (ty == FSUB) return lhs - rhs;
-                if constexpr (ty == FMUL) return lhs * rhs;
-                if constexpr (ty == FDIV) return lhs / rhs;
-                if constexpr (ty == FREM) return lhs % rhs;
-                if constexpr (ty == SHL) return lhs << rhs;
-                if constexpr (ty == LSHR) return lhs >> rhs;
+            constexpr auto calcFunc = [] (calculate_t lhs, calculate_t rhs) {
+                if constexpr (ty == ADD || ty == FADD) return lhs + rhs;
+                if constexpr (ty == SUB || ty == FSUB) return lhs - rhs;
+                if constexpr (ty == MUL || ty == FMUL) return lhs * rhs;
+                if constexpr (ty == SDIV || ty == FDIV) return lhs / rhs;
+                if constexpr (ty == SREM) return lhs % rhs;
+                if constexpr (ty == UDIV) return (unsigned) lhs / (unsigned) rhs;
+                if constexpr (ty == UREM) return (unsigned) lhs % (unsigned) rhs;
+                if constexpr (ty == FREM) return std::fmod((float) lhs, (float) rhs);
+                if constexpr (ty == SHL) return (unsigned) lhs << (unsigned) rhs;
+                if constexpr (ty == LSHR) return (unsigned) lhs >> (unsigned) rhs;
                 if constexpr (ty == ASHR) return (int) lhs >> (int) rhs;
-                if constexpr (ty == AND) return lhs & rhs;
-                if constexpr (ty == OR) return lhs | rhs;
-                if constexpr (ty == XOR) return lhs ^ rhs;
+                if constexpr (ty == AND) return (unsigned) lhs & (unsigned) rhs;
+                if constexpr (ty == OR) return (unsigned) lhs | (unsigned) rhs;
+                if constexpr (ty == XOR) return (unsigned) lhs ^ (unsigned) rhs;
                 __builtin_unreachable();
             };
             interpreter.map[this] = calcFunc(interpreter.getValue(getLhs()), interpreter.getValue(getRhs()));
         }
 
-        [[nodiscard]] IntegerLiteral *calc() const {
+        [[nodiscard]] Literal *calc() const {
             Interpreter interpreter{};
             interpret(interpreter);
-            return getIntegerLiteral(interpreter.getValue(this));
+            return getLiteral(interpreter.getValue(this));
         }
 
         [[nodiscard]] std::vector<Value *> getOperands() const override {
@@ -142,7 +138,9 @@ namespace mir {
 
         [[nodiscard]] Instruction *clone() const override { return new fneg(*this); }
 
-        void interpret(Interpreter &interpreter) const override { /*todo...*/ }
+        void interpret(Interpreter &interpreter) const override {
+            interpreter.map[this] = - (float) interpreter.getValue(getOperand());
+        }
 
         std::ostream &output(std::ostream &os) const override;
     };
@@ -168,14 +166,16 @@ namespace mir {
         [[nodiscard]] Instruction *clone() const override { return new load(*this); }
 
         void interpret(Interpreter &interpreter) const override {
-            interpreter.map[this] = interpreter.stack.at(interpreter.getValue(getPointerOperand()));
+            interpreter.map[this] = interpreter.stack.at((size_t) interpreter.getValue(getPointerOperand()));
         }
 
         std::ostream &output(std::ostream &os) const override;
     };
 
     struct Instruction::store : Instruction {
-        explicit store(Value *src, Value *dest) : Instruction(Type::getVoidType(), STORE, src, dest) {}
+        explicit store(Value *src, Value *dest) : Instruction(Type::getVoidType(), STORE, src, dest) {
+            assert(dynamic_cast<ZeroInitializer *>(src) == nullptr);
+        }
 
         [[nodiscard]] Value *getSrc() const { return getOperand(0); }
 
@@ -184,7 +184,8 @@ namespace mir {
         [[nodiscard]] Instruction *clone() const override { return new store(*this); }
 
         void interpret(Interpreter &interpreter) const override {
-            interpreter.stack[interpreter.getValue(getDest())] = interpreter.getValue(getSrc());
+            auto base = (size_t) interpreter.getValue(getDest());
+            interpreter.stack[base] = interpreter.getValue(getSrc());
         }
 
         std::ostream &output(std::ostream &os) const override;
@@ -216,7 +217,7 @@ namespace mir {
             auto curType = indexTy;
             for (int i = 0; i < getNumIndices(); i++) {
                 if (i) curType = curType->getBase();
-                curPos += (int) curType->size() / 4 * interpreter.getValue(getIndexOperand(i));
+                curPos += (int) curType->size() / 4 * (int) interpreter.getValue(getIndexOperand(i));
             }
             return curPos;
         }
@@ -280,7 +281,10 @@ namespace mir {
                     default: __builtin_unreachable();
                 }
             };
-            interpreter.map[this] = calc(interpreter.getValue(getLhs()), interpreter.getValue(getRhs()));
+            interpreter.map[this] = calc(
+                    (int) interpreter.getValue(getLhs()),
+                    (int) interpreter.getValue(getRhs())
+            );
         }
 
         std::ostream &output(std::ostream &os) const override;
@@ -306,7 +310,33 @@ namespace mir {
 
         [[nodiscard]] Instruction *clone() const override { return new fcmp(*this); }
 
-        void interpret(Interpreter &interpreter) const override { /*todo!*/ }
+        void interpret(Interpreter &interpreter) const override {
+            auto calc = [this](float lhs, float rhs) {
+                switch (cond) {
+                    case FALSE: return false;
+                    case OEQ: return lhs == rhs;
+                    case OGT: return lhs > rhs;
+                    case OGE: return lhs >= rhs;
+                    case OLT: return lhs < rhs;
+                    case OLE: return lhs <= rhs;
+                    case ONE: return lhs != rhs;
+                    case ORD: return lhs == lhs && rhs == rhs;
+                    case UEQ: return lhs == rhs || lhs != lhs || rhs != rhs;
+                    case UGT: return lhs > rhs || lhs != lhs || rhs != rhs;
+                    case UGE: return lhs >= rhs || lhs != lhs || rhs != rhs;
+                    case ULT: return lhs < rhs || lhs != lhs || rhs != rhs;
+                    case ULE: return lhs <= rhs || lhs != lhs || rhs != rhs;
+                    case UNE: return lhs != rhs || lhs != lhs || rhs != rhs;
+                    case UNO: return lhs != lhs || rhs != rhs;
+                    case TRUE: return true;
+                    default: __builtin_unreachable();
+                }
+            };
+            interpreter.map[this] = calc(
+                    (float) interpreter.getValue(getLhs()),
+                    (float) interpreter.getValue(getRhs())
+            );
+        }
 
         std::ostream &output(std::ostream &os) const override;
     };
@@ -401,10 +431,37 @@ namespace mir {
         [[nodiscard]] Instruction *clone() const override { return new call(*this); }
 
         void interpret(Interpreter &interpreter) const override {
-            std::vector<int> args;
+            std::vector<calculate_t> args;
             for (int i = 0; i < getNumArgs(); i++)
                 args.push_back(interpreter.getValue(getArg(i)));
             interpreter.map[this] = getFunction()->interpret(args);
+        }
+
+        std::ostream &output(std::ostream &os) const override;
+    };
+
+    struct Instruction::memset : Instruction {
+        int val, size;
+
+        memset(Value *ptr, int val, int size) : Instruction(Type::getVoidType(), MEMSET, ptr), val(val), size(size) {}
+
+        [[nodiscard]] Value *getBase() const { return getOperand(0); }
+
+        [[nodiscard]] Instruction *clone() const override { return new memset(*this); }
+
+        [[nodiscard]] Literal *getVal(pType ty) const {
+            uint32_t v = val;
+            v = v << 24 | v << 16 | v << 8 | v;
+            if (ty == Type::getI1Type()) return getBooleanLiteral(val);
+            if (ty == Type::getI8Type()) return getIntegerLiteral(val);
+            if (ty == Type::getI32Type()) return getIntegerLiteral(*reinterpret_cast<int *>(&v));
+            if (ty->isFloatTy()) return getFloatLiteral(*reinterpret_cast<float *>(&v));
+            throw std::runtime_error("unknown type for memset");
+        }
+
+        void interpret(Interpreter &interpreter) const override {
+            auto base = (size_t) interpreter.getValue(getBase());
+            std::memset(&interpreter.stack[base], val, size);
         }
 
         std::ostream &output(std::ostream &os) const override;

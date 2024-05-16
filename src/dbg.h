@@ -15,6 +15,7 @@
 #define dbg(...) ((void)0)
 #endif // _DEBUG_
 
+#include <fstream>
 #include <cassert>
 #include <iostream>
 

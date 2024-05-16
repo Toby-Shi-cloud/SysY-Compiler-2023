@@ -246,15 +246,17 @@ namespace mir {
     inst_node_t constantFolding(Instruction::call *call) {
         if (call->getFunction()->noPostEffect && !call->isValue()) return call->parent->erase(call);
         if (!call->getFunction()->isPure) return call->node;
-        std::vector<int> args;
+        std::vector<calculate_t> args;
         args.reserve(call->getNumArgs());
         for (int i = 0; i < call->getNumArgs(); i++) {
-            if (auto lit = dynamic_cast<IntegerLiteral *>(call->getArg(i)))
-                args.push_back(lit->value);
+            if (auto lit = dynamic_cast<Literal *>(call->getArg(i))) {
+                try { args.push_back(lit->getValue()); }
+                catch (std::exception &) { return call->node; }
+            }
             else return call->node;
         }
-        int ret = call->getFunction()->interpret(args);
-        return substitute(call, getIntegerLiteral(ret));
+        auto ret = call->getFunction()->interpret(args);
+        return substitute(call, getLiteral(ret));
     }
 
     inst_node_t constantFolding(Instruction *inst) {

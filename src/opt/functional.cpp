@@ -111,7 +111,7 @@ namespace mir {
             }
     }
 
-    int Function::interpret(const std::vector<int> &_args_v) const {
+    calculate_t Function::interpret(const std::vector<calculate_t> &_args_v) const {
         assert(isPure);
         Interpreter interpreter;
         for (int i = 0; i < args.size(); i++)

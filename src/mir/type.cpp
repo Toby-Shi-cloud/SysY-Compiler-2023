@@ -75,6 +75,11 @@ namespace mir {
         return nullptr;
     }
 
+    pType Type::getBaseRecursive() const {
+        if (auto ty = getBase()) return ty->getBaseRecursive();
+        return this;
+    }
+
     pType Type::getFunctionRet() const {
         assert(isFunctionTy());
         return static_cast<pFunctionType>(this)->ret; // NOLINT

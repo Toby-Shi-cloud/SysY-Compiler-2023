@@ -32,16 +32,26 @@ namespace mir {
     using bb_node_t = std::list<BasicBlock *>::iterator;
     using bb_pos_t = std::list<BasicBlock *>::const_iterator;
 
+    struct calculate_t : std::variant<int, float> {
+        using variant::variant;
+
+        template<typename T>
+        explicit operator T() const {
+            return std::visit([](auto v) { return T(v); }, *this);
+        }
+
+        calculate_t(unsigned value) : calculate_t(static_cast<int>(value)) {} // NOLINT(google-explicit-constructor)
+    };
+
     struct Interpreter {
-        //todo!! float support
-        int retValue{};
+        calculate_t retValue{};
         const BasicBlock *lastBB{};
         const BasicBlock *currentBB{};
-        std::vector<int> stack{};
-        std::unordered_map<const Value *, int> map{};
-        std::unordered_map<const Value *, int> phi{};
+        std::vector<calculate_t> stack{};
+        std::unordered_map<const Value *, calculate_t> map{};
+        std::unordered_map<const Value *, calculate_t> phi{};
 
-        inline int getValue(const Value *value) const;
+        inline calculate_t getValue(const Value *value) const;
     };
 }
 
@@ -226,7 +236,7 @@ namespace mir {
 
         [[nodiscard]] Function *clone() const;
 
-        [[nodiscard]] int interpret(const std::vector<int> &_args_v) const;
+        [[nodiscard]] calculate_t interpret(const std::vector<calculate_t> &_args_v) const;
     };
 
     /**
@@ -276,7 +286,7 @@ namespace mir {
             // Conversion Operations
             TRUNC, ZEXT, SEXT, FPTOUI, FPTOSI, UITOFP, SITOFP,
             // Other Operations
-            ICMP, FCMP, PHI, SELECT, CALL
+            ICMP, FCMP, PHI, SELECT, CALL, MEMSET
         } instrTy;
 
         BasicBlock *parent = nullptr;
@@ -352,11 +362,8 @@ namespace mir {
         struct phi;
         struct select;
         struct call;
+        struct memset;
     };
-
-    typedef struct CalculateType {
-        std::variant<int, float> value;
-    } calculate_t;
 
     /**
      * Literal is a constant value. <br>
@@ -376,7 +383,7 @@ namespace mir {
         static BooleanLiteral *trueLiteral;
         static BooleanLiteral *falseLiteral;
 
-        [[nodiscard]] inline calculate_t getValue() const override { return {value}; }
+        [[nodiscard]] inline calculate_t getValue() const override { return value; }
 
     private:
         explicit BooleanLiteral(bool value)
@@ -399,7 +406,7 @@ namespace mir {
         explicit IntegerLiteral(unsigned value)
             : IntegerLiteral(static_cast<int>(value)) {}
 
-        [[nodiscard]] inline calculate_t getValue() const override { return {value}; }
+        [[nodiscard]] inline calculate_t getValue() const override { return value; }
     };
 
     IntegerLiteral *getIntegerLiteral(int value);
@@ -408,17 +415,13 @@ namespace mir {
         return getIntegerLiteral(static_cast<int>(value));
     }
 
-    inline Literal *getLiteral(int value) {
-        return getIntegerLiteral(value);
-    }
-
     struct FloatLiteral : Literal {
         const float value;
 
         explicit FloatLiteral(float value)
                 : Literal(Type::getFloatType(), stringify(value)), value(value) {}
 
-        [[nodiscard]] inline calculate_t getValue() const override { return {value}; }
+        [[nodiscard]] inline calculate_t getValue() const override { return value; }
 
         [[nodiscard]] inline static std::string stringify(float v) {
             double d = v;
@@ -435,36 +438,51 @@ namespace mir {
 
     FloatLiteral *getFloatLiteral(float value);
 
+    inline Literal *getLiteral(int value) {
+        return getIntegerLiteral(value);
+    }
+
     inline Literal *getLiteral(float value) {
         return getFloatLiteral(value);
     }
 
-#define BIN_CALC_OP(op) \
-    inline calculate_t operator op (const calculate_t &lhs, const calculate_t &rhs) { \
-        return std::visit([](auto v1, auto v2) -> calculate_t { \
-            return {v1 op v2}; \
-        }, lhs.value, rhs.value); \
+    inline Literal *getLiteral(calculate_t value) {
+        return std::visit([](auto v) {
+            return getLiteral(v);
+        }, value);
     }
 
-#define BIN_LIT_OP(op) \
+#define BIN_CALC_OP(op, ty) \
+    inline ty operator op (const calculate_t &lhs, const calculate_t &rhs) { \
+        return std::visit([](auto v1, auto v2) -> ty { \
+            return v1 op v2; \
+        }, lhs, rhs); \
+    }
+
+#define BIN_LIT_OP_calculate_t(op) \
     inline Literal *operator op (const Literal &lhs, const Literal &rhs) { \
         return std::visit([](auto v) -> Literal * { \
             return getLiteral(v); \
-        }, (lhs.getValue() op rhs.getValue()).value); \
+        }, lhs.getValue() op rhs.getValue()); \
     }
 
-#define BIN_OP(op) BIN_CALC_OP(op) BIN_LIT_OP(op)
+#define BIN_LIT_OP_bool(op) \
+    inline Literal *operator op (const Literal &lhs, const Literal &rhs) { \
+        return getBooleanLiteral(lhs.getValue() op rhs.getValue()); \
+    }
 
-    BIN_OP(+)
-    BIN_OP(-)
-    BIN_OP(*)
-    BIN_OP(/)
-    BIN_OP(>)
-    BIN_OP(>=)
-    BIN_OP(<)
-    BIN_OP(<=)
-    BIN_OP(==)
-    BIN_OP(!=)
+#define BIN_OP(op, ty) BIN_CALC_OP(op, ty) BIN_LIT_OP_##ty(op)
+
+    BIN_OP(+, calculate_t)
+    BIN_OP(-, calculate_t)
+    BIN_OP(*, calculate_t)
+    BIN_OP(/, calculate_t)
+    BIN_OP(>, bool)
+    BIN_OP(>=, bool)
+    BIN_OP(<, bool)
+    BIN_OP(<=, bool)
+    BIN_OP(==, bool)
+    BIN_OP(!=, bool)
 
     inline calculate_t operator%(const calculate_t &lhs, const calculate_t &rhs) { \
         return std::visit([](auto v1, auto v2) -> calculate_t {
@@ -475,10 +493,10 @@ namespace mir {
             } else {
                 return {v1 % v2};
             }
-        }, lhs.value, rhs.value);
+        }, lhs, rhs);
     }
 
-    BIN_LIT_OP(%)
+    BIN_LIT_OP_calculate_t(%)
 
 #undef BIN_OP
 #undef BIN_CALC_OP
@@ -551,11 +569,17 @@ namespace mir {
 
     std::ostream &operator<<(std::ostream &os, const ArrayValue &array);
 
-    inline int Interpreter::getValue(const Value *value) const {
-        if (auto lit = dynamic_cast<const IntegerLiteral *>(value))
-            return lit->value;
-        if (auto lit = dynamic_cast<const BooleanLiteral *>(value))
-            return lit->value;
+    inline bool isZero(const Value *value) {
+        return value == getIntegerLiteral(0)
+               || value == getFloatLiteral(0)
+               || dynamic_cast<const ZeroInitializer *>(value);
+    }
+
+    inline calculate_t Interpreter::getValue(const Value *value) const {
+        if (auto lit = dynamic_cast<const Literal *>(value)) {
+            try { return lit->getValue(); }
+            catch (const std::exception &e) {}
+        }
         return map.at(value);
     }
 }

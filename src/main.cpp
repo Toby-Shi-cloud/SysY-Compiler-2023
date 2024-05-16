@@ -22,7 +22,9 @@ int main(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         using namespace std::string_literals;
         if (argv[i] == "-O0"s) set_optimize_level(0);
+        else if (argv[i] == "-O1"s) set_optimize_level(1);
         else if (argv[i] == "-O2"s) set_optimize_level(2);
+        else if (argv[i] == "-O3"s) set_optimize_level(3);
         else if (argv[i] == "-no-S"s) no_mips = true;
         else if (argv[i] == "-S"s) ptr = &mips_file;
         else if (argv[i] == "-emit-llvm"s) ptr = &llvm_ir_file;

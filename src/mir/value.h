@@ -93,11 +93,11 @@ namespace mir {
         /**
          * Use shared pointer here to avoid 'use after delete'. <br>
          */
-        std::vector<std::shared_ptr<Use>> operands;
+        std::vector<std::weak_ptr<Use>> operands;
 
         void reInsertOperandsUser() {
             for (auto &operand: operands)
-                operand->users.insert(this);
+                operand.lock()->users.insert(this);
         }
 
     protected:
@@ -109,7 +109,7 @@ namespace mir {
         void eraseOperand(int _first, int _end) {
             for (auto i = _first; i != _end; ++i) {
                 auto &&operand = operands[i];
-                operand->users.erase(this);
+                operand.lock()->users.erase(this);
             }
             operands.erase(operands.cbegin() + _first, operands.cbegin() + _end);
             reInsertOperandsUser();
@@ -117,7 +117,7 @@ namespace mir {
 
         int findOperand(const Value *value) const {
             auto it = std::find_if(operands.begin(), operands.end(),
-                                   [&value](auto &&use) { return use->value == value; });
+                                   [&value](auto &&use) { return use.lock()->value == value; });
             return static_cast<int>(it - operands.begin());
         }
 
@@ -139,20 +139,22 @@ namespace mir {
 
         ~User() override {
             for (auto &operand: operands) {
-                operand->users.erase(this);
-                if (auto counter = operand->value->inlineRefCounter()) {
-                    if (*counter == 0 && operand->users.empty()) delete operand->value;
+                if (auto op = operand.lock()) {
+                    op->users.erase(this);
+                    if (auto counter = op->value->inlineRefCounter()) {
+                        if (*counter == 0 && op->users.empty()) delete op->value;
+                    }
                 }
             }
         }
 
         template<typename R = Value>
-        [[nodiscard]] R *getOperand(int i) const { return static_cast<R *>(operands[i]->value); }
+        [[nodiscard]] R *getOperand(int i) const { return static_cast<R *>(operands[i].lock()->value); }
 
         [[nodiscard]] auto getNumOperands() const { return operands.size(); }
 
         void substituteOperand(int pos, Value *_new) {
-            operands[pos]->users.erase(this);
+            operands[pos].lock()->users.erase(this);
             operands[pos] = _new->use;
             reInsertOperandsUser();
         }
@@ -177,7 +179,7 @@ namespace mir {
         [[nodiscard]] virtual std::vector<Value *> getOperands() const {
             std::vector<Value *> ret;
             std::transform(operands.begin(), operands.end(), std::back_inserter(ret),
-                           [](auto &&use) { return use->value; });
+                           [](auto &&use) { return use.lock()->value; });
             return ret;
         }
     };

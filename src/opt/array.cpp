@@ -10,7 +10,7 @@ namespace mir {
     inline bool arrayCanSpilt(const Value *value) {
         for (auto &&user: value->users()) {
             if (dynamic_cast<Instruction::call *>(user)) {
-                if (!value->type->isIntegerTy()) return false;
+                if (!value->type->isNumberTy()) return false;
                 continue;
             }
             if (auto gep = dynamic_cast<Instruction::getelementptr *>(user)) {
@@ -28,13 +28,21 @@ namespace mir {
         opt_infos.split_array()++;
         Interpreter interpreter;
         interpreter.map[array] = 0;
+        auto ty = array->type->getBaseRecursive();
         auto dfs = [&](auto &&inst, auto &&self) -> void {
             if (auto gep = dynamic_cast<Instruction::getelementptr *>(inst)) {
                 gep->interpret(interpreter);
                 for (auto &&user: gep->users())
                     self(user, self);
-                Value *new_value = new_array.at(interpreter.map.at(gep));
+                auto idx = (size_t) interpreter.map.at(gep);
+                Value *new_value = new_array.at(idx);
                 substitute(gep, new_value);
+            } else if (auto _memset = dynamic_cast<Instruction::memset *>(inst)) {
+                auto bb = _memset->parent;
+                auto base = (size_t) interpreter.map.at(_memset->getBase());
+                for (auto i = 0; i < _memset->size / 4; i++)
+                    bb->insert(_memset->node, new Instruction::store(_memset->getVal(ty), new_array.at(base + i)));
+                bb->erase(_memset);
             }
         };
         for (auto &&user: array->users())
@@ -46,9 +54,10 @@ namespace mir {
         if (!arrayCanSpilt(alloca_)) return std::next(alloca_->node);
         auto bb = alloca_->parent;
         std::vector<Instruction::alloca_ *> new_alloca;
+        auto base_type = alloca_->type->getBaseRecursive();
         new_alloca.reserve(alloca_->type->size() / 4);
         for (auto i = 0; i < alloca_->type->size() / 4; i++) {
-            auto new_alloca_ = new Instruction::alloca_(Type::getI32Type());
+            auto new_alloca_ = new Instruction::alloca_(base_type);
             new_alloca.push_back(new_alloca_);
         }
         substituteArray(alloca_, new_alloca);
@@ -66,12 +75,13 @@ namespace mir {
         std::vector<GlobalVar *> new_global;
         new_global.reserve(global->type->size() / 4);
         auto dfs = [&](pType type, Literal *init, auto &&self) -> void {
-            if (type->isIntegerTy()) {
-                auto lit = dynamic_cast<IntegerLiteral *>(init);
-                auto index = new_global.size();
+            auto index = new_global.size();
+            if (type->isNumberTy()) {
+                auto lit = dynamic_cast<Literal *>(init);
+                auto _new_init = lit ? getLiteral(lit->getValue()) : nullptr;
                 auto _new_val = new GlobalVar(
-                        Type::getI32Type(), global->name.substr(1) + "." + std::to_string(index),
-                        lit, global->isConstLVal());
+                        type, global->name.substr(1) + "." + std::to_string(index),
+                        _new_init, global->isConstLVal());
                 new_global.push_back(_new_val);
                 return;
             }

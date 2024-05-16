@@ -49,6 +49,9 @@ jobs:
   functional-test:
     needs: compile
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        optimizer: [O0, O2]
 
     steps:
       - uses: actions/checkout@v3
@@ -85,12 +88,12 @@ jobs:
         run: |
           chmod +x ${{github.workspace}}/tests/*.sh
           chmod +x ${{github.workspace}}/tests/*.py
-          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-LLVM-O0-*
+          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-LLVM-${{matrix.optimizer}}-*
 
       - name: Summary
         if: always()
         run: |
-          echo "## Functional Test Summary (-O0):" >> $GITHUB_STEP_SUMMARY
+          echo "## Functional Test Summary (-${{matrix.optimizer}}):" >> $GITHUB_STEP_SUMMARY
           echo "| Test Name | Passed | Failed |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
           cat ${{github.workspace}}/tests/functional.log >> $GITHUB_STEP_SUMMARY || true
