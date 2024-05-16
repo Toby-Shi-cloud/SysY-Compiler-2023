@@ -351,11 +351,10 @@ namespace frontend::visitor {
     template<>
     SysYVisitor::return_type SysYVisitor::visit<CompUnit>(const GrammarNode &node) {
         for (auto func: mir::Function::getLibrary()) {
-            auto msg = symbol_table.insert(
-                    std::string_view(func->name).substr(1),
-                    {func, nullptr},
-                    Token()
-            );
+            auto name = std::string_view(func->name).substr(1);
+            if (auto idx = name.find_last_of('_'); idx != std::string_view::npos)
+                name = name.substr(idx + 1);
+            auto msg = symbol_table.insert(name, {func, nullptr}, Token());
             assert(msg == std::nullopt);
         }
         return visitChildren(node);
