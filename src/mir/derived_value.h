@@ -566,7 +566,7 @@ namespace dbg {
     [[maybe_unused]]
     inline bool pretty_print(std::ostream &stream, mir::BasicBlock *const &value) {
         if (value == nullptr) return pretty_print(stream, nullptr);
-        stream << value->getName();
+        stream << value->name;
         return true;
     }
 
@@ -574,7 +574,7 @@ namespace dbg {
     [[maybe_unused]]
     inline bool pretty_print(std::ostream &stream, mir::Function *const &value) {
         if (value == nullptr) return pretty_print(stream, nullptr);
-        stream << value->getName();
+        stream << value->name;
         return true;
     }
 }
