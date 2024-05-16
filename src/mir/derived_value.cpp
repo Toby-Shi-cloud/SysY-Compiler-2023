@@ -198,9 +198,12 @@ namespace mir {
     }
 
     GlobalVar::~GlobalVar() {
-        // IntegerLiteral is owned by pool.
-        if (type->isNumberTy()) return;
-        delete init;
+        try_delete(init);
+    }
+
+    void GlobalVar::initialize() {
+        if (init == nullptr) this->init = getZero(type);
+        if (auto counter = this->init->inlineRefCounter()) ++*counter;
     }
 
     IntegerLiteral *getIntegerLiteral(int value) {
@@ -256,6 +259,20 @@ namespace mir {
         }
         s += ']';
         name = std::move(s);
+
+        for (auto v: this->values)
+            if (auto counter = v->inlineRefCounter())
+                ++*counter;
+    }
+
+    ArrayLiteral::~ArrayLiteral() {
+        for (auto &&lit: values)
+            try_delete(lit);
+    }
+
+    ArrayValue::~ArrayValue() {
+        for (auto &&val: values)
+            try_delete(val);
     }
 
     std::ostream &operator<<(std::ostream &os, const BasicBlock &bb) {
@@ -309,12 +326,15 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, const Literal &literal) {
-        os << literal.type << " " << literal.name;
-        return os;
+        return os << literal.type << " " << literal.name;
     }
 
-    ArrayValue::ArrayValue(std::vector<Value *> values)
-        : Value(ArrayType::getArrayType(
-                (int) values.size(), values.empty() ? Type::getI32Type() : values[0]->type)),
-          values(std::move(values)) {}
+    std::ostream &operator<<(std::ostream &os, const ArrayValue &array) {
+        os << "[";
+        for (size_t i = 0; i < array.values.size(); i++) {
+            if (i) os << ", ";
+            os << array.values[i];
+        }
+        return os << "]";
+    }
 }

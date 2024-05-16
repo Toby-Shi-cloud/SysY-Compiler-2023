@@ -72,6 +72,9 @@ namespace mir {
         // return a copy of users
         [[nodiscard]] auto users() const { return use->users; }
 
+        // An inline value will be deleted by the last user.
+        [[nodiscard]] virtual size_t *inlineRefCounter() const { return nullptr; }
+
         void swap(Value *other) {
             std::swap(use->value, other->use->value);
             std::swap(use, other->use);
@@ -135,8 +138,12 @@ namespace mir {
         User(User &&) = default;
 
         ~User() override {
-            for (auto &operand: operands)
+            for (auto &operand: operands) {
                 operand->users.erase(this);
+                if (auto counter = operand->value->inlineRefCounter()) {
+                    if (*counter == 0 && operand->users.empty()) delete operand->value;
+                }
+            }
         }
 
         template<typename R = Value>
@@ -204,6 +211,12 @@ namespace mir {
         if (value.type->isArrayTy()) os << "ptr";
         else os << value.type;
         return os << " " << value.name;
+    }
+
+    inline void try_delete(Value *value) {
+        if (auto counter = value->inlineRefCounter())
+            if (--*counter == 0 && !value->isUsed())
+                delete value;
     }
 
     template<typename T>

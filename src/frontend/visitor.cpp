@@ -371,6 +371,7 @@ namespace frontend::visitor {
             assert(literal && _l.empty());
         } else {
             auto [_r, _l] = array_cast(dynamic_cast<mir::ArrayLiteral *>(literal), type);
+            mir::try_delete(literal);
             literal = dynamic_cast<mir::Literal *>(_r);
             assert(literal && _l.empty());
         }
@@ -423,6 +424,7 @@ namespace frontend::visitor {
             auto [val, list] = visit(*initVal);
             list.push_back(alloca_);
             list.splice(list.end(), storeInitValue(alloca_, type, val));
+            mir::try_delete(val);
             return {nullptr, list};
         }
         mir::Literal *literal;
@@ -432,6 +434,7 @@ namespace frontend::visitor {
             assert(literal && list.empty());
             if (auto arr = dynamic_cast<mir::ArrayLiteral *>(literal)) {
                 auto [v, l] = array_cast(arr, type);
+                mir::try_delete(arr);
                 literal = dynamic_cast<mir::Literal *>(v);
                 assert(literal && l.empty());
             }

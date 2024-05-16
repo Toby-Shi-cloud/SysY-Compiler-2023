@@ -46,6 +46,8 @@ namespace mir {
 }
 
 namespace mir {
+    inline Literal *getZero(pType type);
+
     /**
      * Argument is a function argument. <br>
      */
@@ -237,16 +239,22 @@ namespace mir {
 
         explicit GlobalVar(pType type, std::string name, Literal *init, bool isConst)
                 : Value(type, "@" + std::move(name)), init(init), unnamed(false), isConst(isConst) {
+            initialize();
         }
 
         explicit GlobalVar(pType type, Literal *init, bool isConst)
-                : Value(type), init(init), unnamed(true), isConst(isConst) {}
+                : Value(type), init(init), unnamed(true), isConst(isConst) {
+            initialize();
+        }
 
         [[nodiscard]] bool isConstLVal() const override { return isConst; }
 
         GlobalVar(const GlobalVar &) = delete;
 
         ~GlobalVar() override;
+
+    private:
+        void initialize();
     };
 
     /**
@@ -478,14 +486,22 @@ namespace mir {
 
     struct StringLiteral : Literal {
         const std::string value;
+        mutable size_t refCounter = 0;
 
         explicit StringLiteral(std::string value);
+
+        [[nodiscard]] size_t *inlineRefCounter() const override { return &refCounter; }
     };
 
     struct ArrayLiteral : Literal {
         const std::vector<Literal *> values;
+        mutable size_t refCounter = 0;
 
         explicit ArrayLiteral(std::vector<Literal *> values);
+
+        ~ArrayLiteral() override;
+
+        [[nodiscard]] size_t *inlineRefCounter() const override { return &refCounter; }
 
         [[nodiscard]] inline calculate_t getValue() const override {return values[0]->getValue(); }
     };
@@ -500,8 +516,28 @@ namespace mir {
         if (type->isIntegerTy()) return getIntegerLiteral(0);
         if (type->isFloatTy()) return getFloatLiteral(0);
         assert(type->isArrayTy());
-        return new ZeroInitializer(type);
+        static std::unordered_map<pType, ZeroInitializer *> cache;
+        if (auto it = cache.find(type); it != cache.end())
+            return it->second;
+        return cache[type] = new ZeroInitializer(type);
     }
+
+    struct ArrayValue : Value {
+        const std::vector<Value *> values;
+        mutable size_t refCounter = 0;
+
+        explicit ArrayValue(std::vector<Value *> values)
+            : Value(ArrayType::getArrayType(values.size(), values.empty() ? Type::getI32Type() : values[0]->type)),
+              values(std::move(values)) {
+            for (auto v: this->values)
+                if (auto counter = v->inlineRefCounter())
+                    ++*counter;
+        }
+
+        ~ArrayValue() override;
+
+        [[nodiscard]] size_t *inlineRefCounter() const override { return &refCounter; }
+    };
 
     std::ostream &operator<<(std::ostream &os, const BasicBlock &bb);
 
@@ -513,6 +549,8 @@ namespace mir {
 
     std::ostream &operator<<(std::ostream &os, const Literal &literal);
 
+    std::ostream &operator<<(std::ostream &os, const ArrayValue &array);
+
     inline int Interpreter::getValue(const Value *value) const {
         if (auto lit = dynamic_cast<const IntegerLiteral *>(value))
             return lit->value;
@@ -520,12 +558,6 @@ namespace mir {
             return lit->value;
         return map.at(value);
     }
-
-    struct ArrayValue : Value {
-        const std::vector<Value *> values;
-
-        explicit ArrayValue(std::vector<Value *> values);
-    };
 }
 
 #ifdef DBG_ENABLE
