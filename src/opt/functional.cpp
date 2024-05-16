@@ -23,7 +23,7 @@ namespace mir {
                 auto nxt_bb_it = bb_it;
                 nxt_bb_it = func->bbs.insert(++nxt_bb_it, ret_bb);
                 // 3. prepare return value
-                auto ret_val = call->isValue() ? new Instruction::phi(call->getType()) : nullptr;
+                auto ret_val = call->isValue() ? new Instruction::phi(call->type) : nullptr;
                 if (ret_val) ret_bb->push_front(ret_val);
                 auto call_br = new Instruction::br(callee->bbs.front());
                 if (ret_val) substitute(call, call_br, static_cast<Value *>(ret_val));
@@ -84,7 +84,7 @@ namespace mir {
         func->isPure = true;
         func->noPostEffect = true;
         for (auto &&arg: func->args)
-            if (!arg->getType()->isIntegerTy())
+            if (!arg->type->isIntegerTy())
                 func->isPure = false;
         auto setAttr = [&func](auto &&inst) {
             auto rt = getRootValue(inst).first;

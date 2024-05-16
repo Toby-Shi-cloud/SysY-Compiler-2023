@@ -83,7 +83,7 @@ namespace mir {
 
 namespace mir {
     Argument *Argument::clone(Function *_parent, value_map_t &map) const {
-        auto arg = new Argument(getType(), _parent);
+        auto arg = new Argument(type, _parent);
         map[this] = arg;
         return arg;
     }
@@ -186,7 +186,7 @@ namespace mir {
 
     Function *Function::clone() const {
         value_map_t map;
-        auto func = new Function(getType(), name);
+        auto func = new Function(type, name);
         for (auto &&arg: args)
             func->args.push_back(arg->clone(func, map));
         for (auto &&bb: bbs)
@@ -199,7 +199,7 @@ namespace mir {
 
     GlobalVar::~GlobalVar() {
         // IntegerLiteral is owned by pool.
-        if (getType()->isNumberTy()) return;
+        if (type->isNumberTy()) return;
         delete init;
     }
 
@@ -245,12 +245,12 @@ namespace mir {
 
     ArrayLiteral::ArrayLiteral(std::vector<Literal *> values)
         : Literal(ArrayType::getArrayType(
-              (int) values.size(), values.empty() ? Type::getI32Type() : values[0]->getType())),
+              (int) values.size(), values.empty() ? Type::getI32Type() : values[0]->type)),
           values(std::move(values)) {
         std::string s = "[";
         for (size_t i = 0; i < this->values.size(); i++) {
             if (i) s += ", ";
-            s += this->values[i]->getType()->to_string();
+            s += this->values[i]->type->to_string();
             s += " ";
             s += this->values[i]->name;
         }
@@ -299,8 +299,8 @@ namespace mir {
         os << (var.unnamed ? "private unnamed_addr " : "dso_local ");
         os << (var.isConstLVal() ? "constant " : "global ");
         if (var.init) os << var.init;
-        else os << var.getType() << (var.getType()->isIntegerTy() ? " 0" : " zeroinitializer");
-        os << ", align " << (var.getType()->isStringTy() ? 1 : 4);
+        else os << var.type << (var.type->isIntegerTy() ? " 0" : " zeroinitializer");
+        os << ", align " << (var.type->isStringTy() ? 1 : 4);
         return os;
     }
 
@@ -309,12 +309,12 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, const Literal &literal) {
-        os << literal.getType() << " " << literal.name;
+        os << literal.type << " " << literal.name;
         return os;
     }
 
     ArrayValue::ArrayValue(std::vector<Value *> values)
         : Value(ArrayType::getArrayType(
-                (int) values.size(), values.empty() ? Type::getI32Type() : values[0]->getType())),
+                (int) values.size(), values.empty() ? Type::getI32Type() : values[0]->type)),
           values(std::move(values)) {}
 }

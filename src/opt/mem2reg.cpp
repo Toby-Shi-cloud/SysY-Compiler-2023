@@ -71,7 +71,7 @@ namespace mir {
     }
 
     static void calcPhi(const Function *func, const Instruction::alloca_ *alloc) {
-        assert(alloc->getType() == Type::getI32Type());
+        assert(alloc->type == Type::getI32Type());
         std::unordered_map<BasicBlock *, Value *> liveInV; // live in value
         std::unordered_map<BasicBlock *, Value *> defs; // def value (live out value)
 
@@ -150,7 +150,7 @@ namespace mir {
         func->reCalcBBInfo();
         for (auto inst: func->bbs.front()->instructions) {
             if (auto alloc = dynamic_cast<Instruction::alloca_ *>(inst)) {
-                if (alloc->getType() != Type::getI32Type()) continue;
+                if (alloc->type != Type::getI32Type()) continue;
                 calcPhi(func, alloc);
                 opt_infos.mem_to_reg()++;
             } else break;

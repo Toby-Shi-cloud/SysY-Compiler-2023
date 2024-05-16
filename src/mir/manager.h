@@ -54,9 +54,9 @@ namespace mir {
             os << std::endl;
             for (auto func: Function::getLibrary()) {
                 os << "declare dso_local " << func->retType << " " << func->name << "(";
-                for (auto i = 0; i < func->getType()->getFunctionParamCount(); i++) {
+                for (auto i = 0; i < func->type->getFunctionParamCount(); i++) {
                     if (i) os << ", ";
-                    os << func->getType()->getFunctionParam(i);
+                    os << func->type->getFunctionParam(i);
                 }
                 os << ")" << std::endl;
             }

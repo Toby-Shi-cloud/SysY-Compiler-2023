@@ -286,7 +286,7 @@ namespace mir {
 
         [[nodiscard]] bool isMemoryAccess() const { return instrTy == LOAD || instrTy == STORE; }
 
-        [[nodiscard]] bool isValue() const { return getType() != Type::getVoidType(); }
+        [[nodiscard]] bool isValue() const { return type != Type::getVoidType(); }
 
         template<typename... Args>
         explicit Instruction(pType type, InstrTy instrTy, Args... args) : User(type, args...), instrTy(instrTy) {}

@@ -80,8 +80,8 @@ namespace mir {
     struct Instruction::_binary_instruction : Instruction {
         static_assert(ty >= ADD && ty <= XOR);
 
-        explicit _binary_instruction(Value *lhs, Value *rhs) : Instruction(lhs->getType(), ty, lhs, rhs) {
-            assert(lhs->getType() == rhs->getType());
+        explicit _binary_instruction(Value *lhs, Value *rhs) : Instruction(lhs->type, ty, lhs, rhs) {
+            assert(lhs->type == rhs->type);
         }
 
         [[nodiscard]] Value *getLhs() const { return getOperand(0); }
@@ -134,8 +134,8 @@ namespace mir {
     };
 
     struct Instruction::fneg : Instruction {
-        explicit fneg(Value *value) : Instruction(value->getType(), FNEG, value) {
-            assert(value->getType()->isFloatTy());
+        explicit fneg(Value *value) : Instruction(value->type, FNEG, value) {
+            assert(value->type->isFloatTy());
         }
 
         [[nodiscard]] auto getOperand() const { return Instruction::getOperand(0); }
@@ -154,7 +154,7 @@ namespace mir {
 
         void interpret(Interpreter &interpreter) const override {
             interpreter.map[this] = (int) interpreter.stack.size();
-            interpreter.stack.resize(interpreter.stack.size() + getType()->size() / 4);
+            interpreter.stack.resize(interpreter.stack.size() + type->size() / 4);
         }
 
         std::ostream &output(std::ostream &os) const override;
@@ -243,7 +243,7 @@ namespace mir {
         }
 
         std::ostream &output(std::ostream &os) const override {
-            return os << name << " = " << ty << " " << getValueOperand() << " to " << getType();
+            return os << name << " = " << ty << " " << getValueOperand() << " to " << type;
         }
     };
 
@@ -254,8 +254,8 @@ namespace mir {
 
         explicit icmp(Cond cond, Value *lhs, Value *rhs) :
             Instruction(Type::getI1Type(), ICMP, lhs, rhs), cond(cond) {
-            assert(lhs->getType() == rhs->getType());
-            assert(lhs->getType()->isIntegerTy());
+            assert(lhs->type == rhs->type);
+            assert(lhs->type->isIntegerTy());
         }
 
         [[nodiscard]] Value *getLhs() const { return getOperand(0); }
@@ -296,8 +296,8 @@ namespace mir {
 
         explicit fcmp(Cond cond, Value *lhs, Value *rhs) :
                 Instruction(Type::getI1Type(), FCMP, lhs, rhs), cond(cond) {
-            assert(lhs->getType() == rhs->getType());
-            assert(lhs->getType()->isFloatTy());
+            assert(lhs->type == rhs->type);
+            assert(lhs->type->isFloatTy());
         }
 
         [[nodiscard]] Value *getLhs() const { return getOperand(0); }
@@ -349,7 +349,7 @@ namespace mir {
             auto check_set = parent->predecessors;
             for (auto i = 0; i < getNumIncomingValues(); i++) {
                 auto [value, bb] = getIncomingValue(i);
-                if (value->getType() != getType()) return false;
+                if (value->type != type) return false;
                 if (check_set.count(bb)) check_set.erase(bb);
                 else return false;
             }
@@ -368,9 +368,9 @@ namespace mir {
 
     struct Instruction::select : Instruction {
         explicit select(Value *cond, Value *ifTrue, Value *ifFalse) :
-            Instruction(ifTrue->getType(), SELECT, cond, ifTrue, ifFalse) {
-            assert(cond->getType() == Type::getI1Type());
-            assert(ifTrue->getType() == ifFalse->getType());
+            Instruction(ifTrue->type, SELECT, cond, ifTrue, ifFalse) {
+            assert(cond->type == Type::getI1Type());
+            assert(ifTrue->type == ifFalse->type);
         }
 
         [[nodiscard]] Value *getCondition() const { return getOperand(0); }

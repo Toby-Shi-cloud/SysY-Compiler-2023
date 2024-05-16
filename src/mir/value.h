@@ -39,18 +39,13 @@ namespace mir {
      */
     class Value {
         friend User;
-
-        /**
-         * Every Value has a type. <br>
-         */
-        pType type;
-
         /**
          * Use shared pointer here to avoid 'use after delete'. <br>
          */
         std::shared_ptr<Use> use;
 
     public:
+        const pType type;
         std::string name;
 
     public:
@@ -69,8 +64,6 @@ namespace mir {
         Value &operator=(Value &&) = delete;
 
         [[nodiscard]] virtual bool isConstLVal() const { return false; }
-
-        [[nodiscard]] pType getType() const { return type; }
 
         [[nodiscard]] inline bool isUsed() const;
 
@@ -208,8 +201,8 @@ namespace mir {
     }
 
     inline std::ostream &operator<<(std::ostream &os, const Value &value) {
-        if (value.getType()->isArrayTy()) os << "ptr";
-        else os << value.getType();
+        if (value.type->isArrayTy()) os << "ptr";
+        else os << value.type;
         return os << " " << value.name;
     }
 

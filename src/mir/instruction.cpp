@@ -29,7 +29,7 @@ namespace mir {
 
     std::ostream &Instruction::br::output(std::ostream &os) const {
         if (hasCondition()) {
-            assert(getCondition()->getType() == (pType) Type::getI1Type());
+            assert(getCondition()->type == (pType) Type::getI1Type());
             return os << "br " << getCondition()
                    << ", label " << getIfTrue()->name
                    << ", label " << getIfFalse()->name;
@@ -42,17 +42,17 @@ namespace mir {
     }
 
     std::ostream &Instruction::alloca_::output(std::ostream &os) const {
-        return os << name << " = alloca " << getType() << ", align 4";
+        return os << name << " = alloca " << type << ", align 4";
     }
 
     std::ostream &Instruction::load::output(std::ostream &os) const {
-        return os << name << " = load " << getType() << ", ptr " << getPointerOperand()->name;
+        return os << name << " = load " << type << ", ptr " << getPointerOperand()->name;
     }
 
     std::ostream &Instruction::store::output(std::ostream &os) const {
         if (dynamic_cast<ZeroInitializer *>(getSrc())) {
             return os << "call void @llvm.memset.p0.i32(" << getDest()
-                      << ", i8 0, i32 " << getSrc()->getType()->size()
+                      << ", i8 0, i32 " << getSrc()->type->size()
                       << ", i1 false)";
         }
         return os << "store " << getSrc() << ", ptr " << getDest()->name;
@@ -60,8 +60,8 @@ namespace mir {
 
     Instruction::getelementptr::getelementptr(pType type, Value *ptr, const std::vector<Value *> &idxs)
         : Instruction(type, GETELEMENTPTR,
-                      merge(ptr, idxs.begin() + ptr->getType()->isPointerTy(), idxs.end())),
-          indexTy(getIndexTy(ptr->getType())) {}
+                      merge(ptr, idxs.begin() + ptr->type->isPointerTy(), idxs.end())),
+          indexTy(getIndexTy(ptr->type)) {}
 
     std::ostream &Instruction::getelementptr::output(std::ostream &os) const {
         os << name << " = getelementptr " << indexTy
@@ -81,10 +81,10 @@ namespace mir {
     }
 
     Instruction::phi::phi(const std::vector<incominng_pair> &values)
-        : Instruction(values[0].first->getType(), PHI, flatten(values)) {}
+        : Instruction(values[0].first->type, PHI, flatten(values)) {}
 
     std::ostream &Instruction::phi::output(std::ostream &os) const {
-        os << name << " = phi " << getType() << " ";
+        os << name << " = phi " << type << " ";
         for (int i = 0; i < getNumIncomingValues(); i++) {
             if (i) os << ", ";
             auto [value, label] = getIncomingValue(i);
@@ -94,7 +94,7 @@ namespace mir {
     }
 
     Instruction::call::call(Function *func, const std::vector<Value *> &args)
-        : Instruction(func->getType()->getFunctionRet(), CALL, merge(func, args.begin(), args.end())) {}
+        : Instruction(func->type->getFunctionRet(), CALL, merge(func, args.begin(), args.end())) {}
 
     std::ostream &Instruction::select::output(std::ostream &os) const {
         return os << name << " = select " << getCondition() << ", " << getTrueValue() << ", " << getFalseValue();
@@ -103,7 +103,7 @@ namespace mir {
     std::ostream &Instruction::call::output(std::ostream &os) const {
         if (getFunction()->retType != Type::getVoidType())
             os << name << " = ";
-        os << "call " << getFunction()->getType();
+        os << "call " << getFunction()->type;
         os << " " << getFunction()->name << "(";
         for (int i = 0; i < getNumArgs(); i++) {
             if (i) os << ", ";

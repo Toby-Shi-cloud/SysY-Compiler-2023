@@ -157,7 +157,7 @@ namespace backend {
     }
 
     void Translator::translateAllocaInst(const mir::Instruction::alloca_ *allocaInst) {
-        auto alloca_size = allocaInst->getType()->size();
+        auto alloca_size = allocaInst->type->size();
         assert(alloca_size % 4 == 0);
         curFunc->allocaSize += alloca_size;
         auto addr = curFunc->newAddress(mips::PhyRegister::get("$sp"),
@@ -516,17 +516,17 @@ namespace backend {
         if (mirVar->init == nullptr)
             result = new mips::GlobalVar{
                 std::move(name), false, false, false,
-                static_cast<unsigned>(mirVar->getType()->size()), {}
+                static_cast<unsigned>(mirVar->type->size()), {}
             };
         else if (auto str = dynamic_cast<mir::StringLiteral *>(mirVar->init))
             result = new mips::GlobalVar{
                 std::move(name), true, true, true,
-                static_cast<unsigned>(mirVar->getType()->size()), str->value
+                static_cast<unsigned>(mirVar->type->size()), str->value
             };
         else
             result = new mips::GlobalVar{
                 std::move(name), true, false, false,
-                static_cast<unsigned>(mirVar->getType()->size()), flatten(mirVar->init)
+                static_cast<unsigned>(mirVar->type->size()), flatten(mirVar->init)
             };
         gMap[mirVar] = result;
         mipsModule->globalVars.emplace_back(result);

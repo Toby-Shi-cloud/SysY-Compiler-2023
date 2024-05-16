@@ -10,7 +10,7 @@ namespace mir {
     inline bool arrayCanSpilt(const Value *value) {
         for (auto &&user: value->users()) {
             if (dynamic_cast<Instruction::call *>(user)) {
-                if (!value->getType()->isIntegerTy()) return false;
+                if (!value->type->isIntegerTy()) return false;
                 continue;
             }
             if (auto gep = dynamic_cast<Instruction::getelementptr *>(user)) {
@@ -42,12 +42,12 @@ namespace mir {
     }
 
     auto spiltArray(Instruction::alloca_ *alloca_) {
-        if (alloca_->getType()->isIntegerTy()) return std::next(alloca_->node);
+        if (alloca_->type->isIntegerTy()) return std::next(alloca_->node);
         if (!arrayCanSpilt(alloca_)) return std::next(alloca_->node);
         auto bb = alloca_->parent;
         std::vector<Instruction::alloca_ *> new_alloca;
-        new_alloca.reserve(alloca_->getType()->size() / 4);
-        for (auto i = 0; i < alloca_->getType()->size() / 4; i++) {
+        new_alloca.reserve(alloca_->type->size() / 4);
+        for (auto i = 0; i < alloca_->type->size() / 4; i++) {
             auto new_alloca_ = new Instruction::alloca_(Type::getI32Type());
             new_alloca.push_back(new_alloca_);
         }
@@ -60,11 +60,11 @@ namespace mir {
     }
 
     void spiltArray(Manager &mgr, GlobalVar *global) {
-        if (global->getType()->isIntegerTy()) return;
-        if (global->getType()->isStringTy()) return;
+        if (global->type->isIntegerTy()) return;
+        if (global->type->isStringTy()) return;
         if (!arrayCanSpilt(global)) return;
         std::vector<GlobalVar *> new_global;
-        new_global.reserve(global->getType()->size() / 4);
+        new_global.reserve(global->type->size() / 4);
         auto dfs = [&](pType type, Literal *init, auto &&self) -> void {
             if (type->isIntegerTy()) {
                 auto lit = dynamic_cast<IntegerLiteral *>(init);
@@ -79,7 +79,7 @@ namespace mir {
             for (auto i = 0; i < type->getArraySize(); i++)
                 self(type->getArrayBase(), arr ? arr->values[i] : nullptr, self);
         };
-        dfs(global->getType(), global->init, dfs);
+        dfs(global->type, global->init, dfs);
         substituteArray(global, new_global);
         for (auto &&_new_val: new_global)
             if (_new_val->isUsed())
@@ -104,7 +104,7 @@ namespace mir {
         auto main = *std::find_if(mgr.functions.begin(), mgr.functions.end(),
                                   std::function<bool(Function *)>(&Function::isMain));
         for (auto &&var: mgr.globalVars) {
-            if (!var->getType()->isIntegerTy()) continue;
+            if (!var->type->isIntegerTy()) continue;
             auto users = var->users();
             if (std::any_of(users.begin(), users.end(), [&](auto user) {
                 auto inst = dynamic_cast<Instruction *>(user);

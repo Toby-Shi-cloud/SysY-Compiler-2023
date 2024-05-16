@@ -48,12 +48,12 @@ namespace frontend::visitor {
     }
 
     mir::Value *convert_to(mir::Value *value, mir::pType ty, bool sgn, /*out*/ std::list<mir::Value *> &list) {
-        if (value->getType() == ty) return value;
+        if (value->type == ty) return value;
         while (auto arr = dynamic_cast<mir::ArrayValue *>(value))
             value = arr->values[0];
-        if (value->getType() == ty) return value;
-        if (!value->getType()->isNumberTy()) return value;
-        if (value->getType() == mir::Type::getI1Type()) sgn = false; // bool is unsigned
+        if (value->type == ty) return value;
+        if (!value->type->isNumberTy()) return value;
+        if (value->type == mir::Type::getI1Type()) sgn = false; // bool is unsigned
         if (auto lit = dynamic_cast<mir::Literal *>(value)) {
             if (ty->isIntegerTy()) {
                 return mir::getIntegerLiteral(std::visit([](auto v) { return (int) v; }, lit->getValue().value));
@@ -62,10 +62,10 @@ namespace frontend::visitor {
             }
         }
         mir::Value *ret;
-        if (value->getType()->isIntegerTy()) {
+        if (value->type->isIntegerTy()) {
             if (ty->isIntegerTy()) {
-                assert(value->getType()->getIntegerBits() != ty->getIntegerBits());
-                if (value->getType()->getIntegerBits() > ty->getIntegerBits()) {
+                assert(value->type->getIntegerBits() != ty->getIntegerBits());
+                if (value->type->getIntegerBits() > ty->getIntegerBits()) {
                     ret = new mir::Instruction::trunc(ty, value);
                 } else {
                     ret = sgn ? (mir::Instruction *) new mir::Instruction::sext(ty, value)
@@ -88,18 +88,18 @@ namespace frontend::visitor {
     }
 
     mir::Value *convert_to_bool(mir::Value *value, bool neg, /*out*/ std::list<mir::Value *> &list) {
-        if (value->getType() == mir::Type::getI1Type()) {
+        if (value->type == mir::Type::getI1Type()) {
             if (!neg) return value;
             auto inst = new mir::Instruction::xor_(value, mir::getBooleanLiteral(true));
             list.push_back(inst);
             return inst;
         }
         mir::Value *cmp;
-        if (value->getType()->isIntegerTy()) {
+        if (value->type->isIntegerTy()) {
             using icmp = mir::Instruction::icmp;
             cmp = new icmp(neg ? icmp::EQ : icmp::NE, value, mir::getLiteral(0));
         } else {
-            assert(value->getType()->isFloatTy());
+            assert(value->type->isFloatTy());
             using fcmp = mir::Instruction::fcmp;
             cmp = new fcmp(neg ? fcmp::OEQ : fcmp::ONE, value, mir::getLiteral(.0f));
         }
@@ -172,7 +172,7 @@ namespace frontend::visitor {
             if (ret_literal && literal && ret_list.empty()) {
                 ret_literal = lit(*ret_literal, *literal);
                 ret_val = ret_literal;
-            } else if (ret_val->getType()->isFloatTy() || value->getType()->isFloatTy()) {
+            } else if (ret_val->type->isFloatTy() || value->type->isFloatTy()) {
                 ret_val = convert_to(ret_val, mir::Type::getFloatType(), true, ret_list);
                 value = convert_to(value, mir::Type::getFloatType(), true, ret_list);
                 ret_val = funcf(ret_val, value);
@@ -255,7 +255,7 @@ namespace frontend::visitor {
         std::vector<std::unique_ptr<vec_t>> stack{};
         stack.emplace_back(new vec_t{});
         for (auto val: arr->values) {
-            if (val->getType()->isArrayTy()) {
+            if (val->type->isArrayTy()) {
                 auto [v, l] = array_cast(dynamic_cast<ArrTy *>(val), tys.back()->getArrayBase());
                 list.splice(list.end(), l);
                 stack.back()->push_back((ValTy) v);
@@ -479,7 +479,7 @@ namespace frontend::visitor {
         std::vector<mir::pType> params;
         std::transform(params_list.begin(), params_list.end(), std::back_inserter(params),
                        [](value_type value) {
-                           return value->getType();
+                           return value->type;
                        });
         auto funcType = mir::FunctionType::getFunctionType(funcRetType, std::move(params));
         auto func = new mir::Function(funcType, std::string(identifier.raw));
@@ -493,10 +493,10 @@ namespace frontend::visitor {
         auto it2 = token_buffer.begin();
         value_list init_list = {};
         for (; it1 != params_list.end(); ++it1, ++it2) {
-            auto arg = func->addArgument((*it1)->getType());
+            auto arg = func->addArgument((*it1)->type);
             mir::Value *val = arg;
-            if (arg->getType()->isNumberTy()) {
-                auto alloca_ = new Instruction::alloca_(arg->getType());
+            if (arg->type->isNumberTy()) {
+                auto alloca_ = new Instruction::alloca_(arg->type);
                 auto store_ = new Instruction::store(arg, alloca_);
                 init_list.push_back(alloca_);
                 init_list.push_back(store_);
@@ -643,7 +643,7 @@ namespace frontend::visitor {
             });
             return {nullptr, list};
         }
-        auto store = new Instruction::store(convert_to(value, variable->getType(), true, list), variable);
+        auto store = new Instruction::store(convert_to(value, variable->type, true, list), variable);
         list.push_back(store);
         return {store, list};
     }
@@ -733,7 +733,7 @@ namespace frontend::visitor {
         value_list list = {};
         if (node.children.size() > 1) {
             list.splice(list.end(), l);
-            auto ty = variable->getType();
+            auto ty = variable->type;
             for (int i = 1; i < indices.size(); i++) ty = ty->getBase();
             variable = new Instruction::getelementptr(ty, variable, indices);
             list.push_back(variable);
@@ -746,8 +746,8 @@ namespace frontend::visitor {
         // LPARENT exp RPARENT | lVal | number
         if (in_const_expr) return visitChildren(node);
         auto [value, list] = visitChildren(node);
-        if (node.children[0]->type == LVal && value->getType()->isNumberTy()) {
-            value = new Instruction::load(value->getType(), value);
+        if (node.children[0]->type == LVal && value->type->isNumberTy()) {
+            value = new Instruction::load(value->type, value);
             list.push_back(value);
         }
         return {value, list};
@@ -793,7 +793,7 @@ namespace frontend::visitor {
             }
             value_list list = {};
             if (node.children.size() == 3) {
-                if (function->getType()->getFunctionParamCount() != 0)
+                if (function->type->getFunctionParamCount() != 0)
                     message_queue.push_back(message{
                             message::ERROR, 'd', line, column,
                             "too few arguments for function '" + std::string(raw) + "'"
@@ -805,23 +805,23 @@ namespace frontend::visitor {
             // visit funcRParams
             auto [value, l] = visitExps(node.children[2]->children.begin(), node.children[2]->children.end());
             list.splice(list.end(), l);
-            if (function->getType()->getFunctionParamCount() != value.size()) {
+            if (function->type->getFunctionParamCount() != value.size()) {
                 message_queue.push_back(message{
                         message::ERROR, 'd', line, column,
                         std::string("too ") +
-                        (function->getType()->getFunctionParamCount() < value.size() ? "many" : "few") +
+                        (function->type->getFunctionParamCount() < value.size() ? "many" : "few") +
                         " arguments for function '" + std::string(raw) + "'"
                 });
             } else {
                 for (int i = 0; i < value.size(); i++) {
-                    if (!value[i]->getType()->convertableTo(function->getType()->getFunctionParam(i))) {
+                    if (!value[i]->type->convertableTo(function->type->getFunctionParam(i))) {
                         message_queue.push_back(message{
                                 message::ERROR, 'e', line, column,
                                 std::string("incompatible type for the ") + std::to_string(i + 1) +
                                 "th argument of function '" + std::string(raw) + "'"
                         });
                     }
-                    value[i] = convert_to(value[i], function->getType()->getFunctionParam(i), true, list);
+                    value[i] = convert_to(value[i], function->type->getFunctionParam(i), true, list);
                 }
             }
             auto call = new Instruction::call(function, value);
@@ -844,7 +844,7 @@ namespace frontend::visitor {
             case PLUS:
                 break;
             case MINU:
-                if (value->getType()->isIntegerTy())
+                if (value->type->isIntegerTy())
                     value = new Instruction::sub(
                             zero_value, convert_to(value, mir::Type::getI32Type(), false, list));
                 else value = new Instruction::fneg(value);
