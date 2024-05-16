@@ -296,13 +296,13 @@ namespace mir {
 
         [[nodiscard]] bool isTerminator() const { return instrTy == RET || instrTy == BR; }
 
-        [[nodiscard]] bool isCall() const { return instrTy == CALL; }
+        [[nodiscard]] bool isCall() const { return instrTy == CALL || instrTy == MEMSET; }
 
         [[nodiscard]] bool isPhy() const { return instrTy == PHI; }
 
         [[nodiscard]] bool isBeginner() const { return instrTy == PHI || instrTy == ALLOCA; }
 
-        [[nodiscard]] bool isMemoryAccess() const { return instrTy == LOAD || instrTy == STORE; }
+        [[nodiscard]] bool isMemoryAccess() const { return instrTy == LOAD || instrTy == STORE || instrTy == MEMSET; }
 
         [[nodiscard]] bool isValue() const { return type != Type::getVoidType(); }
 

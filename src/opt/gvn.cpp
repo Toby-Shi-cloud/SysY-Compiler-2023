@@ -68,6 +68,10 @@ namespace mir {
                 if (irrelevant(getRootValue(store), root)) continue;
                 return std::nullopt;
             }
+            if (auto memset = dynamic_cast<Instruction::memset *>(inst)) {
+                if (irrelevant(getRootValue(memset), root)) continue;
+                return std::nullopt;
+            }
             auto other = dynamic_cast<Instruction::load *>(inst);
             assert(other);
             if (other->getPointerOperand() == current->getPointerOperand()) return other;
@@ -85,6 +89,9 @@ namespace mir {
                     return nullptr;
             if (auto other = dynamic_cast<Instruction::store *>(inst))
                 if (!irrelevant(getRootValue(other), root))
+                    break;
+            if (auto memset = dynamic_cast<Instruction::memset *>(inst))
+                if (!irrelevant(getRootValue(memset), root))
                     break;
         }
         it = std::next(current->node);

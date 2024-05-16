@@ -104,6 +104,8 @@ namespace mir {
                         func->isPure = false;
                 if (auto store = dynamic_cast<Instruction::store *>(inst))
                     setAttr(store);
+                if (auto memset = dynamic_cast<Instruction::memset *>(inst))
+                    setAttr(memset);
                 if (auto call = dynamic_cast<Instruction::call *>(inst); call && !call->getFunction()->noPostEffect)
                     for (auto i = 0; i < call->getNumArgs(); i++)
                         setAttr(call->getArg(i));

@@ -49,6 +49,8 @@ namespace mir {
             return getRootValue(load->getPointerOperand());
         if (auto store = dynamic_cast<const Instruction::store *>(value))
             return getRootValue(store->getDest());
+        if (auto memset = dynamic_cast<const Instruction::memset *>(value))
+            return getRootValue(memset->getBase());
         if (auto gep = dynamic_cast<const Instruction::getelementptr *>(value)) {
             auto ret = getRootValue(gep->getPointerOperand());
             if (!ret.second) return ret;

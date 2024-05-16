@@ -50,7 +50,7 @@ namespace mir {
     }
 
     auto spiltArray(Instruction::alloca_ *alloca_) {
-        if (alloca_->type->isIntegerTy()) return std::next(alloca_->node);
+        if (alloca_->type->isNumberTy()) return std::next(alloca_->node);
         if (!arrayCanSpilt(alloca_)) return std::next(alloca_->node);
         auto bb = alloca_->parent;
         std::vector<Instruction::alloca_ *> new_alloca;
@@ -69,7 +69,7 @@ namespace mir {
     }
 
     void spiltArray(Manager &mgr, GlobalVar *global) {
-        if (global->type->isIntegerTy()) return;
+        if (global->type->isNumberTy()) return;
         if (global->type->isStringTy()) return;
         if (!arrayCanSpilt(global)) return;
         std::vector<GlobalVar *> new_global;
