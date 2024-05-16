@@ -384,7 +384,7 @@ namespace backend {
         const bool isMain = mirFunction->isMain();
         const bool isLeaf = mirFunction->isLeaf();
         const bool retValue = mirFunction->retType == mir::Type::getI32Type() && !isMain;
-        std::string name = mirFunction->getName().substr(1);
+        std::string name = mirFunction->name.substr(1);
         curFunc = new mips::Function{std::move(name), isMain, isLeaf, retValue};
         fMap[mirFunction] = curFunc;
         if (!isLeaf) curFunc->shouldSave.insert(mips::PhyRegister::get("$ra"));
@@ -511,8 +511,8 @@ namespace backend {
     void Translator::translateGlobalVar(const mir::GlobalVar *mirVar) {
         mips::rGlobalVar result;
         std::string name;
-        if (mirVar->unnamed) name = mirVar->getName(), name[0] = '$';
-        else name = mirVar->getName().substr(1);
+        if (mirVar->unnamed) name = mirVar->name, name[0] = '$';
+        else name = mirVar->name.substr(1);
         if (mirVar->init == nullptr)
             result = new mips::GlobalVar{
                 std::move(name), false, false, false,

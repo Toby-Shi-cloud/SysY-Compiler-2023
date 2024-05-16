@@ -155,14 +155,14 @@ namespace mir {
     void Function::allocName() const {
         size_t counter = 0;
         for (auto arg: args) {
-            arg->setName("%" + std::to_string(counter++));
+            arg->name = "%" + std::to_string(counter++);
         }
         for (auto bb: bbs) {
             if (bb->instructions.empty()) continue;
-            bb->setName("%" + std::to_string(counter++));
+            bb->name = "%" + std::to_string(counter++);
             for (auto instruction: bb->instructions) {
                 if (!instruction->isValue()) continue;
-                instruction->setName("%" + std::to_string(counter++));
+                instruction->name = "%" + std::to_string(counter++);
             }
         }
     }
@@ -186,7 +186,7 @@ namespace mir {
 
     Function *Function::clone() const {
         value_map_t map;
-        auto func = new Function(getType(), getName());
+        auto func = new Function(getType(), name);
         for (auto &&arg: args)
             func->args.push_back(arg->clone(func, map));
         for (auto &&bb: bbs)
@@ -240,7 +240,7 @@ namespace mir {
             }
         }
         s += R"(\00")";
-        setName(std::move(s));
+        name = std::move(s);
     }
 
     ArrayLiteral::ArrayLiteral(std::vector<Literal *> values)
@@ -252,23 +252,23 @@ namespace mir {
             if (i) s += ", ";
             s += this->values[i]->getType()->to_string();
             s += " ";
-            s += this->values[i]->getName();
+            s += this->values[i]->name;
         }
         s += ']';
-        setName(std::move(s));
+        name = std::move(s);
     }
 
     std::ostream &operator<<(std::ostream &os, const BasicBlock &bb) {
         if (bb.parent->bbs.front() != &bb) {
-            os << bb.getName().substr(1) << ":";
-            for (auto i = bb.getName().length(); i < 50; i++) os << " ";
+            os << bb.name.substr(1) << ":";
+            for (auto i = bb.name.length(); i < 50; i++) os << " ";
             os << "; preds = ";
             std::vector<BasicBlock *> predecessors{bb.predecessors.begin(), bb.predecessors.end()};
             std::sort(predecessors.begin(), predecessors.end(),
                       [](auto &&x, auto &&y) { return x->getId() < y->getId(); });
             bool first = true;
             for (auto pred: predecessors)
-                os << (first ? "" : ", ") << pred->getName(), first = false;
+                os << (first ? "" : ", ") << pred->name, first = false;
             os << "\n";
         }
         for (auto instruction: bb.instructions) {
@@ -281,7 +281,7 @@ namespace mir {
         assert(!func.isLibrary());
         func.allocName();
         func.calcPreSuc();
-        os << "define dso_local " << func.retType << " " << func.getName() << "(";
+        os << "define dso_local " << func.retType << " " << func.name << "(";
         for (size_t i = 0; i < func.args.size(); i++) {
             if (i) os << ", ";
             os << func.args[i];
@@ -295,7 +295,7 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, const GlobalVar &var) {
-        os << var.getName() << " = ";
+        os << var.name << " = ";
         os << (var.unnamed ? "private unnamed_addr " : "dso_local ");
         os << (var.isConst() ? "constant " : "global ");
         if (var.init) os << var.init;
@@ -309,7 +309,7 @@ namespace mir {
     }
 
     std::ostream &operator<<(std::ostream &os, const Literal &literal) {
-        os << literal.getType() << " " << literal.getName();
+        os << literal.getType() << " " << literal.name;
         return os;
     }
 

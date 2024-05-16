@@ -31,22 +31,22 @@ namespace mir {
         if (hasCondition()) {
             assert(getCondition()->getType() == (pType) Type::getI1Type());
             return os << "br " << getCondition()
-                   << ", label " << getIfTrue()->getName()
-                   << ", label " << getIfFalse()->getName();
+                   << ", label " << getIfTrue()->name
+                   << ", label " << getIfFalse()->name;
         }
-        return os << "br label " << getTarget()->getName();
+        return os << "br label " << getTarget()->name;
     }
 
     std::ostream &Instruction::fneg::output(std::ostream &os) const {
-        return os << getName() << " = fneg " << getOperand();
+        return os << name << " = fneg " << getOperand();
     }
 
     std::ostream &Instruction::alloca_::output(std::ostream &os) const {
-        return os << getName() << " = alloca " << getType() << ", align 4";
+        return os << name << " = alloca " << getType() << ", align 4";
     }
 
     std::ostream &Instruction::load::output(std::ostream &os) const {
-        return os << getName() << " = load " << getType() << ", ptr " << getPointerOperand()->getName();
+        return os << name << " = load " << getType() << ", ptr " << getPointerOperand()->name;
     }
 
     std::ostream &Instruction::store::output(std::ostream &os) const {
@@ -55,7 +55,7 @@ namespace mir {
                       << ", i8 0, i32 " << getSrc()->getType()->size()
                       << ", i1 false)";
         }
-        return os << "store " << getSrc() << ", ptr " << getDest()->getName();
+        return os << "store " << getSrc() << ", ptr " << getDest()->name;
     }
 
     Instruction::getelementptr::getelementptr(pType type, Value *ptr, const std::vector<Value *> &idxs)
@@ -64,8 +64,8 @@ namespace mir {
           indexTy(getIndexTy(ptr->getType())) {}
 
     std::ostream &Instruction::getelementptr::output(std::ostream &os) const {
-        os << getName() << " = getelementptr " << indexTy
-                << ", ptr " << getPointerOperand()->getName();
+        os << name << " = getelementptr " << indexTy
+                << ", ptr " << getPointerOperand()->name;
         for (int i = 0; i < getNumIndices(); i++) {
             os << ", " << getIndexOperand(i);
         }
@@ -73,22 +73,22 @@ namespace mir {
     }
 
     std::ostream &Instruction::icmp::output(std::ostream &os) const {
-        return os << getName() << " = icmp " << cond << " " << getLhs() << ", " << getRhs()->getName();
+        return os << name << " = icmp " << cond << " " << getLhs() << ", " << getRhs()->name;
     }
 
     std::ostream &Instruction::fcmp::output(std::ostream &os) const {
-        return os << getName() << " = fcmp " << cond << " " << getLhs() << ", " << getRhs()->getName();
+        return os << name << " = fcmp " << cond << " " << getLhs() << ", " << getRhs()->name;
     }
 
     Instruction::phi::phi(const std::vector<incominng_pair> &values)
         : Instruction(values[0].first->getType(), PHI, flatten(values)) {}
 
     std::ostream &Instruction::phi::output(std::ostream &os) const {
-        os << getName() << " = phi " << getType() << " ";
+        os << name << " = phi " << getType() << " ";
         for (int i = 0; i < getNumIncomingValues(); i++) {
             if (i) os << ", ";
             auto [value, label] = getIncomingValue(i);
-            os << "[ " << value->getName() << ", " << label->getName() << " ]";
+            os << "[ " << value->name << ", " << label->name << " ]";
         }
         return os;
     }
@@ -97,14 +97,14 @@ namespace mir {
         : Instruction(func->getType()->getFunctionRet(), CALL, merge(func, args.begin(), args.end())) {}
 
     std::ostream &Instruction::select::output(std::ostream &os) const {
-        return os << getName() << " = select " << getCondition() << ", " << getTrueValue() << ", " << getFalseValue();
+        return os << name << " = select " << getCondition() << ", " << getTrueValue() << ", " << getFalseValue();
     }
 
     std::ostream &Instruction::call::output(std::ostream &os) const {
         if (getFunction()->retType != Type::getVoidType())
-            os << getName() << " = ";
+            os << name << " = ";
         os << "call " << getFunction()->getType();
-        os << " " << getFunction()->getName() << "(";
+        os << " " << getFunction()->name << "(";
         for (int i = 0; i < getNumArgs(); i++) {
             if (i) os << ", ";
             os << getArg(i);

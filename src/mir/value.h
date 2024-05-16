@@ -46,13 +46,6 @@ namespace mir {
         pType type;
 
         /**
-         * Not every Value has a name. <br>
-         * To mark the value as anonymous, set name to empty string.
-         */
-        std::string name;
-        inline static const std::string anonymous = "<anonymous>";
-
-        /**
          * To mark the value as constant, set isConstant to true. <br>
          * False by default.
          */
@@ -64,24 +57,27 @@ namespace mir {
         std::shared_ptr<Use> use;
 
     public:
-        explicit Value(pType type, bool isConstant) : type(type), isConstant(isConstant), use(new Use{this}) {}
+        std::string name;
 
-        explicit Value(pType type) : Value(type, false) {}
+    public:
+        Value(pType type, std::string name, bool isConstant)
+                : type(type), name(std::move(name)), isConstant(isConstant), use(new Use{this}) {}
 
-        Value(const Value &value) : type(value.type), name(value.name), isConstant(value.isConstant),
-                                    use(new Use{this}) {}
+        explicit Value(pType type) : Value(type, "<anonymous>", false) {}
+
+        Value(pType type, std::string name) : Value(type, std::move(name), false) {}
+
+        Value(const Value &value) : Value(value.type, value.name, value.isConstant) {}
 
         Value(Value &&) = default;
 
         virtual ~Value() = default;
 
+        Value &operator=(const Value &) = delete;
+
+        Value &operator=(Value &&) = delete;
+
         void setConst(bool constant = true) { isConstant = constant; }
-
-        void setName(std::string str) { name = std::move(str); }
-
-        [[nodiscard]] bool hasName() const { return !name.empty(); }
-
-        [[nodiscard]] const std::string &getName() const { return hasName() ? name : anonymous; }
 
         [[nodiscard]] pType getType() const { return type; }
 
@@ -89,7 +85,7 @@ namespace mir {
 
         [[nodiscard]] bool isConst() const { return isConstant; }
 
-        [[nodiscard]] long getId() const { return std::strtol(getName().c_str() + 1, nullptr, 0); }
+        [[nodiscard]] auto getId() const { return std::stoi(name.c_str() + 1); }
 
         // return a copy of users
         [[nodiscard]] auto users() const { return use->users; }
@@ -201,7 +197,7 @@ namespace mir {
         if (use->users.empty()) return false;
         if (use->users.size() > 1) return true;
         if (auto self = dynamic_cast<const User *>(this);
-            use->users.count(const_cast<User *>(self)))
+                use->users.count(const_cast<User *>(self)))
             return false;
         return true;
     }
@@ -225,7 +221,7 @@ namespace mir {
     inline std::ostream &operator<<(std::ostream &os, const Value &value) {
         if (value.getType()->isArrayTy()) os << "ptr";
         else os << value.getType();
-        return os << " " << value.getName();
+        return os << " " << value.name;
     }
 
     template<typename T>

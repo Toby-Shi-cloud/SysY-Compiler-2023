@@ -26,8 +26,8 @@ namespace mir {
         void allocName() const {
             std::unordered_map<std::string, int> names;
             for (auto globalVar: globalVars)
-                if (auto &cnt = names[globalVar->getName()]; cnt++)
-                    globalVar->setName(globalVar->getName() + "." + std::to_string(cnt));
+                if (auto &cnt = names[globalVar->name]; cnt++)
+                    globalVar->name += "." + std::to_string(cnt);
             for (auto function: functions)
                 function->allocName();
         }
@@ -53,7 +53,7 @@ namespace mir {
                 os << globalVar << std::endl;
             os << std::endl;
             for (auto func: Function::getLibrary()) {
-                os << "declare dso_local " << func->retType << " " << func->getName() << "(";
+                os << "declare dso_local " << func->retType << " " << func->name << "(";
                 for (auto i = 0; i < func->getType()->getFunctionParamCount(); i++) {
                     if (i) os << ", ";
                     os << func->getType()->getFunctionParam(i);

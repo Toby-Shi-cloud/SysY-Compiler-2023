@@ -156,9 +156,7 @@ namespace mir {
             return funcs;
         }
 
-        explicit Function(pType type, const std::string &name) : Value(type), retType(type->getFunctionRet()) {
-            setName("@" + name);
-        }
+        explicit Function(pType type, const std::string &name) : Value(type, "@" + name), retType(type->getFunctionRet()) {}
 
         Function(const Function &) = delete;
 
@@ -202,7 +200,7 @@ namespace mir {
 
         void calcDomDepth() const;
 
-        [[nodiscard]] bool isMain() const { return getName() == "@main"; }
+        [[nodiscard]] bool isMain() const { return name == "@main"; }
 
         [[nodiscard]] bool isLeaf() const;
 
@@ -237,12 +235,11 @@ namespace mir {
         const bool unnamed;
 
         explicit GlobalVar(pType type, std::string name, Literal *init, bool isConstant)
-                : Value(type, isConstant), init(init), unnamed(false) {
-            setName("@" + std::move(name));
+                : Value(type, "@" + std::move(name), isConstant), init(init), unnamed(false) {
         }
 
         explicit GlobalVar(pType type, Literal *init, bool isConstant)
-                : Value(type, isConstant), init(init), unnamed(true) {}
+                : Value(type, "", isConstant), init(init), unnamed(true) {}
 
         GlobalVar(const GlobalVar &) = delete;
 
@@ -354,14 +351,12 @@ namespace mir {
      * Literal is a constant value. <br>
      */
     struct Literal : Value {
-        explicit Literal(pType type) : Value(type, true) {}
+        explicit Literal(pType type) : Value(type, "", true) {}
 
-        explicit Literal(pType type, std::string name) : Value(type, true) {
-            setName(std::move(name));
-        }
+        explicit Literal(pType type, std::string name) : Value(type, std::move(name), true) {}
 
         [[nodiscard]] inline virtual calculate_t getValue() const {
-            throw std::runtime_error("Cannot get " + getName() + "'s value");
+            throw std::runtime_error("Cannot get " + name + "'s value");
         }
     };
 

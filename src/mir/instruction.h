@@ -129,7 +129,7 @@ namespace mir {
         [[nodiscard]] Instruction *clone() const override { return new _binary_instruction(*this); }
 
         std::ostream &output(std::ostream &os) const override {
-            return os << getName() << " = " << ty << " " << getLhs() << ", " << getRhs()->getName();
+            return os << name << " = " << ty << " " << getLhs() << ", " << getRhs()->name;
         }
     };
 
@@ -241,7 +241,7 @@ namespace mir {
         }
 
         std::ostream &output(std::ostream &os) const override {
-            return os << getName() << " = " << ty << " " << getValueOperand() << " to " << getType();
+            return os << name << " = " << ty << " " << getValueOperand() << " to " << getType();
         }
     };
 

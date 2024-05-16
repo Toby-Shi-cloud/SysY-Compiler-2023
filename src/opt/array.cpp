@@ -70,7 +70,7 @@ namespace mir {
                 auto lit = dynamic_cast<IntegerLiteral *>(init);
                 auto index = new_global.size();
                 auto _new_val = new GlobalVar(
-                        Type::getI32Type(), global->getName().substr(1) + "." + std::to_string(index),
+                        Type::getI32Type(), global->name.substr(1) + "." + std::to_string(index),
                         lit, global->isConst());
                 new_global.push_back(_new_val);
                 return;

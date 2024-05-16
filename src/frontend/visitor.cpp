@@ -335,7 +335,7 @@ namespace frontend::visitor {
     SysYVisitor::return_type SysYVisitor::visit<CompUnit>(const GrammarNode &node) {
         for (auto func: mir::Function::getLibrary()) {
             auto msg = symbol_table.insert(
-                    std::string_view(func->getName()).substr(1),
+                    std::string_view(func->name).substr(1),
                     {func, nullptr},
                     Token()
             );
@@ -378,7 +378,7 @@ namespace frontend::visitor {
         mir::GlobalVar *variable;
         if (current_function) {
             variable = new mir::GlobalVar(type, literal, true);
-            variable->setName("@__const." + current_function->getName().substr(1) + "." + std::string(identifier.raw));
+            variable->name = "@__const." + current_function->name.substr(1) + "." + std::string(identifier.raw);
         } else {
             variable = new mir::GlobalVar(type, std::string(identifier.raw), literal, true);
         }
@@ -502,7 +502,7 @@ namespace frontend::visitor {
                 init_list.push_back(store_);
                 val = alloca_;
             }
-            if (auto msg = symbol_table.insert((*it1)->getName(), {val, nullptr}, **it2)) {
+            if (auto msg = symbol_table.insert((*it1)->name, {val, nullptr}, **it2)) {
                 message_queue.push_back(*msg);
             }
         }
@@ -520,7 +520,7 @@ namespace frontend::visitor {
         auto &identifier = node.children[1]->getToken();
         auto type = getVarType(node.children.begin() + 2, node.children.end());
         auto virtual_value = new mir::Value(type);
-        virtual_value->setName(std::string(identifier.raw));
+        virtual_value->name = std::string(identifier.raw);
         token_buffer.push_back(&identifier);
         return {nullptr, {virtual_value}};
     }
