@@ -70,13 +70,13 @@ namespace mir {
 
     Function *Function::starttime() {
         const static Function _f(FunctionType::getFunctionType(
-                Type::getVoidType(), {}), "_sysy_starttime");
+                Type::getVoidType(), {Type::getI32Type()}), "_sysy_starttime");
         return const_cast<Function *>(&_f);
     }
 
     Function *Function::stoptime() {
         const static Function _f(FunctionType::getFunctionType(
-                Type::getVoidType(), {}), "_sysy_stoptime");
+                Type::getVoidType(), {Type::getI32Type()}), "_sysy_stoptime");
         return const_cast<Function *>(&_f);
     }
 }

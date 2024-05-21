@@ -812,6 +812,11 @@ namespace frontend::visitor {
             }
             value_list list = {};
             if (node.children.size() == 3) {
+                if (function == mir::Function::starttime() || function == mir::Function::stoptime()) {
+                    auto call = new Instruction::call(function, {mir::getLiteral((int) line)});
+                    list.push_back(call);
+                    return {call, list};
+                }
                 if (function->type->getFunctionParamCount() != 0)
                     message_queue.push_back(message{
                             message::ERROR, 'd', line, column,
