@@ -5,7 +5,7 @@
 #ifndef COMPILER_ENUM_H
 #define COMPILER_ENUM_H
 
-#include <magic_enum/magic_enum.hpp>
+#include <magic_enum.hpp>
 
 namespace magic_enum {
     template<typename Enum>

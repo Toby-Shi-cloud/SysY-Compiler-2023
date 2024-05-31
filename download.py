@@ -24,8 +24,7 @@ def download_dbg_macro():
     dir_name = list(filter(lambda x: x.startswith('sharkdp-dbg-macro-'), os.listdir('include')))
     if len(dir_name) == 0:
         raise FileNotFoundError('Directory not found: sharkdp-dbg-macro-*')
-    os.makedirs(os.path.join('include', 'dbg_macro'), exist_ok=True)
-    shutil.move(os.path.join('include', dir_name[0], 'dbg.h'), os.path.join('include', 'dbg_macro'))
+    shutil.move(os.path.join('include', dir_name[0], 'dbg.h'), 'include/dbg_macro.h')
     shutil.rmtree(os.path.join('include', dir_name[0]))
 
 
@@ -35,7 +34,17 @@ def download_magic_enum():
     dir_name = list(filter(lambda x: x.startswith('Neargye-magic_enum-'), os.listdir('include')))
     if len(dir_name) == 0:
         raise FileNotFoundError('Directory not found: Neargye-magic_enum-*')
-    shutil.move(os.path.join('include', dir_name[0], 'include', 'magic_enum'), 'include')
+    shutil.move(os.path.join('include', dir_name[0], 'include', 'magic_enum', 'magic_enum.hpp'), 'include')
+    shutil.rmtree(os.path.join('include', dir_name[0]))
+
+
+def download_clipp():
+    print('Downloading clipp...')
+    download('muellan', 'clipp')
+    dir_name = list(filter(lambda x: x.startswith('muellan-clipp-'), os.listdir('include')))
+    if len(dir_name) == 0:
+        raise FileNotFoundError('Directory not found: muellan-clipp-*')
+    shutil.move(os.path.join('include', dir_name[0], 'include', 'clipp.h'), 'include')
     shutil.rmtree(os.path.join('include', dir_name[0]))
 
 
@@ -51,6 +60,7 @@ def main():
     os.makedirs('include', exist_ok=True)
     download_dbg_macro()
     download_magic_enum()
+    download_clipp()
     if os.path.exists(TEMP_TAR):
         os.remove(TEMP_TAR)
 

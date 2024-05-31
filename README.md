@@ -18,11 +18,19 @@ BUAA Compiler Course Project 2023 by Toby Shi.
 ### Dependencies
 - ["dbg.h"](https://github.com/sharkdp/dbg-macro) for debug (no need for release mode)
 - ["magic_enum"](https://github.com/Neargye/magic_enum) for enum reflection
+- ["clipp"](https://github.com/muellan/clipp) for cli argument parsing
 
 You can download this library manually or use `download.py` (`gh` needed) to install them.
 
 ## Usage
 
-直接不带参数运行的版本是符合实验要求的版本，如果需要调整请参考
+```
+SYNOPSIS
+        Compiler <source> [-O <level>] [-emit-llvm] [-S] [-o <output>]
 
-https://github.com/Toby-Shi-cloud/SysY-Compiler-2023/blob/71adc9706254cb6141f7575b7c803e30c03bb95f/src/main.cpp#L14-L31
+OPTIONS
+        -O          optimization level (0-3)
+        -emit-llvm  emit llvm ir
+        -S          emit assembly
+        -o          output file (default a.out)
+```

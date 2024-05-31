@@ -7,33 +7,49 @@
 #include "mips/component.h"
 #include "backend/translator.h"
 
-frontend::message_queue_t message_queue;
-mir::Manager mir_manager;
-mips::Module mips_module;
-
-bool no_mips = false;
-const char *source_file = "testfile.sy";
-const char *llvm_ir_file = "testfile.ll";
-const char *mips_file = "testfile.asm";
+#include <clipp.h>
+using namespace clipp;
 
 int main(int argc, char **argv) {
-    set_optimize_level(2); // as default
-    decltype(source_file) *ptr = &source_file;
-    for (int i = 1; i < argc; i++) {
-        using namespace std::string_literals;
-        if (argv[i] == "-O0"s) set_optimize_level(0);
-        else if (argv[i] == "-O1"s) set_optimize_level(1);
-        else if (argv[i] == "-O2"s) set_optimize_level(2);
-        else if (argv[i] == "-O3"s) set_optimize_level(3);
-        else if (argv[i] == "-no-S"s) no_mips = true;
-        else if (argv[i] == "-S"s) ptr = &mips_file;
-        else if (argv[i] == "-emit-llvm"s) ptr = &llvm_ir_file;
-        else *ptr = argv[i], ptr = &source_file;
+    int opt_level = 1;
+    bool llvm_ir = false, assembly = false, help = false;
+    std::string infile, outfile = "a.out";
+
+    auto cli = (
+        opt_value("source", infile).required(true)
+            .if_missing([]{ std::cout << "Source file not provided!\n"; } )
+            .if_repeated([argv](int idx){ std::cout << "Duplicate source file: " << argv[idx] << "\n"; } ),
+        option("-O").doc("optimization level (0-3)") & value("level", opt_level),
+        option("-emit-llvm").set(llvm_ir).doc("emit llvm ir"),
+        option("-S").set(assembly).doc("emit assembly"),
+        option("-o").doc("output file (default a.out)") & value("output", outfile)
+    );
+    auto cli_help = option("-h", "--help").set(help).doc("show help");
+
+    if (!parse(argc, argv, cli | cli_help)) {
+        std::cout << "Usage:" << usage_lines(cli, argv[0]);
+        return 1;
     }
 
-    std::ifstream fin(source_file);
-    std::ofstream fir(llvm_ir_file);
-    std::ofstream fmips(mips_file);
+    if (help) {
+        std::cout << make_man_page(cli, argv[0]);
+        return 0;
+    }
+
+    if (!llvm_ir && !assembly) {
+        std::cout << "Error: no output specified" << std::endl;
+        return 1;
+    }
+
+    std::ifstream fin(infile);
+    if (!fin) {
+        std::cerr << "Error: cannot open file " << infile << std::endl;
+        return 1;
+    }
+
+    frontend::message_queue_t message_queue;
+    mir::Manager mir_manager;
+    mips::Module mips_module;
 
     std::string src, s;
     while (std::getline(fin, s)) {
@@ -54,10 +70,14 @@ int main(int argc, char **argv) {
 
     mir_manager.optimize();
     mir_manager.allocName();
-    mir_manager.output(fir);
+    if (llvm_ir) {
+        std::ofstream fir(assembly ? outfile + ".ll" : outfile);
+        mir_manager.output(fir);
+    }
 
-    if (no_mips) return 0;
+    if (!assembly) return 0;
 
+    std::ofstream fmips(outfile);
     backend::Translator translator(&mir_manager, &mips_module);
     translator.translate();
 

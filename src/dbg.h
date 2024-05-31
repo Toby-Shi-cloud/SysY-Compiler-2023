@@ -8,7 +8,7 @@
 #if defined(_DEBUG_)
 #define DBG_ENABLE
 #define DBG_MACRO_NO_WARNING
-#include <dbg_macro/dbg.h>
+#include <dbg_macro.h>
 #undef DBG_MACRO_NO_WARNING
 #else
 #undef DBG_ENABLE
