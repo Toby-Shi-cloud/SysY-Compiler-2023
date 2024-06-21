@@ -4,8 +4,7 @@
 #include "frontend/parser.h"
 #include "frontend/visitor.h"
 #include "mir/manager.h"
-#include "mips/component.h"
-#include "backend/translator.h"
+#include "riscv/lir.h"
 
 #include <clipp.h>
 using namespace clipp;
@@ -74,6 +73,12 @@ int main(int argc, char **argv) {
         std::ofstream fir(assembly ? outfile + ".ll" : outfile);
         mir_manager.output(fir);
     }
+
+    mir_manager.for_each_func([](auto func) {
+        auto dag = riscv::build_dag(func);
+        std::fstream f("dag_" + func->name.substr(1) + ".dot", std::ios::out);
+        f << lir64::to_graph(dag);
+    });
 
     return 0;
 }

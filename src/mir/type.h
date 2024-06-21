@@ -54,6 +54,8 @@ namespace mir {
 
         static pIntegerType getI32Type();
 
+        static pIntegerType getI64Type();
+
         static pType getFloatType();
 
         static pPointerType getPointerType(pType base);

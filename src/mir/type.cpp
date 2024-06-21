@@ -28,6 +28,10 @@ namespace mir {
         return IntegerType::getIntegerType(32);
     }
 
+    pIntegerType Type::getI64Type() {
+        return IntegerType::getIntegerType(64);
+    }
+
     pType Type::getFloatType() {
         static Type type(FLOAT);
         return &type;
