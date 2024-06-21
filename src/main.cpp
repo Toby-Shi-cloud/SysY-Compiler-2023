@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
     }
 
     std::ifstream fin(infile);
+    set_optimize_level(opt_level);
     if (!fin) {
         std::cerr << "Error: cannot open file " << infile << std::endl;
         return 1;
@@ -49,7 +50,6 @@ int main(int argc, char **argv) {
 
     frontend::message_queue_t message_queue;
     mir::Manager mir_manager;
-    mips::Module mips_module;
 
     std::string src, s;
     while (std::getline(fin, s)) {
@@ -75,14 +75,5 @@ int main(int argc, char **argv) {
         mir_manager.output(fir);
     }
 
-    if (!assembly) return 0;
-
-    std::ofstream fmips(outfile);
-    backend::Translator translator(&mir_manager, &mips_module);
-    translator.translate();
-
-    if (opt_settings.using_inline_printer)
-        inline_printer(fmips, mips_module);
-    else fmips << mips_module;
     return 0;
 }
