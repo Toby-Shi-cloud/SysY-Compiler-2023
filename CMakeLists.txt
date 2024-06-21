@@ -3,7 +3,7 @@ project(Compiler)
 
 set(CMAKE_CXX_STANDARD 17)
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     add_definitions(-D_DEBUG_)
 endif ()
 
