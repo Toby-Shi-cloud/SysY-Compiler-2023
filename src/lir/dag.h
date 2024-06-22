@@ -32,7 +32,10 @@ namespace LIR {
         using Value = mir::pType;
         struct Ch {};
         struct Glue {};
-        using Type = std::variant<Value, Ch, Glue>;
+        struct Type : std::variant<Value, Ch, Glue> {
+            using variant::variant;
+            Type(Value ty) : variant(ty->isPointerTy() || ty->isArrayTy() ? DAG_ADDRESS_TYPE : ty) {}
+        };
 
         Type type;
         DAGNode *node;
@@ -211,28 +214,9 @@ namespace LIR::node {
         [[nodiscard]] const_slice<DAGValue> values() const override { return {&ret, 1}; } \
         [[nodiscard]] std::string name() const override { return #ty; } \
     }
-
-    DAG_NODE_GEN(add);
-    DAG_NODE_GEN(sub);
-    DAG_NODE_GEN(mul);
-    DAG_NODE_GEN(udiv);
-    DAG_NODE_GEN(sdiv);
-    DAG_NODE_GEN(urem);
-    DAG_NODE_GEN(srem);
-
-    DAG_NODE_GEN(fadd);
-    DAG_NODE_GEN(fsub);
-    DAG_NODE_GEN(fmul);
-    DAG_NODE_GEN(fdiv);
-    DAG_NODE_GEN(frem);
-
-    DAG_NODE_GEN(shl);
-    DAG_NODE_GEN(lshr);
-    DAG_NODE_GEN(ashr);
-    DAG_NODE_GEN(and_);
-    DAG_NODE_GEN(or_);
-    DAG_NODE_GEN(xor_);
-
+    FOR_EACH(DAG_NODE_GEN, add, sub, mul, udiv, sdiv, urem, srem);
+    FOR_EACH(DAG_NODE_GEN, fadd, fsub, fmul, fdiv, frem);
+    FOR_EACH(DAG_NODE_GEN, shl, lshr, ashr, and_, or_, xor_);
 #undef DAG_NODE_GEN
 
 #define DAG_NODE_GEN(ty) \
@@ -245,17 +229,30 @@ namespace LIR::node {
         [[nodiscard]] const_slice<DAGValue> values() const override { return {&ret, 1}; } \
         [[nodiscard]] std::string name() const override { return #ty; } \
     }
-
-    DAG_NODE_GEN(fneg);
-    DAG_NODE_GEN(zext);
-    DAG_NODE_GEN(sext);
-    DAG_NODE_GEN(trunc);
-    DAG_NODE_GEN(fptoui);
-    DAG_NODE_GEN(fptosi);
-    DAG_NODE_GEN(uitofp);
-    DAG_NODE_GEN(sitofp);
-
+    FOR_EACH(DAG_NODE_GEN, fneg, zext, sext, trunc, fptoui, fptosi, uitofp, sitofp);
 #undef DAG_NODE_GEN
+
+    struct icmp : DAGNode {
+        mir::Instruction::icmp::Cond cond;
+        DAGLink lhs, rhs;
+        DAGValue ret{this, mir::Type::getI1Type()};
+        explicit icmp(mir::Instruction::icmp *inst) :
+            cond(inst->cond), lhs(this, inst->getLhs()->type), rhs(this, inst->getRhs()->type) {}
+        [[nodiscard]] const_slice<DAGLink> links() const override { return {&lhs, 2}; }
+        [[nodiscard]] const_slice<DAGValue> values() const override { return {&ret, 1}; }
+        [[nodiscard]] std::string name() const override { return "icmp\\<" + std::string(magic_enum::enum_name(cond)) + "\\>"; }
+    };
+
+    struct fcmp : DAGNode {
+        mir::Instruction::fcmp::Cond cond;
+        DAGLink lhs, rhs;
+        DAGValue ret{this, mir::Type::getI1Type()};
+        explicit fcmp(mir::Instruction::fcmp *inst) :
+            cond(inst->cond), lhs(this, inst->getLhs()->type), rhs(this, inst->getRhs()->type) {}
+        [[nodiscard]] const_slice<DAGLink> links() const override { return {&lhs, 2}; }
+        [[nodiscard]] const_slice<DAGValue> values() const override { return {&ret, 1}; }
+        [[nodiscard]] std::string name() const override { return "fcmp\\<" + std::string(magic_enum::enum_name(cond)) + "\\>"; }
+    };
 
 /// MARKER: DAGNode Transformation
 
@@ -348,7 +345,7 @@ namespace LIR::node {
     struct LAddress : DAGValueNode {
         ssize_t offset; // offset to fp (positive for params & negative for local val)
         explicit LAddress(ssize_t offset) : DAGValueNode(DAG_ADDRESS_TYPE), offset(offset) {}
-        [[nodiscard]] std::string name() const override { return std::to_string(offset) + "(fp)"; }
+        [[nodiscard]] std::string name() const override { return "address\\<" + std::to_string(offset) + "(fp)\\>"; }
     };
 
 /// MARKER: DAGNode Control Flow
@@ -369,6 +366,26 @@ namespace LIR::node {
         [[nodiscard]] const_slice<DAGLink> links() const override { return {&cond, 3}; }
         [[nodiscard]] const_slice<DAGValue> values() const override { return {&ret, 1}; }
         [[nodiscard]] std::string name() const override { return "select"; }
+    };
+
+    struct JumpNode : DAGNode {
+        mir::BasicBlock *bb;
+        DAGLink ch{this, DAGValue::Ch()};
+        explicit JumpNode(mir::BasicBlock *bb) : bb(bb) {}
+        [[nodiscard]] const_slice<DAGLink> links() const override { return {&ch, 1}; }
+        [[nodiscard]] const_slice<DAGValue> values() const override { return {nullptr, 0}; }
+        [[nodiscard]] std::string name() const override { return "jump " + bb->name; }
+        [[nodiscard]] bool in_used() const override { return true; }
+    };
+
+    struct BrNode : DAGNode {
+        mir::BasicBlock *if_true, *if_false;
+        DAGLink cond{this, mir::Type::getI1Type()}, ch{this, DAGValue::Ch()};
+        BrNode(mir::BasicBlock *if_true, mir::BasicBlock *if_false) : if_true(if_true), if_false(if_false) {}
+        [[nodiscard]] const_slice<DAGLink> links() const override { return {&cond, 2}; }
+        [[nodiscard]] const_slice<DAGValue> values() const override { return {nullptr, 0}; }
+        [[nodiscard]] std::string name() const override { return "br " + if_true->name + " " + if_false->name; }
+        [[nodiscard]] bool in_used() const override { return true; }
     };
 
     struct EntryToken : DAGNode {

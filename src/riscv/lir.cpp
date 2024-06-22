@@ -12,14 +12,13 @@ static auto build_to_reg_node(mir::Value *value, node::DAGValue *reg, CallArg &a
     auto copy = std::make_unique<node::CopyToReg>(Type::getI64Type());
     copy->dependency.set_link(arg.last_side_effect);
     copy->reg.set_link(reg);
-    if (value->type == Type::getI32Type()) {
-        auto sext = std::make_unique<node::sext>(Type::getI32Type(), Type::getI64Type());
-        sext->val.set_link(lir64::get_node_value(value, arg));
-        copy->value.set_link(&sext->ret);
-        arg.dag.push_back(std::move(sext));
+    auto val = lir64::get_node_value(value, arg);
+    if (value->type == Type::getI32Type() || value->type->isPointerTy() || value->type->isArrayTy()) {
+        auto sext = lir64::build_convert_node<node::sext>(val, Type::getI64Type(), arg);
+        copy->value.set_link(sext);
     } else if (value->type == Type::getFloatType()) {
         auto move = std::make_unique<node::FMV_X_W>();
-        move->rs.set_link(lir64::get_node_value(value, arg));
+        move->rs.set_link(val);
         copy->value.set_link(&move->rd);
         arg.dag.push_back(std::move(move));
     } else {
@@ -34,10 +33,7 @@ static auto build_from_reg_node(mir::Value *value, node::DAGValue *reg, CallArg 
     copy->dependency.set_link(arg.last_side_effect);
     copy->reg.set_link(reg);
     if (value->type == Type::getI32Type()) {
-        auto trunc = std::make_unique<node::trunc>(Type::getI64Type(), Type::getI32Type());
-        trunc->val.set_link(&copy->value);
-        arg.map[value] = &trunc->ret;
-        arg.dag.push_back(std::move(trunc));
+        arg.map[value] = lir64::build_convert_node<node::trunc>(&copy->value, Type::getI32Type(), arg);
     } else if (value->type == Type::getFloatType()) {
         auto move = std::make_unique<node::FMV_W_X>();
         move->rs.set_link(&copy->value);
@@ -102,6 +98,5 @@ std::vector<lir64::DAG> riscv::build_dag(mir::Function *func) {
             arg.last_side_effect = &node->ch;
             arg.dag.push_back(std::move(node));
         },
-        [](auto &&inst, auto &&...) { TODO(inst); },
     });
 }

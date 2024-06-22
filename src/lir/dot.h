@@ -81,19 +81,21 @@ namespace dot {
     };
 
     struct subgraph {
-        graph graph;
+        static inline size_t id = 0;
+        const graph &graph;
         size_t nested;
     };
 
     inline std::ostream &operator<<(std::ostream &os, const subgraph &g) {
-        os << str::repeat("\t", g.nested) << (g.nested ? "subgraph" : "digraph") << "{\n";
-        if (!g.nested) os << "\trankdir = BT;\n";
+        os << str::repeat("\t", g.nested);
+        if (g.nested) os << "subgraph cluster_" << subgraph::id++ << " {\n";
+        else os << "digraph {\n" << "\trankdir = BT;\n";
         for (const auto &n: g.graph.nodes) {
             std::visit(overloaded{
-                [&](const node &n) { os << str::repeat("\t", g.nested + 1) << n; },
+                [&](const node &n) { os << str::repeat("\t", g.nested + 1) << n << ";"; },
                 [&](const graph &s) { os << subgraph{s, g.nested + 1}; },
             }, n);
-            os << ";\n";
+            os << "\n";
         }
         for (const auto &l: g.graph.links)
             os << str::repeat("\t", g.nested + 1) << l << ";\n";

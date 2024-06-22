@@ -39,11 +39,6 @@ namespace LIR {
     }
 
     inline std::unique_ptr<DAGNode> build_vreg_node(mir::Value *value, CallArg &arg) {
-        if (auto it = arg.globals->address_map.find(value); it != arg.globals->address_map.end()) {
-            auto node = std::make_unique<node::LAddress>(it->second);
-            arg.map[value] = &node->value;
-            return node;
-        }
         auto reg = std::make_unique<node::VRegister>(value->getId(), value->type);
         auto node = std::make_unique<node::CopyFromReg>(reg->value.type);
         node->reg.set_link(&reg->value);
@@ -62,6 +57,12 @@ namespace LIR {
     inline auto get_node_value(mir::Value *value, CallArg &arg) {
         if (auto val = arg.map[value])
             return val;
+        if (auto it = arg.globals->address_map.find(value); it != arg.globals->address_map.end()) {
+            auto node = std::make_unique<node::LAddress>(it->second);
+            auto ret = &node->value;
+            arg.dag.push_back(std::move(node));
+            return ret;
+        }
         if (auto lit = dynamic_cast<mir::Literal *>(value)) {
             return build_constant_node(lit, arg.dag);
         } else if (auto gvar = dynamic_cast<mir::GlobalVar *>(value)) {
@@ -141,7 +142,7 @@ namespace LIR {
             if (idx == mir::getIntegerLiteral(0)) continue;
             auto mul = std::make_unique<node::mul>(idx->type, mir::Type::getI32Type(), DAG_ADDRESS_TYPE);
             mul->lhs.set_link(get_node_value(idx, arg));
-            mul->rhs.set_link(get_node_value(mir::getLiteral((int)type->ssize()), arg));
+            mul->rhs.set_link(get_node_value(mir::getLiteral((int) type->ssize()), arg));
             auto add = std::make_unique<node::add>(addr->type, DAG_ADDRESS_TYPE, DAG_ADDRESS_TYPE);
             add->lhs.set_link(addr);
             add->rhs.set_link(&mul->ret);
@@ -158,6 +159,36 @@ namespace LIR {
 
     inline void build_select_node(mir::Instruction::select *select, CallArg &arg) {
         TODO("build_select_node");
+    }
+
+    inline void build_br_node(mir::Instruction::br *br, CallArg &arg) {
+        if (br->hasCondition()) {
+            auto cond = get_node_value(br->getCondition(), arg);
+            auto node = std::make_unique<node::BrNode>(br->getIfTrue(), br->getIfFalse());
+            node->cond.set_link(cond);
+            node->ch.set_link(arg.last_side_effect);
+            arg.dag.push_back(std::move(node));
+        } else {
+            auto node = std::make_unique<node::JumpNode>(br->getIfTrue());
+            node->ch.set_link(arg.last_side_effect);
+            arg.dag.push_back(std::move(node));
+        }
+    }
+
+    inline void build_icmp_node(mir::Instruction::icmp *icmp, CallArg &arg) {
+        auto node = std::make_unique<node::icmp>(icmp);
+        node->lhs.set_link(get_node_value(icmp->getLhs(), arg));
+        node->rhs.set_link(get_node_value(icmp->getRhs(), arg));
+        arg.map[icmp] = &node->ret;
+        arg.dag.push_back(std::move(node));
+    }
+
+    inline void build_fcmp_node(mir::Instruction::fcmp *fcmp, CallArg &arg) {
+        auto node = std::make_unique<node::fcmp>(fcmp);
+        node->lhs.set_link(get_node_value(fcmp->getLhs(), arg));
+        node->rhs.set_link(get_node_value(fcmp->getRhs(), arg));
+        arg.map[fcmp] = &node->ret;
+        arg.dag.push_back(std::move(node));
     }
 
 #define build_inline(TY, func, ty) \
@@ -188,7 +219,7 @@ namespace LIR {
         for (auto inst: bb->instructions) {
             switch (inst->instrTy) {
                 build_external(RET, ret);
-                build_external(BR, br);
+                build_exact(BR, br);
                 build_inline(ADD, build_binary_node, add);
                 build_inline(SUB, build_binary_node, sub);
                 build_inline(MUL, build_binary_node, mul);
@@ -219,8 +250,8 @@ namespace LIR {
                 build_inline(FPTOSI, build_unary_node, fptosi);
                 build_inline(UITOFP, build_unary_node, uitofp);
                 build_inline(SITOFP, build_unary_node, sitofp);
-                build_external(ICMP, icmp);
-                build_external(FCMP, fcmp);
+                build_exact(ICMP, icmp);
+                build_exact(FCMP, fcmp);
                 build_exact(PHI, phi);
                 build_exact(SELECT, select);
                 build_external(CALL, call);
