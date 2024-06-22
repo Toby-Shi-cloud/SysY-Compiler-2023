@@ -5,6 +5,9 @@
 #ifndef COMPILER_RISCV_REG_H
 #define COMPILER_RISCV_REG_H
 
+#include <cctype>
+#include <cstring>
+#include <algorithm>
 #include "../dbg.h"
 #include "../mir/type.h"
 
@@ -40,9 +43,9 @@ namespace riscv {
     };
 
     constexpr Register operator ""_R(const char *str, size_t) {
-        if (str[0] == 'x' && isnumber(str[1])) {
+        if (str[0] == 'x' && isdigit(str[1])) {
             return {false, std::stoi(str + 1)};
-        } else if (str[0] == 'f' && isnumber(str[1])) {
+        } else if (str[0] == 'f' && isdigit(str[1])) {
             return {true, std::stoi(str + 1)};
         } else if (auto x = std::find_if(Register::x_name, Register::x_name + 32,
                                          [=](auto n) { return std::strcmp(str, n) == 0; });

@@ -71,7 +71,7 @@ namespace mir {
     }
 
     static void calcPhi(const Function *func, const Instruction::alloca_ *alloc) {
-        assert(alloc->type == Type::getI32Type());
+        auto zero = getZero(alloc->type);
         std::unordered_map<BasicBlock *, Value *> liveInV; // live in value
         std::unordered_map<BasicBlock *, Value *> defs; // def value (live out value)
 
@@ -96,7 +96,7 @@ namespace mir {
             for (auto df: bb->df) {
                 if (F.count(df)) continue;
                 F.insert(df);
-                auto phi = new Instruction::phi(Type::getI32Type());
+                auto phi = new Instruction::phi(alloc->type);
                 liveInV[df] = phi;
                 df->push_front(phi);
                 if (!defs.count(df))
@@ -105,11 +105,10 @@ namespace mir {
         }
 
         // Step 3. create phi
-        // NOLINTNEXTLINE
-        const auto find_d = [&liveInV, &defs](BasicBlock *bb, auto &&self) -> Value *{
+        const auto find_d = [zero, &liveInV, &defs](BasicBlock *bb, auto &&self) -> Value *{
             if (defs.count(bb)) return defs[bb];
             if (liveInV.count(bb)) return defs[bb] = liveInV[bb];
-            if (bb->idom == nullptr) return defs[bb] = getIntegerLiteral(0);
+            if (bb->idom == nullptr) return defs[bb] = zero;
             return defs[bb] = self(bb->idom, self);
         };
         for (auto bb: F) {
@@ -120,10 +119,9 @@ namespace mir {
         }
 
         // Step 4. convert load & store
-        // NOLINTNEXTLINE
-        const auto find_v = [&liveInV, &defs](BasicBlock *bb, auto &&self) -> Value *{
+        const auto find_v = [zero, &liveInV, &defs](BasicBlock *bb, auto &&self) -> Value *{
             if (liveInV.count(bb)) return liveInV[bb];
-            if (bb->idom == nullptr) return liveInV[bb] = getIntegerLiteral(0);
+            if (bb->idom == nullptr) return liveInV[bb] = zero;
             if (defs.count(bb->idom)) return liveInV[bb] = defs[bb->idom];
             return liveInV[bb] = self(bb->idom, self);
         };
@@ -150,7 +148,7 @@ namespace mir {
         func->reCalcBBInfo();
         for (auto inst: func->bbs.front()->instructions) {
             if (auto alloc = dynamic_cast<Instruction::alloca_ *>(inst)) {
-                if (alloc->type != Type::getI32Type()) continue;
+                if (alloc->type != Type::getI32Type() && alloc->type != Type::getFloatType()) continue;
                 calcPhi(func, alloc);
                 opt_infos.mem_to_reg()++;
             } else break;
