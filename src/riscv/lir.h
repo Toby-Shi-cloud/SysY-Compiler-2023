@@ -51,6 +51,17 @@ namespace riscv::node {
         [[nodiscard]] DAGValue *ch_value() override { return &ch; };
     };
 
+    struct MemsetNode : RiscvNode {
+        mir::Instruction::memset *inst;
+        DAGLink dependency{this, DAGValue::Ch()}, address{this, DAG_ADDRESS_TYPE};
+        DAGValue ch{this, DAGValue::Ch()};
+        explicit MemsetNode(mir::Instruction::memset *inst): inst(inst) {}
+        [[nodiscard]] const_slice<DAGLink> links() const override { return {&dependency, 2}; }
+        [[nodiscard]] const_slice<DAGValue> values() const override { return {&ch, 1}; }
+        [[nodiscard]] std::string name() const override { return "memset\\<" + std::to_string(inst->val) + "\\>(" + std::to_string(inst->size) + ")"; }
+        [[nodiscard]] DAGValue *ch_value() override { return &ch; };
+    };
+
     struct Riscv1I1ONode : RiscvNode {
         DAGLink rs;
         DAGValue rd;

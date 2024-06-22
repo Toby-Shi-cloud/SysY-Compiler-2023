@@ -93,6 +93,14 @@ std::vector<lir64::DAG> riscv::build_dag(mir::Function *func) {
             arg.dag.push_back(std::move(copy));
             arg.dag.push_back(std::move(node));
         },
+        [](Instruction::memset *memset, CallArg &arg) {
+            auto node = std::make_unique<node::MemsetNode>(memset);
+            node->dependency.set_link(arg.last_side_effect);
+            auto addr = lir64::get_node_value(memset->getBase(), arg);
+            node->address.set_link(lir64::build_convert_node<node::zext>(addr, DAG_ADDRESS_TYPE, arg));
+            arg.last_side_effect = &node->ch;
+            arg.dag.push_back(std::move(node));
+        },
         [](auto &&inst, auto &&...) { TODO(inst); },
     });
 }

@@ -14,10 +14,10 @@
 #include "../slice.h"
 
 #if ARCHITECUTRE_XLEN == 32
-#define DAG_ADDRERSS_TYPE mir::Type::getI32Type()
+#define DAG_ADDRESS_TYPE mir::Type::getI32Type()
 #define LIR lir32
 #elif ARCHITECUTRE_XLEN == 64
-#define DAG_ADDRERSS_TYPE mir::Type::getI64Type()
+#define DAG_ADDRESS_TYPE mir::Type::getI64Type()
 #define LIR lir64
 #else
 #error "Unsupported XLEN"
@@ -114,10 +114,10 @@ namespace LIR {
         [[nodiscard]] virtual DAGValue *ch_value() { return nullptr; };
 
 #ifdef _DEBUG_
-        mir::Instruction *original = nullptr;
+        std::string m_node_id;
 
-        void set_original(mir::Instruction *ori) {
-            original = ori;
+        void set_original(std::string node_id) {
+            m_node_id = std::move(node_id);
         }
 
         [[nodiscard]] auto to_dot_node_name() const {
@@ -154,11 +154,7 @@ namespace LIR {
                 labels.emplace_back(link_labels);
             }
             labels.emplace_back(name());
-            if (original) {
-                std::stringstream ss;
-                original->output(ss);
-                labels.emplace_back(ss.str());
-            }
+            if (!m_node_id.empty()) labels.emplace_back(m_node_id);
             if (!values().empty()) {
                 std::vector<dot::label> value_labels;
                 value_labels.reserve(values().size());
@@ -246,20 +242,20 @@ namespace LIR::node {
 
 /// MARKER: DAGNode Transformation
 
-    struct load : DAGNode {
-        DAGLink dependency{this, DAGValue::Ch()}, address{this, DAG_ADDRERSS_TYPE};
+    struct LoadNode : DAGNode {
+        DAGLink dependency{this, DAGValue::Ch()}, address{this, DAG_ADDRESS_TYPE};
         DAGValue value, ch{this, DAGValue::Ch()};
-        explicit load(DAGValue::Type type) : value(this, type) {}
+        explicit LoadNode(DAGValue::Type type) : value(this, type) {}
         [[nodiscard]] const_slice<DAGLink> links() const override { return {&dependency, 2}; }
         [[nodiscard]] const_slice<DAGValue> values() const override { return {&value, 2}; }
         [[nodiscard]] std::string name() const override { return "load"; }
         [[nodiscard]] DAGValue *ch_value() override { return &ch; };
     };
 
-    struct store : DAGNode {
-        DAGLink dependency{this, DAGValue::Ch()}, value, address{this, DAG_ADDRERSS_TYPE};
+    struct StoreNode : DAGNode {
+        DAGLink dependency{this, DAGValue::Ch()}, value, address{this, DAG_ADDRESS_TYPE};
         DAGValue ch{this, DAGValue::Ch()};
-        explicit store(DAGValue::Type type) : value(this, type) {}
+        explicit StoreNode(DAGValue::Type type) : value(this, type) {}
         [[nodiscard]] const_slice<DAGLink> links() const override { return {&dependency, 3}; }
         [[nodiscard]] const_slice<DAGValue> values() const override { return {&ch, 1}; }
         [[nodiscard]] std::string name() const override { return "store"; }
@@ -309,9 +305,17 @@ namespace LIR::node {
 
     struct GAddress : DAGValueNode {
         mir::GlobalVar *g_var;
-        explicit GAddress(mir::GlobalVar *g_var) : DAGValueNode(DAG_ADDRERSS_TYPE), g_var(g_var) {}
-        [[nodiscard]] std::string name() const override { return "global<" + g_var->name + ">"; }
+        explicit GAddress(mir::GlobalVar *g_var) : DAGValueNode(DAG_ADDRESS_TYPE), g_var(g_var) {}
+        [[nodiscard]] std::string name() const override { return "global\\<" + g_var->name + "\\>"; }
     };
+
+    struct LAddress : DAGValueNode {
+        ssize_t offset; // offset to fp (positive for params & negative for local val)
+        explicit LAddress(ssize_t offset) : DAGValueNode(DAG_ADDRESS_TYPE), offset(offset) {}
+        [[nodiscard]] std::string name() const override { return std::to_string(offset) + "(fp)"; }
+    };
+
+/// MARKER: DAGNode Control Flow
 
     struct PhiNode : DAGNode {
         std::vector<DAGLink> ops;
