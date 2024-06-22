@@ -41,6 +41,8 @@ namespace LIR {
         DAGValue(DAGNode *node, Type type) : type(type), node(node) {}
 
         inline ~DAGValue();
+
+        inline DAGValue *last_user_ch();
     };
 
     inline std::string to_string(const DAGValue::Type &ty) {
@@ -74,8 +76,9 @@ namespace LIR {
 
     public:
         DAGValue::Type type;
+        DAGNode *node;
 
-        explicit DAGLink(DAGValue::Type type) : type(type) {}
+        DAGLink(DAGNode *node, DAGValue::Type type) : node(node), type(type) {}
 
         ~DAGLink() { reset(); }
 
@@ -97,10 +100,6 @@ namespace LIR {
         }
     };
 
-    inline DAGValue::~DAGValue() {
-        for (auto &&u: std::list{users}) u->reset();
-    }
-
     /// Directed Acyclic Graph Node
     /// This is the basic node and contains nothing but useful method.
     struct DAGNode {
@@ -111,6 +110,8 @@ namespace LIR {
         [[nodiscard]] virtual const_slice<DAGValue> values() const = 0;
 
         [[nodiscard]] virtual std::string name() const = 0;
+
+        [[nodiscard]] virtual DAGValue *ch_value() { return nullptr; };
 
 #ifdef _DEBUG_
         mir::Instruction *original = nullptr;
@@ -162,7 +163,7 @@ namespace LIR {
                 std::vector<dot::label> value_labels;
                 value_labels.reserve(values().size());
                 for (auto &&v: values()) {
-                    value_labels.push_back(dot::label::port{
+                    value_labels.emplace_back(dot::label::port{
                         "o" + std::to_string(value_labels.size()),
                         to_string(v.type)
                     });
@@ -173,6 +174,15 @@ namespace LIR {
         }
 #endif
     };
+
+    inline DAGValue::~DAGValue() {
+        for (auto &&u: std::list{users}) u->reset();
+    }
+
+    inline DAGValue *DAGValue::last_user_ch() {
+        if (users.empty()) return nullptr;
+        return users.back()->node->ch_value();
+    }
 }
 
 namespace LIR::node {
@@ -182,8 +192,8 @@ namespace LIR::node {
     struct ty : DAGNode { \
         DAGLink lhs, rhs; \
         DAGValue ret; \
-        explicit ty(DAGValue::Type type) : lhs(type), rhs(type), ret(this, type) {} \
-        ty(DAGValue::Type lhs, DAGValue::Type rhs, DAGValue::Type ret) : lhs(lhs), rhs(rhs), ret(this, ret) {} \
+        explicit ty(DAGValue::Type type) : ty(type, type, type) {} \
+        ty(DAGValue::Type lhs, DAGValue::Type rhs, DAGValue::Type ret) : lhs(this, lhs), rhs(this, rhs), ret(this, ret) {} \
         [[nodiscard]] const_slice<DAGLink> links() const override { return {&lhs, 2}; } \
         [[nodiscard]] const_slice<DAGValue> values() const override { return {&ret, 1}; } \
         [[nodiscard]] std::string name() const override { return #ty; } \
@@ -216,8 +226,8 @@ namespace LIR::node {
     struct ty : DAGNode { \
         DAGLink val; \
         DAGValue ret; \
-        explicit ty(DAGValue::Type type) : val(type), ret(this, type) {} \
-        ty(DAGValue::Type val, DAGValue::Type ret) : val(val), ret(this, ret) {} \
+        explicit ty(DAGValue::Type type) : ty(type, type) {} \
+        ty(DAGValue::Type val, DAGValue::Type ret) : val(this, val), ret(this, ret) {} \
         [[nodiscard]] const_slice<DAGLink> links() const override { return {&val, 1}; } \
         [[nodiscard]] const_slice<DAGValue> values() const override { return {&ret, 1}; } \
         [[nodiscard]] std::string name() const override { return #ty; } \
@@ -237,39 +247,43 @@ namespace LIR::node {
 /// MARKER: DAGNode Transformation
 
     struct load : DAGNode {
-        DAGLink dependency{DAGValue::Ch()}, address{DAG_ADDRERSS_TYPE}, undef{mir::Type::getI1Type()};
+        DAGLink dependency{this, DAGValue::Ch()}, address{this, DAG_ADDRERSS_TYPE};
         DAGValue value, ch{this, DAGValue::Ch()};
         explicit load(DAGValue::Type type) : value(this, type) {}
-        [[nodiscard]] const_slice<DAGLink> links() const override { return {&dependency, 3}; }
+        [[nodiscard]] const_slice<DAGLink> links() const override { return {&dependency, 2}; }
         [[nodiscard]] const_slice<DAGValue> values() const override { return {&value, 2}; }
         [[nodiscard]] std::string name() const override { return "load"; }
+        [[nodiscard]] DAGValue *ch_value() override { return &ch; };
     };
 
     struct store : DAGNode {
-        DAGLink dependency{DAGValue::Ch()}, value, address{DAG_ADDRERSS_TYPE}, undef{mir::Type::getI1Type()};
+        DAGLink dependency{this, DAGValue::Ch()}, value, address{this, DAG_ADDRERSS_TYPE};
         DAGValue ch{this, DAGValue::Ch()};
-        explicit store(DAGValue::Type type) : value(type) {}
-        [[nodiscard]] const_slice<DAGLink> links() const override { return {&dependency, 4}; }
+        explicit store(DAGValue::Type type) : value(this, type) {}
+        [[nodiscard]] const_slice<DAGLink> links() const override { return {&dependency, 3}; }
         [[nodiscard]] const_slice<DAGValue> values() const override { return {&ch, 1}; }
         [[nodiscard]] std::string name() const override { return "store"; }
+        [[nodiscard]] DAGValue *ch_value() override { return &ch; };
     };
 
     struct CopyToReg : DAGNode {
-        DAGLink dependency{DAGValue::Ch()}, reg, value;
+        DAGLink dependency{this, DAGValue::Ch()}, reg, value;
         DAGValue ch{this, DAGValue::Ch()}, glue{this, DAGValue::Glue()};
-        explicit CopyToReg(DAGValue::Type type) : reg(type), value(type) {}
+        explicit CopyToReg(DAGValue::Type type) : reg(this, type), value(this, type) {}
         [[nodiscard]] const_slice<DAGLink> links() const override { return {&dependency, 3}; }
         [[nodiscard]] const_slice<DAGValue> values() const override { return {&ch, 2}; }
         [[nodiscard]] std::string name() const override { return "CopyToReg"; }
+        [[nodiscard]] DAGValue *ch_value() override { return &ch; };
     };
 
     struct CopyFromReg : DAGNode {
-        DAGLink dependency{DAGValue::Ch()}, reg;
+        DAGLink dependency{this, DAGValue::Ch()}, reg, glue{this, DAGValue::Glue()};
         DAGValue value, ch{this, DAGValue::Ch()};
-        explicit CopyFromReg(DAGValue::Type type) : reg(type), value(this, type) {}
-        [[nodiscard]] const_slice<DAGLink> links() const override { return {&dependency, 2}; }
+        explicit CopyFromReg(DAGValue::Type type) : reg(this, type), value(this, type) {}
+        [[nodiscard]] const_slice<DAGLink> links() const override { return {&dependency, 3}; }
         [[nodiscard]] const_slice<DAGValue> values() const override { return {&value, 2}; }
         [[nodiscard]] std::string name() const override { return "CopyFromReg"; }
+        [[nodiscard]] DAGValue *ch_value() override { return &ch; };
     };
 
 /// MARKER: DAGNode Value
@@ -309,9 +323,9 @@ namespace LIR::node {
     };
 
     struct SelectNode : DAGNode {
-        DAGLink cond{mir::Type::getI1Type()}, lhs, rhs;
+        DAGLink cond{this, mir::Type::getI1Type()}, lhs, rhs;
         DAGValue ret;
-        explicit SelectNode(DAGValue::Type type) : lhs(type), rhs(type), ret(this, type) {}
+        explicit SelectNode(DAGValue::Type type) : lhs(this, type), rhs(this, type), ret(this, type) {}
         [[nodiscard]] const_slice<DAGLink> links() const override { return {&cond, 3}; }
         [[nodiscard]] const_slice<DAGValue> values() const override { return {&ret, 1}; }
         [[nodiscard]] std::string name() const override { return "select"; }
@@ -322,6 +336,7 @@ namespace LIR::node {
         [[nodiscard]] const_slice<DAGLink> links() const override { return {nullptr, 0}; }
         [[nodiscard]] const_slice<DAGValue> values() const override { return {&ch, 1}; }
         [[nodiscard]] std::string name() const override { return "EntryToken"; }
+        [[nodiscard]] DAGValue *ch_value() override { return &ch; };
     };
 
 /// Note: architecture specific nodes are NOT defined here.
@@ -335,10 +350,10 @@ namespace LIR {
             dot::graph sub;
             for (auto &&n: d) {
                 auto [node, links] = n->to_dot_node();
-                sub.nodes.push_back(node);
+                sub.nodes.emplace_back(node);
                 sub.links.insert(sub.links.end(), links.begin(), links.end());
             }
-            graph.nodes.push_back(sub);
+            graph.nodes.emplace_back(sub);
         }
         return graph;
     }

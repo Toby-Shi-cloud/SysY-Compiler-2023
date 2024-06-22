@@ -12,19 +12,10 @@ namespace LIR {
     using value_map_t = std::unordered_map<mir::Value *, DAGValue *>;
 
     struct CallArg {
-        DAG &dag;
-        value_map_t &map;
-        DAGValue *last_side_effect;
-    };
-
-    template<typename Callback>
-    std::vector<DAG> build_dag(mir::Function *func, Callback &&callback) {
+        DAG dag;
         value_map_t map;
-        std::vector<DAG> dags;
-        for (auto bb: func->bbs)
-            dags.push_back(build_dag(map, bb, callback));
-        return dags;
-    }
+        DAGValue *last_side_effect = nullptr;
+    };
 
     inline auto build_constant_node(mir::Literal *literal, value_map_t &map) {
         auto node = std::make_unique<node::Constant>(literal);
@@ -32,13 +23,13 @@ namespace LIR {
         return node;
     }
 
-    inline auto build_vreg_node(mir::Value *value, DAG &dag, value_map_t &map) {
+    inline auto build_vreg_node(mir::Value *value, CallArg &arg) {
         auto reg = std::make_unique<node::VRegister>(value->getId(), value->type);
         auto node = std::make_unique<node::CopyFromReg>(reg->value.type);
         node->reg.set_link(&reg->value);
-        node->dependency.set_link(map[nullptr]);
-        map[value] = &node->value;
-        dag.push_back(std::move(reg));
+        node->dependency.set_link(arg.map[nullptr]);
+        arg.map[value] = &node->value;
+        arg.dag.push_back(std::move(reg));
         return node;
     }
 
@@ -48,17 +39,17 @@ namespace LIR {
         return node;
     }
 
-    inline auto get_node_value(mir::Value *value, DAG &dag, value_map_t &map) {
-        if (auto val = map[value])
+    inline auto get_node_value(mir::Value *value, CallArg &arg) {
+        if (auto val = arg.map[value])
             return val;
         if (auto lit = dynamic_cast<mir::Literal *>(value)) {
-            dag.push_back(build_constant_node(lit, map));
+            arg.dag.push_back(build_constant_node(lit, arg.map));
         } else if (auto gvar = dynamic_cast<mir::GlobalVar *>(value)) {
-            dag.push_back(build_gvar_node(gvar, map));
+            arg.dag.push_back(build_gvar_node(gvar, arg.map));
         } else {
-            dag.push_back(build_vreg_node(value, dag, map));
+            arg.dag.push_back(build_vreg_node(value, arg));
         }
-        return map[value];
+        return arg.map[value];
     }
 
     inline auto get_last_user(DAGValue *value, value_map_t &map) {
@@ -69,8 +60,8 @@ namespace LIR {
     template<typename Node, typename Inst>
     auto build_binary_node(Inst *inst, CallArg &arg) {
         auto node = std::make_unique<Node>(inst->type);
-        node->lhs.set_link(get_node_value(inst->getLhs(), arg.dag, arg.map));
-        node->rhs.set_link(get_node_value(inst->getRhs(), arg.dag, arg.map));
+        node->lhs.set_link(get_node_value(inst->getLhs(), arg));
+        node->rhs.set_link(get_node_value(inst->getRhs(), arg));
         arg.map[inst] = &node->ret;
         arg.dag.push_back(std::move(node));
     }
@@ -79,7 +70,7 @@ namespace LIR {
     auto build_unary_node(Inst *inst, CallArg &arg) {
         auto inVal = ((mir::User *) inst)->getOperand(0);
         auto node = std::make_unique<Node>(inVal->type, inst->type);
-        node->val.set_link(get_node_value(inVal, arg.dag, arg.map));
+        node->val.set_link(get_node_value(inVal, arg));
         arg.map[inst] = &node->ret;
         arg.dag.push_back(std::move(node));
     }
@@ -117,13 +108,13 @@ namespace LIR {
         std::invoke(callback, (Instruction::ty *) inst, arg); \
         break
     template<typename Callback>
-    DAG build_dag(value_map_t &map, mir::BasicBlock *bb, Callback &&callback) {
+    DAG build_dag_bb(mir::BasicBlock *bb, Callback &&callback) {
         using mir::Instruction;
-        DAG dag;
+        CallArg arg;
         auto entry = std::make_unique<node::EntryToken>();
-        map[nullptr] = &entry->ch;
-        CallArg arg{dag, map, &entry->ch};
-        dag.push_back(std::move(entry));
+        arg.map[nullptr] = &entry->ch;
+        arg.last_side_effect = &entry->ch;
+        arg.dag.push_back(std::move(entry));
         for (auto inst: bb->instructions) {
             switch (inst->instrTy) {
                 build_external(RET, ret);
@@ -166,15 +157,23 @@ namespace LIR {
                 build_external(MEMSET, memset);
             }
 #ifdef _DEBUG_
-            if (auto v = map[inst])
+            if (auto v = arg.map[inst])
                 v->node->set_original(inst);
 #endif
         }
-        return dag;
+        return std::move(arg.dag);
     }
 #undef build_inline
 #undef build_exact
 #undef build_external
+
+    template<typename Callback>
+    std::vector<DAG> build_dag(mir::Function *func, Callback &&callback) {
+        std::vector<DAG> dags;
+        for (auto bb: func->bbs)
+            dags.push_back(build_dag_bb(bb, callback));
+        return dags;
+    }
 }
 
 #endif //COMPILER_LIR_BUILD_H

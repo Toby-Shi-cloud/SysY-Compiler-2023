@@ -74,11 +74,13 @@ int main(int argc, char **argv) {
         mir_manager.output(fir);
     }
 
+#ifdef _DEBUG_
     mir_manager.for_each_func([](auto func) {
         auto dag = riscv::build_dag(func);
         std::fstream f("dag_" + func->name.substr(1) + ".dot", std::ios::out);
         f << lir64::to_graph(dag);
     });
+#endif
 
     return 0;
 }
