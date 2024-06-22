@@ -13,10 +13,10 @@
 #include "../mir.h"
 #include "../slice.h"
 
-#if ARCHITECUTRE_XLEN == 32
+#if ARCHITECTURE_XLEN == 32
 #define DAG_ADDRESS_TYPE mir::Type::getI32Type()
 #define LIR lir32
-#elif ARCHITECUTRE_XLEN == 64
+#elif ARCHITECTURE_XLEN == 64
 #define DAG_ADDRESS_TYPE mir::Type::getI64Type()
 #define LIR lir64
 #else
@@ -26,7 +26,7 @@
 namespace LIR {
     struct DAGNode;
     struct DAGLink;
-    using DAG = std::vector<std::unique_ptr<DAGNode>>;
+    using DAG = std::list<std::unique_ptr<DAGNode>>;
 
     struct DAGValue {
         using Value = mir::pType;
@@ -43,6 +43,8 @@ namespace LIR {
         inline ~DAGValue();
 
         inline DAGValue *last_user_ch();
+
+        inline void swap_to(DAGValue *that);
     };
 
     inline std::string to_string(const DAGValue::Type &ty) {
@@ -113,6 +115,13 @@ namespace LIR {
 
         [[nodiscard]] virtual DAGValue *ch_value() { return nullptr; };
 
+        [[nodiscard]] virtual bool in_used() const {
+            auto v = values();
+            return std::any_of(v.begin(), v.end(), [](auto &&v) {
+                return !v.users.empty();
+            });
+        }
+
 #ifdef _DEBUG_
         std::string m_node_id;
 
@@ -178,6 +187,14 @@ namespace LIR {
     inline DAGValue *DAGValue::last_user_ch() {
         if (users.empty()) return nullptr;
         return users.back()->node->ch_value();
+    }
+
+    inline void DAGValue::swap_to(DAGValue *that) {
+        for (auto it = users.begin(); it != users.end();) {
+            auto link = *(it++);
+            link->set_link(that);
+        }
+        assert(users.empty());
     }
 }
 
@@ -298,9 +315,28 @@ namespace LIR::node {
     };
 
     struct Constant : DAGValueNode {
-        mir::Literal *literal;
-        explicit Constant(mir::Literal *literal) : DAGValueNode(literal->type), literal(literal) {}
-        [[nodiscard]] std::string name() const override { return "constant\\<" + literal->name + "\\>"; }
+        struct value_t : std::variant<float, long long> {
+            using variant::variant;
+
+            explicit value_t(mir::calculate_t v) noexcept {
+                std::visit(overloaded{
+                    [this](float v) { emplace<0>(v); },
+                    [this](int v) { emplace<1>(v); },
+                }, v);
+            }
+
+            template<typename T>
+            explicit operator T() const {
+                return std::visit([](auto v) { return (T) v; }, *this);
+            }
+
+            std::string to_string() const {
+                return std::visit([](auto v) { return std::to_string(v); }, *this);
+            }
+        } constant;
+        explicit Constant(mir::Literal *literal) : DAGValueNode(literal->type), constant(literal->getValue()) {}
+        Constant(DAGValue::Type type, value_t constant) : DAGValueNode(type), constant(constant) {}
+        [[nodiscard]] std::string name() const override { return "constant\\<" + constant.to_string() + "\\>"; }
     };
 
     struct GAddress : DAGValueNode {

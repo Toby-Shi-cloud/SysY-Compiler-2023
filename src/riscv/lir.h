@@ -5,15 +5,17 @@
 #ifndef COMPILER_RISCV_LIR_H
 #define COMPILER_RISCV_LIR_H
 
-#define ARCHITECUTRE_XLEN 64
+#define ARCHITECTURE_XLEN 64
 #include "reg.h"
-#include "../lir/build.h"
+#include "../lir/dag.h"
 
 namespace riscv::node {
     using namespace lir64;
     using namespace lir64::node;
 
-    struct RiscvNode : DAGNode {};
+    struct RiscvNode : DAGNode {
+        [[nodiscard]] bool in_used() const override { return true; }
+    };
 
     struct RegisterNode : RiscvNode {
         Register reg;

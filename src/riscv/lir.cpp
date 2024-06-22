@@ -3,6 +3,7 @@
 //
 
 #include "lir.h"
+#include "../lir/build.h"
 
 using mir::Instruction, lir64::CallArg, mir::Type;
 using namespace riscv;

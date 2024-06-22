@@ -7,6 +7,7 @@
 
 #include <unordered_map>
 #include "dag.h"
+#include "constant.h"
 
 namespace LIR {
     template<typename K, typename V>
@@ -30,10 +31,10 @@ namespace LIR {
         DAGValue *last_side_effect = nullptr;
     };
 
-    inline auto build_constant_node(mir::Literal *literal, CallArg &arg) {
+    inline auto build_constant_node(mir::Literal *literal, DAG &dag) {
         auto node = std::make_unique<node::Constant>(literal);
         auto val = &node->value;
-        arg.dag.push_back(std::move(node));
+        dag.push_back(std::move(node));
         return val;
     }
 
@@ -62,7 +63,7 @@ namespace LIR {
         if (auto val = arg.map[value])
             return val;
         if (auto lit = dynamic_cast<mir::Literal *>(value)) {
-            return build_constant_node(lit, arg);
+            return build_constant_node(lit, arg.dag);
         } else if (auto gvar = dynamic_cast<mir::GlobalVar *>(value)) {
             arg.dag.push_back(build_gvar_node(gvar, arg.map));
         } else {
@@ -241,8 +242,11 @@ namespace LIR {
     std::vector<DAG> build_dag(mir::Function *func, Callback &&callback) {
         FuncArg arg;
         std::vector<DAG> dags;
-        for (auto bb: func->bbs)
-            dags.push_back(build_dag_bb(bb, arg, callback));
+        for (auto bb: func->bbs) {
+            auto dag = build_dag_bb(bb, arg, callback);
+            constant_folding(dag);
+            dags.push_back(std::move(dag));
+        }
         return dags;
     }
 }

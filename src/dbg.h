@@ -19,14 +19,6 @@
 #include <cassert>
 #include <iostream>
 
-template<typename...Args>
-struct overloaded : Args... {
-    using Args::operator()...;
-};
-
-template<typename...Args>
-overloaded(Args...) -> overloaded<Args...>;
-
-#define TODO(msg) (std::cerr << "[" << __FILE__ << ":" << __LINE__ << "] " << "TODO: " << (msg) << std::endl, exit(-1))
+#include "util.h"
 
 #endif //COMPILER_DBG_H
