@@ -846,7 +846,8 @@ SysYVisitor::return_type SysYVisitor::visit<UnaryExp>(const GrammarNode &node) {
         auto literal = dynamic_cast<mir::Literal *>(value);
         assert(literal && list.empty());
         if (unary_op_type == MINU) {
-            literal = std::visit([](auto v) { return mir::getLiteral(-v); }, literal->getValue());
+            literal =
+                std::visit([](auto v) { return mir::getLiteral(-v); }, literal->getValue().as());
         } else {
             assert(unary_op_type == PLUS);
         }

@@ -15,6 +15,14 @@
 #include <variant>
 #include "mir/value.h"
 
+template <class T>
+struct variant_helper {
+    [[nodiscard]] auto &as() const {
+        return static_cast<const typename T::variant &>(*static_cast<const T *>(this));
+    }
+    auto &as() { return static_cast<typename T::variant &>(*static_cast<T *>(this)); }
+};
+
 /**
  * Derived Values <br>
  * Use struct instead of class to make all members public.
@@ -32,12 +40,12 @@ using inst_pos_t = std::list<Instruction *>::const_iterator;
 using bb_node_t = std::list<BasicBlock *>::iterator;
 using bb_pos_t = std::list<BasicBlock *>::const_iterator;
 
-struct calculate_t : std::variant<int, float> {
+struct calculate_t : std::variant<int, float>, variant_helper<calculate_t> {
     using variant::variant;
 
     template <typename T>
     explicit operator T() const {
-        return std::visit([](auto v) { return T(v); }, *this);
+        return std::visit([](auto v) { return T(v); }, this->as());
     }
 
     // NOLINTNEXTLINE
@@ -419,18 +427,18 @@ inline Literal *getLiteral(int value) { return getIntegerLiteral(value); }
 inline Literal *getLiteral(float value) { return getFloatLiteral(value); }
 
 inline Literal *getLiteral(calculate_t value) {
-    return std::visit([](auto v) { return getLiteral(v); }, value);
+    return std::visit([](auto v) { return getLiteral(v); }, value.as());
 }
 
-#define BIN_CALC_OP(op, ty)                                                           \
-    inline ty operator op(const calculate_t &lhs, const calculate_t &rhs) {           \
-        return std::visit([](auto v1, auto v2) -> ty { return v1 op v2; }, lhs, rhs); \
+#define BIN_CALC_OP(op, ty)                                                                     \
+    inline ty operator op(const calculate_t &lhs, const calculate_t &rhs) {                     \
+        return std::visit([](auto v1, auto v2) -> ty { return v1 op v2; }, lhs.as(), rhs.as()); \
     }
 
 #define BIN_LIT_OP_calculate_t(op)                                           \
     inline Literal *operator op(const Literal & lhs, const Literal & rhs) {  \
         return std::visit([](auto v) -> Literal * { return getLiteral(v); }, \
-                          lhs.getValue() op rhs.getValue());                 \
+                          (lhs.getValue() op rhs.getValue()).as());          \
     }
 
 #define BIN_LIT_OP_bool(op)                                                 \
@@ -463,7 +471,7 @@ inline calculate_t operator%(const calculate_t &lhs, const calculate_t &rhs) {
                 return {v1 % v2};
             }
         },
-        lhs, rhs);
+        lhs.as(), rhs.as());
 }
 
 BIN_LIT_OP_calculate_t(%)
