@@ -32,12 +32,19 @@ namespace mir {
     using bb_node_t = std::list<BasicBlock *>::iterator;
     using bb_pos_t = std::list<BasicBlock *>::const_iterator;
 
-    struct calculate_t : std::variant<int, float> {
+    template<class T>
+    struct variant_helper {
+        auto &as() const { return static_cast<const typename T::variant &>(*static_cast<const T *>(this)); }
+
+        auto &as() { return static_cast<typename T::variant &>(*static_cast<T *>(this)); }
+    };
+
+    struct calculate_t : std::variant<int, float>, variant_helper<calculate_t> {
         using variant::variant;
 
         template<typename T>
         explicit operator T() const {
-            return std::visit([](auto v) { return T(v); }, *this);
+            return std::visit([](auto v) { return T(v); }, this->as());
         }
 
         calculate_t(unsigned value) : calculate_t(static_cast<int>(value)) {} // NOLINT(google-explicit-constructor)
@@ -449,21 +456,21 @@ namespace mir {
     inline Literal *getLiteral(calculate_t value) {
         return std::visit([](auto v) {
             return getLiteral(v);
-        }, value);
+        }, value.as());
     }
 
 #define BIN_CALC_OP(op, ty) \
     inline ty operator op (const calculate_t &lhs, const calculate_t &rhs) { \
         return std::visit([](auto v1, auto v2) -> ty { \
             return v1 op v2; \
-        }, lhs, rhs); \
+        }, lhs.as(), rhs.as()); \
     }
 
 #define BIN_LIT_OP_calculate_t(op) \
     inline Literal *operator op (const Literal &lhs, const Literal &rhs) { \
         return std::visit([](auto v) -> Literal * { \
             return getLiteral(v); \
-        }, lhs.getValue() op rhs.getValue()); \
+        }, (lhs.getValue() op rhs.getValue()).as()); \
     }
 
 #define BIN_LIT_OP_bool(op) \
@@ -493,7 +500,7 @@ namespace mir {
             } else {
                 return {v1 % v2};
             }
-        }, lhs, rhs);
+        }, lhs.as(), rhs.as());
     }
 
     BIN_LIT_OP_calculate_t(%)

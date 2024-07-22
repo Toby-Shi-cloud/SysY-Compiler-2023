@@ -32,7 +32,8 @@ namespace LIR {
         using Value = mir::pType;
         struct Ch {};
         struct Glue {};
-        struct Type : std::variant<Value, Ch, Glue> {
+        struct Type : std::variant<Value, Ch, Glue>, mir::variant_helper<Type> {
+            using VarType = std::variant<Value, Ch, Glue>;
             using variant::variant;
             Type(Value ty) : variant(ty->isPointerTy() || ty->isArrayTy() ? DAG_ADDRESS_TYPE : ty) {}
         };
@@ -61,7 +62,7 @@ namespace LIR {
             [](const DAGValue::Glue &) -> std::string {
                 return "glue";
             }
-        }, ty);
+        }, ty.as());
     }
 
     inline bool operator==(const DAGValue::Type &lhs, const DAGValue::Type &rhs) {
@@ -312,23 +313,23 @@ namespace LIR::node {
     };
 
     struct Constant : DAGValueNode {
-        struct value_t : std::variant<float, long long> {
+        struct value_t : std::variant<float, long long>, mir::variant_helper<value_t> {
             using variant::variant;
 
             explicit value_t(mir::calculate_t v) noexcept {
                 std::visit(overloaded{
                     [this](float v) { emplace<0>(v); },
                     [this](int v) { emplace<1>(v); },
-                }, v);
+                }, v.as());
             }
 
             template<typename T>
             explicit operator T() const {
-                return std::visit([](auto v) { return (T) v; }, *this);
+                return std::visit([](auto v) { return (T) v; }, this->as());
             }
 
             std::string to_string() const {
-                return std::visit([](auto v) { return std::to_string(v); }, *this);
+                return std::visit([](auto v) { return std::to_string(v); }, this->as());
             }
         } constant;
         explicit Constant(mir::Literal *literal) : DAGValueNode(literal->type), constant(literal->getValue()) {}
