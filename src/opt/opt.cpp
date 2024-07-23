@@ -2,8 +2,8 @@
 // Created by toby on 2023/11/14.
 //
 
-#include "opt.h"
-#include "../settings.h"
+#include "opt/opt.h"
+#include "settings.h"
 
 namespace mir {
 static void basic_optimize(Function *func) {

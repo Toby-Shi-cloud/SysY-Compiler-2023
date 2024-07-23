@@ -5,7 +5,7 @@
 #ifndef COMPILER_MEM2REG_H
 #define COMPILER_MEM2REG_H
 
-#include "../mir.h"
+#include "mir.h"
 
 namespace mir {
 void mem2reg(Function *func);

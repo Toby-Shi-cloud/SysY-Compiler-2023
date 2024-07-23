@@ -2,10 +2,10 @@
 // Created by toby on 2023/10/12.
 //
 
-#include "derived_value.h"
+#include "mir/derived_value.h"
 #include <sstream>
 #include <unordered_map>
-#include "instruction.h"
+#include "mir/instruction.h"
 
 namespace mir {
 Function *Function::getint() {

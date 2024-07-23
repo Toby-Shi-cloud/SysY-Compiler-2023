@@ -11,8 +11,8 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include "../enum.h"
-#include "type.h"
+#include "enum.h"
+#include "mir/type.h"
 
 // Use List
 namespace mir {

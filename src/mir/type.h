@@ -6,7 +6,7 @@
 #define COMPILER_MIR_TYPE_H
 
 #include <vector>
-#include "../dbg.h"
+#include "dbg.h"
 
 namespace mir {
 struct Type;

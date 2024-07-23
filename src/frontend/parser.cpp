@@ -2,7 +2,7 @@
 // Created by toby on 2023/9/22.
 //
 
-#include "parser.h"
+#include "frontend/parser.h"
 
 // SysYParser parse_impl
 namespace frontend::parser {

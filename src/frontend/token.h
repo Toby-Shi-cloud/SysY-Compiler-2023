@@ -8,8 +8,8 @@
 #include <algorithm>
 #include <array>
 #include <optional>
-#include "../dbg.h"
-#include "../enum.h"
+#include "dbg.h"
+#include "enum.h"
 
 namespace frontend::token::token_type {
 using magic_enum::operator<<;

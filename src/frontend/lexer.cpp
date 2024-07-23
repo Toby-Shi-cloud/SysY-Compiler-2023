@@ -2,7 +2,7 @@
 // Created by toby on 2023/9/11.
 //
 
-#include "lexer.h"
+#include "frontend/lexer.h"
 #include <algorithm>
 #include <unordered_map>
 

@@ -5,7 +5,7 @@
 #ifndef COMPILER_LEXER_H
 #define COMPILER_LEXER_H
 
-#include "token.h"
+#include "frontend/token.h"
 
 namespace frontend::lexer {
 using namespace frontend::token;

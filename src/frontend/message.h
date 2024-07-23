@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <ostream>
 #include <vector>
-#include "../enum.h"
+#include "enum.h"
 
 namespace frontend {
 using magic_enum::operator<<;

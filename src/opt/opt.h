@@ -6,8 +6,8 @@
 #define COMPILER_OPT_H
 
 #include <optional>
-#include "functional.h"
-#include "mem2reg.h"
+#include "opt/functional.h"
+#include "opt/mem2reg.h"
 
 namespace mir {
 inline auto substitute(Instruction *_old, Instruction *_new) {
