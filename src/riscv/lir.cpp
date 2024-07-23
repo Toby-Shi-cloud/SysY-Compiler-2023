@@ -47,7 +47,8 @@ static auto build_from_reg_node(mir::Value *value, node::DAGValue *reg, CallArg 
 }
 
 std::vector<lir64::DAG> riscv::build_dag(mir::Function *func) {
-    return lir64::build_dag(func, overloaded{
+    return lir64::build_dag(
+        func,
         [](Instruction::ret *ret, CallArg &arg) {
             if (ret->getReturnValue() == nullptr) {
                 auto node = std::make_unique<node::RetVoidNode>();
@@ -97,6 +98,5 @@ std::vector<lir64::DAG> riscv::build_dag(mir::Function *func) {
             node->address.set_link(lir64::build_convert_node<node::zext>(addr, DAG_ADDRESS_TYPE, arg));
             arg.last_side_effect = &node->ch;
             arg.dag.push_back(std::move(node));
-        },
-    });
+        });
 }

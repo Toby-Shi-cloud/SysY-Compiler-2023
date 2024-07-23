@@ -1,10 +1,10 @@
 #include <fstream>
 #include <iostream>
-#include "settings.h"
 #include "frontend/parser.h"
 #include "frontend/visitor.h"
 #include "mir/manager.h"
 #include "riscv/lir.h"
+#include "settings.h"
 
 #include <clipp.h>
 using namespace clipp;
@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
     visitor.visit(parser.comp_unit());
 
     sort_by_line(message_queue);
-    for (auto &message: message_queue) {
+    for (auto &message : message_queue) {
         std::cout << message << std::endl;
     }
     if (!message_queue.empty()) return 0;
@@ -73,6 +73,8 @@ int main(int argc, char **argv) {
         std::ofstream fir(assembly ? outfile + ".ll" : outfile);
         mir_manager.output(fir);
     }
+
+    if (!assembly) return 0;
 
 #ifdef _DEBUG_
     mir_manager.for_each_func([](auto func) {

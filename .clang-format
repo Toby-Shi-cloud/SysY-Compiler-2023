@@ -1,0 +1,15 @@
+Language: Cpp
+BasedOnStyle: Google
+ColumnLimit: 120
+
+SortIncludes: CaseInsensitive
+IncludeBlocks: Preserve
+
+IndentWidth: 4
+PPIndentWidth: 1
+AccessModifierOffset: -3
+
+IndentCaseLabels: false
+IndentCaseBlocks: false
+AllowShortCaseLabelsOnASingleLine: true
+

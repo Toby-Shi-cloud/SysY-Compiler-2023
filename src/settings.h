@@ -26,30 +26,27 @@ inline void set_optimize_level(int level) {
 #define SET(f) opt_settings.f = true;
     opt_settings = {};
     switch (level) {
-        case 3:
-            [[fallthrough]];
-        case 2:
-            SET(using_gp);
-            SET(using_gvn);
-            SET(using_gcm);
-            SET(using_force_inline);
-            SET(using_div2mul);
-            SET(using_inline_printer);
-            SET(using_array_splitting);
-            SET(using_inline_global_var);
-            [[fallthrough]];
-        case 1:
-            SET(using_mem2reg);
-            SET(using_constant_folding);
-            SET(using_arithmetic_folding);
-            SET(using_block_merging);
-            SET(using_block_relocation);
-            break;
-        default:
-            SET(force_no_opt);
-            break;
+    case 3: [[fallthrough]];
+    case 2:
+        SET(using_gp);
+        SET(using_gvn);
+        SET(using_gcm);
+        SET(using_force_inline);
+        SET(using_div2mul);
+        SET(using_inline_printer);
+        SET(using_array_splitting);
+        SET(using_inline_global_var);
+        [[fallthrough]];
+    case 1:
+        SET(using_mem2reg);
+        SET(using_constant_folding);
+        SET(using_arithmetic_folding);
+        SET(using_block_merging);
+        SET(using_block_relocation);
+        break;
+    default: SET(force_no_opt); break;
     }
 #undef SET
 }
 
-#endif //COMPILER_SETTINGS_H
+#endif  // COMPILER_SETTINGS_H
