@@ -1,11 +1,11 @@
 #include <fstream>
 #include <iostream>
-#include "settings.h"
+#include "backend/translator.h"
 #include "frontend/parser.h"
 #include "frontend/visitor.h"
-#include "mir/manager.h"
 #include "mips/component.h"
-#include "backend/translator.h"
+#include "mir/manager.h"
+#include "settings.h"
 
 #include <clipp.h>
 using namespace clipp;
@@ -15,14 +15,16 @@ int main(int argc, char **argv) {
     bool llvm_ir = false, assembly = false, help = false;
     std::string infile, outfile = "a.out";
 
-    auto cli = (
-        opt_value("source", infile).required(true)
-            .if_missing([]{ std::cout << "Source file not provided!\n"; } )
-            .if_repeated([argv](int idx){ std::cout << "Duplicate source file: " << argv[idx] << "\n"; } ),
-        option("-O").doc("optimization level (0-3)") & value("level", opt_level),
-        option("-emit-llvm").set(llvm_ir).doc("emit llvm ir"),
-        option("-S").set(assembly).doc("emit assembly"),
-        option("-o").doc("output file (default a.out)") & value("output", outfile)
+    auto cli = (  //
+        opt_value("source", infile)
+            .required(true)
+            .if_missing([] { std::cout << "Source file not provided!\n"; })
+            .if_repeated(
+                [argv](int idx) { std::cout << "Duplicate source file: " << argv[idx] << "\n"; }),
+        option("-O").doc("optimization level (0-3)") & value("level", opt_level),  // 优化等级
+        option("-emit-llvm").set(llvm_ir).doc("emit llvm ir"),                     // 输出 LLVM IR
+        option("-S").set(assembly).doc("emit assembly"),                           // 输出汇编
+        option("-o").doc("output file (default a.out)") & value("output", outfile)  // 输出文件
     );
     auto cli_help = option("-h", "--help").set(help).doc("show help");
 
@@ -64,7 +66,7 @@ int main(int argc, char **argv) {
     visitor.visit(parser.comp_unit());
 
     sort_by_line(message_queue);
-    for (auto &message: message_queue) {
+    for (auto &message : message_queue) {
         std::cout << message << std::endl;
     }
     if (!message_queue.empty()) return 0;
@@ -84,6 +86,7 @@ int main(int argc, char **argv) {
 
     if (opt_settings.using_inline_printer)
         inline_printer(fmips, mips_module);
-    else fmips << mips_module;
+    else
+        fmips << mips_module;
     return 0;
 }

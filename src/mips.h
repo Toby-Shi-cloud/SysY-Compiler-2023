@@ -6,8 +6,8 @@
 #define COMPILER_MIPS_H
 
 #include "dbg.h"
-#include "mips/operand.h"
 #include "mips/component.h"
 #include "mips/instruction.h"
+#include "mips/operand.h"
 
-#endif //COMPILER_MIPS_H
+#endif  // COMPILER_MIPS_H

@@ -5,15 +5,16 @@
 #ifndef COMPILER_SLICE_H
 #define COMPILER_SLICE_H
 
-#include "dbg.h"
 #include <cstddef>
 #include <iterator>
+#include "dbg.h"
 
-template<typename T>
+template <typename T>
 class slice {
     T *raw;
     size_t len;
-public:
+
+ public:
     using difference_type = typename std::iterator_traits<T *>::difference_type;
     using value_type = typename std::iterator_traits<T *>::value_type;
     using pointer = typename std::iterator_traits<T *>::pointer;
@@ -27,21 +28,10 @@ public:
         return raw[index];
     }
 
-    size_t size() {
-        return len;
-    }
-
-    bool empty() {
-        return len == 0;
-    }
-
-    pointer begin() {
-        return raw;
-    }
-
-    pointer end() {
-        return raw + len;
-    }
+    size_t size() { return len; }
+    bool empty() { return len == 0; }
+    pointer begin() { return raw; }
+    pointer end() { return raw + len; }
 
     slice slice_to(size_t start, size_t end) {
         assert(start <= end && end <= len);
@@ -49,7 +39,7 @@ public:
     }
 };
 
-template<typename T>
+template <typename T>
 using const_slice = slice<const T>;
 
-#endif //COMPILER_SLICE_H
+#endif  // COMPILER_SLICE_H

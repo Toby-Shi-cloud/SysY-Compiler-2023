@@ -13,12 +13,12 @@
 #else
 #undef DBG_ENABLE
 #define dbg(...) ((void)0)
-#endif // _DEBUG_
+#endif  // _DEBUG_
 
-#include <fstream>
 #include <cassert>
+#include <fstream>
 #include <iostream>
 
 #include "util.h"
 
-#endif //COMPILER_DBG_H
+#endif  // COMPILER_DBG_H

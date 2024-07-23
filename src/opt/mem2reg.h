@@ -8,13 +8,10 @@
 #include "../mir.h"
 
 namespace mir {
-    void mem2reg(Function *func);
+void mem2reg(Function *func);
+void clearDeadInst(const Function *func);
+void clearDeadBlock(Function *func);
+void mergeEmptyBlock(Function *func);
+}  // namespace mir
 
-    void clearDeadInst(const Function *func);
-
-    void clearDeadBlock(Function *func);
-
-    void mergeEmptyBlock(Function *func);
-}
-
-#endif //COMPILER_MEM2REG_H
+#endif  // COMPILER_MEM2REG_H

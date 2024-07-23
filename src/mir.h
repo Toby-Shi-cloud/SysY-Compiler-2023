@@ -6,8 +6,8 @@
 #define COMPILER_MIR_H
 
 #include "dbg.h"
-#include "mir/manager.h"
-#include "mir/instruction.h"
 #include "mir/derived_value.h"
+#include "mir/instruction.h"
+#include "mir/manager.h"
 
-#endif //COMPILER_MIR_H
+#endif  // COMPILER_MIR_H

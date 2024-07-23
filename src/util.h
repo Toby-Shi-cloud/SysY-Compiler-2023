@@ -5,12 +5,12 @@
 #ifndef COMPILER_UTIL_H
 #define COMPILER_UTIL_H
 
-template<typename...Args>
+template <typename... Args>
 struct overloaded : Args... {
     using Args::operator()...;
 };
 
-template<typename...Args>
+template <typename... Args>
 overloaded(Args...) -> overloaded<Args...>;
 
 #define TODO(msg) (std::cerr << "[" << __FILE__ << ":" << __LINE__ << "] " << "TODO: " << (msg) << std::endl, exit(-1))
@@ -40,4 +40,4 @@ overloaded(Args...) -> overloaded<Args...>;
 
 #define FOR_EACH(func, ...) UTIL_CONCAT_(UTIL_FOR_EACH_, UTIL_NUM_ARGS_(__VA_ARGS__))(func, __VA_ARGS__)
 
-#endif //COMPILER_UTIL_H
+#endif  // COMPILER_UTIL_H
