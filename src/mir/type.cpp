@@ -2,7 +2,7 @@
 // Created by toby on 2023/9/26.
 //
 
-#include "type.h"
+#include "mir/type.h"
 
 // Type
 namespace mir {

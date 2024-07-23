@@ -9,9 +9,9 @@
 #include <sstream>
 #include <variant>
 #include <vector>
-#include "../mir.h"
-#include "../slice.h"
-#include "dot.h"
+#include "lir/dot.h"
+#include "mir.h"
+#include "slice.h"
 
 #if ARCHITECTURE_XLEN == 32
 #define DAG_ADDRESS_TYPE mir::Type::getI32Type()

@@ -5,7 +5,7 @@
 #ifndef COMPILER_FUNCTIONAL_H
 #define COMPILER_FUNCTIONAL_H
 
-#include "../mir.h"
+#include "mir.h"
 
 namespace mir {
 void functionInline(Function *func);

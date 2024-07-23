@@ -7,7 +7,7 @@
 
 #include <functional>
 #include <unordered_map>
-#include "derived_value.h"
+#include "mir/derived_value.h"
 
 namespace mir {
 struct Manager {

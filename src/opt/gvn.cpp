@@ -4,7 +4,7 @@
 
 #include <functional>
 #include <set>
-#include "opt.h"
+#include "opt/opt.h"
 
 using value_vector_t = std::vector<mir::Value *>;
 using inst_vector_t = std::vector<mir::Instruction *>;

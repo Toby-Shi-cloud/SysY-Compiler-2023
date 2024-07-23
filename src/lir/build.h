@@ -6,8 +6,8 @@
 #define COMPILER_LIR_BUILD_H
 
 #include <unordered_map>
-#include "constant.h"
-#include "dag.h"
+#include "lir/constant.h"
+#include "lir/dag.h"
 
 namespace LIR {
 template <typename K, typename V>

@@ -2,7 +2,7 @@
 // Created by toby on 2023/12/1.
 //
 
-#include "opt.h"
+#include "opt/opt.h"
 
 namespace mir {
 void functionInline(Function *func) {

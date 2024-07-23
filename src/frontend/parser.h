@@ -7,9 +7,9 @@
 
 #include <list>
 #include <utility>
-#include "grammar.h"
-#include "lexer.h"
-#include "message.h"
+#include "frontend/grammar.h"
+#include "frontend/lexer.h"
+#include "frontend/message.h"
 
 namespace frontend::parser {
 class SysYParser;

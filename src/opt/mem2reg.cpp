@@ -4,7 +4,7 @@
 
 #include <queue>
 #include <stack>
-#include "opt.h"
+#include "opt/opt.h"
 
 namespace mir {
 void Function::calcDominators() const {

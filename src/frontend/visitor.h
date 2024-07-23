@@ -8,9 +8,9 @@
 #include <list>
 #include <stack>
 #include <unordered_map>
-#include "../mir.h"
-#include "grammar.h"
-#include "message.h"
+#include "frontend/grammar.h"
+#include "frontend/message.h"
+#include "mir.h"
 
 namespace frontend::visitor {
 using namespace frontend::token;

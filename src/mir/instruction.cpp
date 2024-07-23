@@ -2,7 +2,7 @@
 // Created by toby on 2023/10/12.
 //
 
-#include "instruction.h"
+#include "mir/instruction.h"
 
 namespace mir {
 static std::vector<Value *> merge(Value *ptr, std::vector<Value *>::const_iterator cbegin,

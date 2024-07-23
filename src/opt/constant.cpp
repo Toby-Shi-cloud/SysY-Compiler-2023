@@ -3,8 +3,8 @@
 // Constant Folding
 //
 
-#include "../settings.h"
-#include "opt.h"
+#include "opt/opt.h"
+#include "settings.h"
 
 namespace mir {
 static inst_node_t arithmeticFolding(Instruction::add *binary) {

@@ -8,8 +8,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cstring>
-#include "../dbg.h"
-#include "../mir/type.h"
+#include "dbg.h"
+#include "mir/type.h"
 
 namespace riscv {
 struct Register {

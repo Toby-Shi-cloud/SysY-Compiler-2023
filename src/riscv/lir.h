@@ -6,8 +6,8 @@
 #define COMPILER_RISCV_LIR_H
 
 #define ARCHITECTURE_XLEN 64
-#include "../lir/dag.h"
-#include "reg.h"
+#include "lir/dag.h"
+#include "riscv/reg.h"
 
 namespace riscv::node {
 using namespace lir64;

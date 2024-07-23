@@ -13,7 +13,7 @@
 #include <sstream>
 #include <unordered_set>
 #include <variant>
-#include "value.h"
+#include "mir/value.h"
 
 /**
  * Derived Values <br>
@@ -443,7 +443,7 @@ BIN_LIT_OP_calculate_t(%)
 #undef BIN_CALC_OP
 #undef BIN_LIT_OP
 
-struct StringLiteral : Literal {
+    struct StringLiteral : Literal {
     const std::string value;
     mutable size_t refCounter = 0;
     explicit StringLiteral(std::string value);

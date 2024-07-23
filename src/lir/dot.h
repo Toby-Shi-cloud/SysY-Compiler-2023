@@ -5,12 +5,12 @@
 #ifndef COMPILER_LIT_DOT_H
 #define COMPILER_LIT_DOT_H
 
-#include "../dbg.h"
+#include "dbg.h"
 #ifdef _DEBUG_
 #include <iostream>
 #include <variant>
 #include <vector>
-#include "../str_helper.h"
+#include "str_helper.h"
 
 namespace dot {
 struct label {

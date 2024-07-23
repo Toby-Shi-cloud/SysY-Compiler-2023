@@ -10,6 +10,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebIn
 endif ()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 file(GLOB_RECURSE SRC_DIR "src/*.cpp")
 set_property(SOURCE ${SRC_DIR} PROPERTY COMPILE_FLAGS "-Werror")

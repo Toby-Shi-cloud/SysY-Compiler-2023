@@ -8,9 +8,9 @@
 #include <functional>
 #include <memory>
 #include <vector>
-#include "../dbg.h"
-#include "../enum.h"
-#include "token.h"
+#include "dbg.h"
+#include "enum.h"
+#include "frontend/token.h"
 
 // Grammar type
 namespace frontend::grammar::grammar_type {

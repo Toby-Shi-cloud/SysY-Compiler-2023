@@ -9,7 +9,7 @@
 #include <cmath>
 #include <cstring>
 #include <sstream>
-#include "derived_value.h"
+#include "mir/derived_value.h"
 
 namespace mir {
 struct Instruction::ret : Instruction {

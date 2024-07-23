@@ -3,7 +3,7 @@
 //
 
 #include <functional>
-#include "opt.h"
+#include "opt/opt.h"
 
 namespace mir {
 // an array can be split iff all its users index it with a constant.

@@ -8,7 +8,7 @@
 #include <cmath>
 #include <optional>
 #include <queue>
-#include "dag.h"
+#include "lir/dag.h"
 
 namespace LIR {
 inline std::optional<node::Constant::value_t> get_constant(DAGLink *link) {
