@@ -3,7 +3,7 @@
 //
 
 #include <optional>
-#include "../mips.h"
+#include "mips.h"
 
 // inline printer is a special printer which will print some blocks several times (copy them) to
 // avoid jump

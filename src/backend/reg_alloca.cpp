@@ -7,8 +7,6 @@
 #include <fstream>
 #include <queue>
 
-#include "translator.h"
-
 namespace backend {
 const auto alloca_regs = mips::PhyRegister::get([](const auto &&phy) {
     return phy->isArg() || phy->isRet() || phy->isTemp() || phy->isSaved();

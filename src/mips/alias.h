@@ -7,7 +7,7 @@
 
 #include <list>
 #include <memory>
-#include "../enum.h"
+#include "enum.h"
 
 /**
  * @brief Define alias for pointer and reference of a type. <br>

@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
 
     if (!assembly) return 0;
 
-    std::ofstream fmips(outfile);
+    std::ofstream fmips(llvm_ir ? outfile + ".asm" : outfile);
     backend::Translator translator(&mir_manager, &mips_module);
     translator.translate();
 

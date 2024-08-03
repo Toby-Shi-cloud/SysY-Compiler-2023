@@ -5,8 +5,8 @@
 #ifndef COMPILER_TRANSLATOR_H
 #define COMPILER_TRANSLATOR_H
 
-#include "../mips.h"
-#include "../mir.h"
+#include "mips.h"
+#include "mir.h"
 
 namespace backend {
 class Translator {

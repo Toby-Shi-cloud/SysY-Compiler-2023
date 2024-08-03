@@ -6,7 +6,7 @@
 #define COMPILER_BACKEND_OPT_H
 
 #include <optional>
-#include "../mips.h"
+#include "mips.h"
 
 namespace mips {
 inline std::optional<int> getLastImm(mips::rInstruction inst, mips::rRegister reg) {

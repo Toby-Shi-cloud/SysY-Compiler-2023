@@ -4,9 +4,9 @@
 
 #include "translator.h"
 #include <queue>
-#include "../settings.h"
 #include "backend_opt.h"
 #include "reg_alloca.h"
+#include "settings.h"
 
 namespace backend {
 static void flatten(mir::Literal *literal, std::vector<int> &result) {
@@ -47,8 +47,16 @@ mips::rRegister Translator::translateBinaryInstHelper(mips::rRegister lhs, mir::
     constexpr std::pair<mips::Instruction::Ty, mips::Instruction::Ty> mipsTys[] = {
         {mips::Instruction::Ty::ADDU, mips::Instruction::Ty::ADDIU},
         {mips::Instruction::Ty::SUBU, mips::Instruction::Ty::ADDIU},
-        {/* MUL */}, {/* UDIV */}, {/* SDIV */}, {/* UREM */}, {/* SREM */},
-        {/* FADD */}, {/* FSUB */}, {/* FMUL */}, {/* FDIV */}, {/* FREM */},
+        {/* MUL */},
+        {/* UDIV */},
+        {/* SDIV */},
+        {/* UREM */},
+        {/* SREM */},
+        {/* FADD */},
+        {/* FSUB */},
+        {/* FMUL */},
+        {/* FDIV */},
+        {/* FREM */},
         {mips::Instruction::Ty::SLLV, mips::Instruction::Ty::SLL},
         {mips::Instruction::Ty::SRLV, mips::Instruction::Ty::SRL},
         {mips::Instruction::Ty::SRAV, mips::Instruction::Ty::SRA},
