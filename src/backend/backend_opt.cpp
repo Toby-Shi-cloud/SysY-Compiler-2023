@@ -2,15 +2,12 @@
 // Created by toby on 2023/11/16.
 //
 
-#include "backend_opt.h"
+#include "backend/backend_opt.h"
 #include <algorithm>
 #include <map>
-#include "reg_alloca.h"
+#include "backend/reg_alloca.h"
 
-namespace mips {
-using backend::all_sub_blocks;
-using backend::compute_blocks_info;
-
+namespace backend::mips {
 void clearDeadCode(rFunction function) {
     bool changed = true;
     while (changed) {
@@ -32,7 +29,8 @@ void clearDeadCode(rFunction function) {
                               [&](auto &&reg) { used.erase(reg); });
             };
             for (auto it = block->instructions.rbegin(); it != block->instructions.rend(); ++it) {
-                auto &inst = *it;
+                auto inst = dynamic_cast<Instruction *>(it->get());
+                assert(inst != nullptr);
                 if (inst->isJumpBranch() || inst->isSyscall() || inst->isStore()) {
                     earseDef(inst);
                     addUsed(inst);
@@ -41,11 +39,11 @@ void clearDeadCode(rFunction function) {
                 assert(!inst->regDef.empty());
                 if (inst->ty == Instruction::Ty::MUL && !pred(inst->regDef[0])) {
                     // change to MULTU
-                    pInstruction newInst = std::make_unique<BinaryMInst>(
+                    pInstructionBase newInst = std::make_unique<BinaryMInst>(
                         Instruction::Ty::MULTU, inst->regUse[0], inst->regUse[1]);
                     newInst->parent = inst->parent;
                     newInst->node = inst->node;
-                    inst.swap(newInst);
+                    it->swap(newInst);
                 }
                 if (std::any_of(inst->regDef.begin(), inst->regDef.end(), pred)) {
                     earseDef(inst);
@@ -53,7 +51,7 @@ void clearDeadCode(rFunction function) {
                     continue;
                 }
                 earseDef(inst);
-                dead.push_back(inst.get());
+                dead.push_back(inst);
                 changed = true;
             }
             for (auto &inst : dead) block->erase(inst->node);
@@ -104,10 +102,11 @@ void divisionFold(rFunction function) {
         std::map<std::tuple<FoldType, operand_t, operand_t>,
                  std::tuple<rInstruction, rRegister, rRegister>>
             map;
-        for (auto &&inst : *block) {
+        for (auto &&inst_base : *block) {
+            auto &&inst = dynamic_cast<Instruction *>(inst_base.get());
             auto dt = deduce_fold_type(inst->ty);
             if (dt == NONE) continue;
-            auto mInst = dynamic_cast<rBinaryMInst>(inst.get());
+            auto mInst = dynamic_cast<rBinaryMInst>(inst);
             assert(mInst);
             auto src1_imm = getLastImm(mInst, mInst->src1());
             auto src2_imm = getLastImm(mInst, mInst->src2());
@@ -294,9 +293,9 @@ void div2mul(rFunction function) {
             };
             for (; inst_it != (*sub_it)->end(); do_after()) {
                 changed = false;
-                auto &&inst = *inst_it;
+                auto inst = dynamic_cast<Instruction *>(inst_it->get());
                 if (inst->ty != Instruction::Ty::DIVU && inst->ty != Instruction::Ty::DIV) continue;
-                auto divInst = dynamic_cast<rBinaryMInst>(inst.get());
+                auto divInst = dynamic_cast<rBinaryMInst>(inst);
                 assert(divInst);
                 auto imm = getLastImm(divInst, divInst->src2());
                 if (imm == std::nullopt) continue;
@@ -310,7 +309,7 @@ void div2mul(rFunction function) {
 void clearDuplicateInst(rFunction function) {
     for (auto &&block : all_sub_blocks(function)) {
         for (auto it = block->begin(); it != block->end();) {
-            auto inst = it->get();
+            auto inst = dynamic_cast<Instruction *>(it->get());
             if (inst->ty != Instruction::Ty::LI && inst->ty != Instruction::Ty::LUI) {
                 ++it;
                 continue;
@@ -326,4 +325,4 @@ void clearDuplicateInst(rFunction function) {
         }
     }
 }
-}  // namespace mips
+}  // namespace backend::mips

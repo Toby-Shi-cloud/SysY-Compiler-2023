@@ -8,7 +8,7 @@
 // inline printer is a special printer which will print some blocks several times (copy them) to
 // avoid jump
 
-namespace mips {
+namespace backend::mips {
 struct InlineBlockContext {
     using content_t = std::variant<rInstruction, rBlock>;
     std::vector<content_t> contents;
@@ -17,7 +17,11 @@ struct InlineBlockContext {
         if (!contents.empty()) contents.pop_back();
         if (label) contents.emplace_back(label);
         for (auto &&sub : block->subBlocks)
-            for (auto &&inst : *sub) contents.emplace_back(inst.get());
+            for (auto &&inst : *sub) {
+                auto mp = dynamic_cast<rInstruction>(inst.get());
+                assert(mp != nullptr);
+                contents.emplace_back(mp);
+            }
     }
 };
 
@@ -123,4 +127,4 @@ void inline_printer(std::ostream &os, const Module &module) {
     inline_printer(os, *module.main);
     for (auto &func : module.functions) inline_printer(os, *func);
 }
-}  // namespace mips
+}  // namespace backend::mips

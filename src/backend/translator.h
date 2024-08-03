@@ -11,19 +11,19 @@
 namespace backend {
 class Translator {
     mir::Manager *mirManager;
-    mips::rModule mipsModule;
-    std::unordered_map<const mir::Function *, mips::rFunction> fMap;
-    std::unordered_map<const mir::BasicBlock *, mips::rBlock> bMap;
-    std::unordered_map<const mir::GlobalVar *, mips::rGlobalVar> gMap;
-    std::unordered_map<const mir::Value *, mips::rOperand> oMap;
-    std::unordered_map<mips::rOperand, const mir::Value *> rMap;
-    mips::rFunction curFunc = nullptr;
-    mips::rBlock curBlock = nullptr;
+    rModule mipsModule;
+    std::unordered_map<const mir::Function *, rFunction> fMap;
+    std::unordered_map<const mir::BasicBlock *, rBlock> bMap;
+    std::unordered_map<const mir::GlobalVar *, rGlobalVar> gMap;
+    std::unordered_map<const mir::Value *, rOperand> oMap;
+    std::unordered_map<rOperand, const mir::Value *> rMap;
+    rFunction curFunc = nullptr;
+    rBlock curBlock = nullptr;
 
-    void put(const mir::Value *value, mips::rOperand operand) {
+    void put(const mir::Value *value, rOperand operand) {
         if (oMap.count(value)) {
-            auto old = dynamic_cast<mips::rRegister>(oMap[value]);
-            auto reg = dynamic_cast<mips::rRegister>(operand);
+            auto old = dynamic_cast<rRegister>(oMap[value]);
+            auto reg = dynamic_cast<rRegister>(operand);
             assert(old && reg);
             old->swapTo(reg);
             rMap.erase(old);
@@ -33,10 +33,10 @@ class Translator {
     }
 
     template <mips::Instruction::Ty rTy, mips::Instruction::Ty iTy>
-    mips::rRegister createBinaryInstHelper(mips::rRegister lhs, mir::Value *rhs);
+    rRegister createBinaryInstHelper(rRegister lhs, mir::Value *rhs);
     template <mir::Instruction::InstrTy ty>
-    mips::rRegister translateBinaryInstHelper(mips::rRegister lhs, mir::Value *rhs);
-    mips::rRegister addressCompute(mips::rAddress addr) const;
+    rRegister translateBinaryInstHelper(rRegister lhs, mir::Value *rhs);
+    rRegister addressCompute(rAddress addr) const;
     void translateRetInst(const mir::Instruction::ret *retInst);
     void translateBranchInst(const mir::Instruction::br *brInst);
     template <mir::Instruction::InstrTy ty>
@@ -56,17 +56,17 @@ class Translator {
     void translateBasicBlock(const mir::BasicBlock *mirBlock);
     void translateInstruction(const mir::Instruction *mirInst);
     void translateGlobalVar(const mir::GlobalVar *mirVar);
-    mips::rOperand translateOperand(const mir::Value *mirValue);
+    rOperand translateOperand(const mir::Value *mirValue);
 
-    mips::rRegister getRegister(const mir::Value *mirValue) {
-        return dynamic_cast<mips::rRegister>(translateOperand(mirValue));
+    rRegister getRegister(const mir::Value *mirValue) {
+        return dynamic_cast<rRegister>(translateOperand(mirValue));
     }
 
-    mips::rAddress getAddress(const mir::Value *mirValue) {
+    rAddress getAddress(const mir::Value *mirValue) {
         auto ptr = translateOperand(mirValue);
-        if (auto addr = dynamic_cast<mips::rAddress>(ptr)) return addr;
-        if (auto reg = dynamic_cast<mips::rRegister>(ptr)) return curFunc->newAddress(reg, 0);
-        if (auto label = dynamic_cast<mips::rLabel>(ptr))
+        if (auto addr = dynamic_cast<rAddress>(ptr)) return addr;
+        if (auto reg = dynamic_cast<rRegister>(ptr)) return curFunc->newAddress(reg, 0);
+        if (auto label = dynamic_cast<rLabel>(ptr))
             return curFunc->newAddress(mips::PhyRegister::get(0), 0, label);
         return nullptr;
     }
@@ -90,7 +90,7 @@ class Translator {
     void optimizeAfterAlloc() const;
 
  public:
-    explicit Translator(mir::Manager *mirManager, mips::rModule mipsModule)
+    explicit Translator(mir::Manager *mirManager, rModule mipsModule)
         : mirManager(mirManager), mipsModule(mipsModule) {}
 
     void translate();

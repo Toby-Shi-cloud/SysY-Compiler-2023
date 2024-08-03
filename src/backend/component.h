@@ -2,19 +2,74 @@
 // Created by toby on 2023/11/6.
 //
 
-#ifndef COMPILER_MIPS_COMPONENT_H
-#define COMPILER_MIPS_COMPONENT_H
+#ifndef COMPILER_BACKEND_COMPONENT_H
+#define COMPILER_BACKEND_COMPONENT_H
 
 #include <list>
 #include <ostream>
 #include <unordered_set>
 #include <vector>
-#include "instruction.h"
+#include "backend/operand.h"
 
-namespace mips {
+namespace backend {
+// InstructionBase
+struct InstructionBase {
+    std::vector<rRegister> regDef, regUse;
+    std::unordered_set<rRegister> liveIn, liveOut;
+    inst_node_t node{};  // the position where the inst is.
+    rSubBlock parent{};
+
+    virtual ~InstructionBase() noexcept {
+        for (auto reg : regDef) reg->defUsers.erase(this);
+        for (auto reg : regUse) reg->useUsers.erase(this);
+    }
+
+    InstructionBase() noexcept = default;
+    InstructionBase(std::vector<rRegister> regDef, std::vector<rRegister> regUse) noexcept
+        : regDef{std::move(regDef)}, regUse{std::move(regUse)} {
+        for (auto reg : this->regDef) reg->defUsers.insert(this);
+        for (auto reg : this->regUse) reg->useUsers.insert(this);
+    }
+
+    InstructionBase(const InstructionBase &inst) noexcept
+        : InstructionBase(inst.regDef, inst.regUse) {}
+    InstructionBase(InstructionBase &&inst) noexcept = delete;
+
+    void reg_def_push_back(rRegister reg) {
+        regDef.push_back(reg);
+        reg->defUsers.insert(this);
+    }
+
+    void reg_use_push_back(rRegister reg) {
+        regUse.push_back(reg);
+        reg->useUsers.insert(this);
+    }
+
+    virtual bool isJumpBranch() const = 0;
+    virtual bool isFuncCall() const = 0;
+    virtual void setJumpLabel(rLabel newLabel) = 0;
+    virtual rLabel getJumpLabel() const = 0;
+    virtual std::ostream &output(std::ostream &os) const = 0;
+    [[nodiscard]] virtual pInstructionBase clone() const = 0;
+
+    [[nodiscard]] rInstructionBase next() const;
+};
+
+inline std::ostream &operator<<(std::ostream &os, const InstructionBase &inst) {
+    return inst.output(os);
+}
+
+inline std::ostream &operator<<(std::ostream &os, const pInstructionBase &inst) {
+    return inst->output(os);
+}
+
+inline std::ostream &operator<<(std::ostream &os, rInstructionBase inst) {
+    return inst->output(os);
+}
+
 /**
  * SubBlock is the unit to allocate registers. <br>
- * SubBlocks have no label. There is one and only one jump instruction
+ * SubBlocks have no label. There is one and only one jump InstructionBase
  * (conditional jump to other block or unconditional jump to function)
  * at the end of every sub-block. Unconditional jump to other block or
  * function return jump is only allowed and must existed when then
@@ -26,7 +81,7 @@ namespace mips {
 struct SubBlock {
     rBlock parent;
     std::list<pSubBlock>::iterator node;
-    std::list<pInstruction> instructions;
+    std::list<pInstructionBase> instructions;
     std::unordered_set<rSubBlock> predecessors, successors;
     std::unordered_set<rRegister> liveIn, liveOut;
     std::unordered_set<rRegister> use, def;
@@ -40,14 +95,16 @@ struct SubBlock {
     [[nodiscard]] auto begin() { return instructions.begin(); }
     [[nodiscard]] auto end() { return instructions.end(); }
 
-    inst_node_t insert(inst_pos_t p, pInstruction &&inst) {
+    inst_node_t insert(inst_pos_t p, pInstructionBase &&inst) {
         auto self = inst.get();
-        auto node = instructions.insert(p, std::move(inst));
+        auto node_ = instructions.insert(p, std::move(inst));
         self->parent = this;
-        return self->node = node;
+        return self->node = node_;
     }
 
-    inst_node_t emplace(inst_pos_t p, rInstruction inst) { return insert(p, pInstruction{inst}); }
+    inst_node_t emplace(inst_pos_t p, rInstructionBase inst) {
+        return insert(p, pInstructionBase{inst});
+    }
 
     template <typename... Args>
     auto erase(Args... args)
@@ -87,13 +144,15 @@ struct Block {
     [[nodiscard]] rSubBlock frontBlock() const { return subBlocks.front().get(); }
     [[nodiscard]] rSubBlock backBlock() const { return subBlocks.back().get(); }
 
-    [[nodiscard]] rInstruction frontInst() const {
+    [[nodiscard]] rInstructionBase frontInst() const {
         return frontBlock()->instructions.front().get();
     }
 
-    [[nodiscard]] rInstruction backInst() const { return backBlock()->instructions.back().get(); }
+    [[nodiscard]] rInstructionBase backInst() const {
+        return backBlock()->instructions.back().get();
+    }
 
-    void push_back(pInstruction &&inst) {
+    void push_back(pInstructionBase &&inst) {
         if (!empty() && backInst()->isJumpBranch() && !backInst()->isFuncCall()) {
             subBlocks.emplace_back(new SubBlock(this));
             subBlocks.back()->node = std::prev(subBlocks.end());
@@ -101,7 +160,7 @@ struct Block {
         subBlocks.back()->insert(subBlocks.back()->end(), std::move(inst));
     }
 
-    void push_back(std::pair<pInstruction, pInstruction> &&pair) {
+    void push_back(std::pair<pInstructionBase, pInstructionBase> &&pair) {
         push_back(std::move(pair.first));
         push_back(std::move(pair.second));
     }
@@ -125,7 +184,7 @@ struct Function {
     int stackOffset = 0;
     unsigned allocaSize, argSize;
     bool isMain, isLeaf, retValue;
-    PhyRegister::phy_set_t shouldSave;
+    std::set<rRegister> shouldSave;
     std::list<pBlock> blocks;
     pBlock exitB = std::make_unique<Block>(this);
     std::unordered_set<pVirRegister> usedVirRegs;
@@ -201,8 +260,6 @@ struct Module {
      * To make full use of $gp, try to place $gp at .data + 0x8000.
      */
     void calcGlobalVarOffset() const;
-
-    friend void inline_printer(std::ostream &os, const Module &module);
 };
 
 inline std::ostream &operator<<(std::ostream &os, const SubBlock &block) {
@@ -261,13 +318,13 @@ inline std::ostream &operator<<(std::ostream &os, const Module &module) {
     for (auto &func : module.functions) os << std::endl << *func;
     return os;
 }
-}  // namespace mips
+}  // namespace backend
 
 #ifdef DBG_ENABLE
 namespace dbg {
 template <>
 [[maybe_unused]]
-inline bool pretty_print(std::ostream &stream, const mips::rBlock &value) {
+inline bool pretty_print(std::ostream &stream, const backend::rBlock &value) {
     if (value == nullptr) return pretty_print(stream, nullptr);
     stream << "(" << value->label << ")" << " ";
     return pretty_print(stream, value->subBlocks);
@@ -275,7 +332,7 @@ inline bool pretty_print(std::ostream &stream, const mips::rBlock &value) {
 
 template <>
 [[maybe_unused]]
-inline bool pretty_print(std::ostream &stream, const mips::pBlock &value) {
+inline bool pretty_print(std::ostream &stream, const backend::pBlock &value) {
     if (value == nullptr) return pretty_print(stream, nullptr);
     stream << "(" << value->label << ")" << " ";
     return pretty_print(stream, value->subBlocks);
@@ -283,32 +340,32 @@ inline bool pretty_print(std::ostream &stream, const mips::pBlock &value) {
 
 template <>
 [[maybe_unused]]
-inline bool pretty_print(std::ostream &stream, const mips::rFunction &value) {
+inline bool pretty_print(std::ostream &stream, const backend::rFunction &value) {
     if (value == nullptr) return pretty_print(stream, nullptr);
     return pretty_print(stream, value->label);
 }
 
 template <>
 [[maybe_unused]]
-inline bool pretty_print(std::ostream &stream, const mips::pFunction &value) {
+inline bool pretty_print(std::ostream &stream, const backend::pFunction &value) {
     if (value == nullptr) return pretty_print(stream, nullptr);
     return pretty_print(stream, value->label);
 }
 
 template <>
 [[maybe_unused]]
-inline bool pretty_print(std::ostream &stream, const mips::rSubBlock &value) {
+inline bool pretty_print(std::ostream &stream, const backend::rSubBlock &value) {
     if (value == nullptr) return pretty_print(stream, nullptr);
     return pretty_print(stream, value->instructions);
 }
 
 template <>
 [[maybe_unused]]
-inline bool pretty_print(std::ostream &stream, const mips::pSubBlock &value) {
+inline bool pretty_print(std::ostream &stream, const backend::pSubBlock &value) {
     if (value == nullptr) return pretty_print(stream, nullptr);
     return pretty_print(stream, value->instructions);
 }
 }  // namespace dbg
 #endif  // DBG_ENABLE
 
-#endif  // COMPILER_MIPS_COMPONENT_H
+#endif  // COMPILER_BACKEND_COMPONENT_H

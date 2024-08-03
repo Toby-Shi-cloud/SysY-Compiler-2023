@@ -5,10 +5,12 @@
 #ifndef COMPILER_MIPS_INSTRUCTION_H
 #define COMPILER_MIPS_INSTRUCTION_H
 
-#include "operand.h"
+#include "backend/component.h"
+#include "mips/operand.h"
 
-namespace mips {
-struct Instruction {
+namespace backend::mips {
+struct Instruction : InstructionBase {
+    // clang-format off
     enum class Ty {
         NOP, ADDU, SUBU, AND, OR, XOR, SLLV, SRAV, SRLV, SLT, SLTU, MOVN, MOVZ, CLO, CLZ,
         MUL, MULTU, MADDU, MSUBU, DIV, DIVU,
@@ -18,66 +20,43 @@ struct Instruction {
         BEQ, BNE, BGEZ, BGTZ, BLEZ, BLTZ, BGEZAL, BLTZAL,
         J, JR, JAL, JALR, SYSCALL
     } ty;
+    // clang-format on
 
-    std::vector<rRegister> regDef, regUse;
-    std::unordered_set<rRegister> liveIn, liveOut;
-    inst_node_t node{};  // the position where the inst is.
-    rSubBlock parent{};
+    explicit Instruction(Ty ty) noexcept : Instruction(ty, {}, {}) {}
 
-    virtual ~Instruction() {
-        for (auto reg : regDef) reg->defUsers.erase(this);
-        for (auto reg : regUse) reg->useUsers.erase(this);
-    }
-
-    explicit Instruction(Ty ty) : Instruction(ty, {}, {}) {}
-
-    explicit Instruction(Ty ty, std::vector<rRegister> regDef, std::vector<rRegister> regUse)
-        : ty{ty}, regDef{std::move(regDef)}, regUse{std::move(regUse)} {
-        for (auto reg : this->regDef) reg->defUsers.insert(this);
-        for (auto reg : this->regUse) reg->useUsers.insert(this);
-        if (isFuncCall()) {
+    Instruction(Ty ty, std::vector<rRegister> regDef, std::vector<rRegister> regUse) noexcept
+        : InstructionBase(std::move(regDef), std::move(regUse)), ty{ty} {
+        if (isFuncCallImpl()) {
             for (auto reg : PhyRegister::get(&PhyRegister::isArg)) reg_use_push_back(reg);
             for (auto reg : PhyRegister::get(&PhyRegister::isRet)) reg_def_push_back(reg);
         }
     }
 
-    Instruction(const Instruction &inst) noexcept
-        : Instruction(inst.ty, inst.regDef, inst.regUse) {}
-
+    Instruction(const Instruction &inst) noexcept = default;
     Instruction(Instruction &&inst) noexcept = delete;
 
-    void reg_def_push_back(rRegister reg) {
-        regDef.push_back(reg);
-        reg->defUsers.insert(this);
-    }
-
-    void reg_use_push_back(rRegister reg) {
-        regUse.push_back(reg);
-        reg->useUsers.insert(this);
-    }
-
-    [[nodiscard]] bool isFuncCall() const {
-        return ty == Ty::JAL || ty == Ty::JALR || ty == Ty::BGEZAL || ty == Ty::BLTZAL;
-    }
-
-    [[nodiscard]] bool isJumpBranch() const { return ty >= Ty::BEQ && ty <= Ty::JALR; }
+    [[nodiscard]] bool isFuncCall() const override { return isFuncCallImpl(); }
+    [[nodiscard]] bool isJumpBranch() const override { return ty >= Ty::BEQ && ty <= Ty::JALR; }
     [[nodiscard]] bool isConditionalBranch() const { return ty >= Ty::BEQ && ty <= Ty::BLTZ; }
     [[nodiscard]] bool isUnconditionalJump() const { return ty >= Ty::J && ty <= Ty::JR; }
     [[nodiscard]] bool isSyscall() const { return ty == Ty::SYSCALL; }
     [[nodiscard]] bool isStore() const { return ty >= Ty::SW && ty <= Ty::SH; }
     [[nodiscard]] bool isLoad() const { return ty >= Ty::LA && ty <= Ty::LBU; }
-    [[nodiscard]] rInstruction next() const;
-    [[nodiscard]] virtual rLabel getJumpLabel() const { return nullptr; }
-    virtual void setJumpLabel(rLabel newLabel) {}
-    virtual std::ostream &output(std::ostream &os) const { return os << ty; }
-    [[nodiscard]] virtual pInstruction clone() const = 0;
+    [[nodiscard]] rLabel getJumpLabel() const override { return nullptr; }
+    void setJumpLabel(rLabel newLabel) override {}
+    std::ostream &output(std::ostream &os) const override { return os << ty; }
+
+ private:
+    [[nodiscard]] bool isFuncCallImpl() const {
+        return ty == Ty::JAL || ty == Ty::JALR || ty == Ty::BGEZAL || ty == Ty::BLTZAL;
+    }
 };
 
 template <typename T>
 struct InstructionImpl : Instruction {
     using Instruction::Instruction;
 
-    [[nodiscard]] pInstruction clone() const override {
+    [[nodiscard]] pInstructionBase clone() const override {
         return std::make_unique<T>(static_cast<const T &>(*this));
     }
 };
@@ -316,11 +295,11 @@ struct SyscallInst : InstructionImpl<SyscallInst> {
 inline std::ostream &operator<<(std::ostream &os, const Instruction &inst) {
     return inst.output(os);
 }
-}  // namespace mips
+}  // namespace backend::mips
 
 #ifdef DBG_ENABLE
 namespace dbg {
-inline std::string instruction_to_string(const mips::Instruction &value) {
+inline std::string instruction_to_string(const backend::mips::Instruction &value) {
     std::stringstream ss;
     ss << value;
     auto s = ss.str();
@@ -331,7 +310,7 @@ inline std::string instruction_to_string(const mips::Instruction &value) {
 
 template <>
 [[maybe_unused]]
-inline bool pretty_print(std::ostream &stream, const mips::rInstruction &value) {
+inline bool pretty_print(std::ostream &stream, const backend::mips::rInstruction &value) {
     if (value == nullptr) return pretty_print(stream, nullptr);
     stream << instruction_to_string(*value);
     return true;
@@ -339,7 +318,7 @@ inline bool pretty_print(std::ostream &stream, const mips::rInstruction &value) 
 
 template <>
 [[maybe_unused]]
-inline bool pretty_print(std::ostream &stream, const mips::pInstruction &value) {
+inline bool pretty_print(std::ostream &stream, const backend::mips::pInstruction &value) {
     if (value == nullptr) return pretty_print(stream, nullptr);
     stream << instruction_to_string(*value);
     return true;

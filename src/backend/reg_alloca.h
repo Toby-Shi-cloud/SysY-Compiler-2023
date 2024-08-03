@@ -12,8 +12,8 @@
 
 namespace backend {
 struct VertexInfo {
-    std::unordered_set<mips::rRegister> regs;
-    std::unordered_set<mips::rRegister> moves;
+    std::unordered_set<rRegister> regs;
+    std::unordered_set<rRegister> moves;
     std::unordered_set<VertexInfo *> edges;
     std::unordered_set<VertexInfo *> sub_edges;
     mips::rPhyRegister color = nullptr;
@@ -38,12 +38,12 @@ struct Graph {
     std::vector<Vertex> vertexes_pool;
     std::unordered_set<VertexInfo *> vertexes;
     std::stack<VertexInfo *> vertex_stack;
-    std::unordered_map<mips::rRegister, VertexInfo *> reg2vertex;
-    std::unordered_set<mips::rRegister> spilled_regs;
+    std::unordered_map<rRegister, VertexInfo *> reg2vertex;
+    std::unordered_set<rRegister> spilled_regs;
 
-    explicit Graph(mips::rFunction function);
-    VertexInfo *get_vertex(mips::rRegister reg);
-    VertexInfo *create_vertex(mips::rRegister reg);
+    explicit Graph(rFunction function);
+    VertexInfo *get_vertex(rRegister reg);
+    VertexInfo *create_vertex(rRegister reg);
     [[nodiscard]] bool can_simplify() const;
     void merge(VertexInfo *self, VertexInfo *other);
     void freeze() const;
@@ -53,20 +53,20 @@ struct Graph {
     void select();
 };
 
-[[nodiscard]] inline auto all_sub_blocks(mips::rFunction function) {
-    std::vector<mips::rSubBlock> ret{};
+[[nodiscard]] inline auto all_sub_blocks(rFunction function) {
+    std::vector<rSubBlock> ret{};
     for (auto &block : *function)
         for (auto &sub : block->subBlocks) ret.push_back(sub.get());
     return ret;
 }
 
-void register_alloca(mips::rFunction function);
-void replace_register(mips::rFunction function, const Graph &graph);
-void compute_blocks_info(mips::rFunction function);
-void compute_use_def(mips::rSubBlock block);
-bool compute_liveIn_liveOut(mips::rFunction function);
-void compute_instructions_info(mips::rFunction function);
-bool compute_instructions_info(mips::rSubBlock block);
+void register_alloca(rFunction function);
+void replace_register(rFunction function, const Graph &graph);
+void compute_blocks_info(rFunction function);
+void compute_use_def(rSubBlock block);
+bool compute_liveIn_liveOut(rFunction function);
+void compute_instructions_info(rFunction function);
+bool compute_instructions_info(rSubBlock block);
 }  // namespace backend
 
 #ifdef DBG_ENABLE

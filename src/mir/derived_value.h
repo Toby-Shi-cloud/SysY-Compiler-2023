@@ -256,11 +256,11 @@ struct GlobalVar : Value {
 };
 
 /**
- * Instructions. <br>
+ * instructions. <br>
  */
 struct Instruction : User {
     enum InstrTy {
-        // Terminator Instructions
+        // Terminator instructions
         RET, BR,
         // Binary Operations
         ADD, SUB, MUL, UDIV, SDIV, UREM, SREM,

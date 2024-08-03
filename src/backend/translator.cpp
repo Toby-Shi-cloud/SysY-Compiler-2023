@@ -25,7 +25,7 @@ static std::vector<int> flatten(mir::Literal *literal) {
 
 namespace backend {
 template <mips::Instruction::Ty rTy, mips::Instruction::Ty iTy>
-mips::rRegister Translator::createBinaryInstHelper(mips::rRegister lhs, mir::Value *rhs) {
+rRegister Translator::createBinaryInstHelper(rRegister lhs, mir::Value *rhs) {
     auto dst = curFunc->newVirRegister();
     if (auto literal = dynamic_cast<mir::IntegerLiteral *>(rhs);
         literal && literal->value < 1 << 15 && literal->value >= -(1 << 15)) {
@@ -43,7 +43,7 @@ mips::rRegister Translator::createBinaryInstHelper(mips::rRegister lhs, mir::Val
 
 template <mir::Instruction::InstrTy ty>
 // ty = ADD, SUB, MUL, UDIV, SDIV, UREM, SREM, SHL, LSHR, ASHR, AND, OR, XOR
-mips::rRegister Translator::translateBinaryInstHelper(mips::rRegister lhs, mir::Value *rhs) {
+rRegister Translator::translateBinaryInstHelper(rRegister lhs, mir::Value *rhs) {
     constexpr std::pair<mips::Instruction::Ty, mips::Instruction::Ty> mipsTys[] = {
         {mips::Instruction::Ty::ADDU, mips::Instruction::Ty::ADDIU},
         {mips::Instruction::Ty::SUBU, mips::Instruction::Ty::ADDIU},
@@ -85,7 +85,7 @@ mips::rRegister Translator::translateBinaryInstHelper(mips::rRegister lhs, mir::
     return dst;
 }
 
-mips::rRegister Translator::addressCompute(mips::rAddress addr) const {
+rRegister Translator::addressCompute(rAddress addr) const {
     if (addr->label == nullptr) {
         auto imm_reg = curFunc->newVirRegister();
         curBlock->push_back(std::make_unique<mips::BinaryIInst>(
@@ -110,7 +110,7 @@ void Translator::translateRetInst(const mir::Instruction::ret *retInst) {
             // li $v0, v
             curBlock->push_back(std::make_unique<mips::BinaryIInst>(
                 mips::Instruction::Ty::LI, mips::PhyRegister::get("$v0"), imm->value));
-        else if (auto reg = dynamic_cast<mips::rRegister>(oMap[v]))
+        else if (auto reg = dynamic_cast<rRegister>(oMap[v]))
             // move $v0, v
             curBlock->push_back(
                 std::make_unique<mips::MoveInst>(mips::PhyRegister::get("$v0"), reg));
@@ -171,13 +171,13 @@ void Translator::translateLoadInst(const mir::Instruction::load *loadInst) {
     auto dst = curFunc->newVirRegister();
     put(loadInst, dst);
     auto ptr = translateOperand(loadInst->getPointerOperand());
-    if (auto label = dynamic_cast<mips::rLabel>(ptr)) {
+    if (auto label = dynamic_cast<rLabel>(ptr)) {
         curBlock->push_back(
             std::make_unique<mips::LoadInst>(mips::Instruction::Ty::LW, dst, label));
-    } else if (auto reg = dynamic_cast<mips::rRegister>(ptr)) {
+    } else if (auto reg = dynamic_cast<rRegister>(ptr)) {
         curBlock->push_back(
             std::make_unique<mips::LoadInst>(mips::Instruction::Ty::LW, dst, reg, 0));
-    } else if (auto addr = dynamic_cast<mips::rAddress>(ptr)) {
+    } else if (auto addr = dynamic_cast<rAddress>(ptr)) {
         curBlock->push_back(std::make_unique<mips::LoadInst>(mips::Instruction::Ty::LW, dst, addr));
     } else {
         assert(false);
@@ -187,13 +187,13 @@ void Translator::translateLoadInst(const mir::Instruction::load *loadInst) {
 void Translator::translateStoreInst(const mir::Instruction::store *storeInst) {
     auto src = getRegister(storeInst->getSrc());
     auto dst = translateOperand(storeInst->getDest());
-    if (auto label = dynamic_cast<mips::rLabel>(dst)) {
+    if (auto label = dynamic_cast<rLabel>(dst)) {
         curBlock->push_back(
             std::make_unique<mips::StoreInst>(mips::Instruction::Ty::SW, src, label));
-    } else if (auto reg = dynamic_cast<mips::rRegister>(dst)) {
+    } else if (auto reg = dynamic_cast<rRegister>(dst)) {
         curBlock->push_back(
             std::make_unique<mips::StoreInst>(mips::Instruction::Ty::SW, src, reg, 0));
-    } else if (auto addr = dynamic_cast<mips::rAddress>(dst)) {
+    } else if (auto addr = dynamic_cast<rAddress>(dst)) {
         curBlock->push_back(
             std::make_unique<mips::StoreInst>(mips::Instruction::Ty::SW, src, addr));
     } else {
@@ -252,7 +252,7 @@ void Translator::translateConversionInst(const mir::Instruction::sext *sextInst)
 void Translator::translateIcmpInst(const mir::Instruction::icmp *icmpInst) {
     auto lhs = icmpInst->getLhs();
     auto rhs = icmpInst->getRhs();
-    mips::rRegister reg, tmp;
+    rRegister reg, tmp;
     switch (icmpInst->cond) {
     case mir::Instruction::icmp::EQ:
         reg = curFunc->newVirRegister();
@@ -380,17 +380,17 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
     const bool isLeaf = mirFunction->isLeaf();
     const bool retValue = mirFunction->retType == mir::Type::getI32Type() && !isMain;
     std::string name = mirFunction->name.substr(1);
-    curFunc = new mips::Function{std::move(name), isMain, isLeaf, retValue};
+    curFunc = new Function{std::move(name), isMain, isLeaf, retValue};
     fMap[mirFunction] = curFunc;
     if (!isLeaf) curFunc->shouldSave.insert(mips::PhyRegister::get("$ra"));
     if (isMain)
-        mipsModule->main = mips::pFunction(curFunc);
+        mipsModule->main = pFunction(curFunc);
     else
         mipsModule->functions.emplace_back(curFunc);
 
     // blocks
     for (auto bb : mirFunction->bbs) {
-        auto block = new mips::Block(curFunc);
+        auto block = new Block(curFunc);
         bMap[bb] = block;
         block->node = curFunc->blocks.emplace(curFunc->end(), block);
     }
@@ -503,28 +503,28 @@ void Translator::translateInstruction(const mir::Instruction *mirInst) {
 }
 
 void Translator::translateGlobalVar(const mir::GlobalVar *mirVar) {
-    mips::rGlobalVar result;
+    rGlobalVar result;
     std::string name;
     if (mirVar->unnamed)
         name = mirVar->name, name[0] = '$';
     else
         name = mirVar->name.substr(1);
     if (mirVar->init == nullptr)
-        result = new mips::GlobalVar{
+        result = new GlobalVar{
             std::move(name), false, false, false, static_cast<unsigned>(mirVar->type->size()), {}};
     else if (auto str = dynamic_cast<mir::StringLiteral *>(mirVar->init))
-        result = new mips::GlobalVar{
+        result = new GlobalVar{
             std::move(name), true, true, true, static_cast<unsigned>(mirVar->type->size()),
             str->value};
     else
-        result = new mips::GlobalVar{
+        result = new GlobalVar{
             std::move(name),      true, false, false, static_cast<unsigned>(mirVar->type->size()),
             flatten(mirVar->init)};
     gMap[mirVar] = result;
     mipsModule->globalVars.emplace_back(result);
 }
 
-mips::rOperand Translator::translateOperand(const mir::Value *mirValue) {
+rOperand Translator::translateOperand(const mir::Value *mirValue) {
     if (auto imm = dynamic_cast<const mir::IntegerLiteral *>(mirValue)) {
         if (imm->value == 0) return mips::PhyRegister::get(0);
         auto reg = curFunc->newVirRegister();
@@ -549,28 +549,27 @@ mips::rOperand Translator::translateOperand(const mir::Value *mirValue) {
 }
 
 void Translator::compute_phi(const mir::Function *mirFunction) {
-    using parallel_copy_t =
-        std::vector<std::pair<mips::rRegister, std::variant<mips::rRegister, int>>>;
+    using parallel_copy_t = std::vector<std::pair<rRegister, std::variant<rRegister, int>>>;
     const auto phi2move = [this](const parallel_copy_t &pc) {
         using move_t = mips::MoveInst;
         std::vector<mips::pInstruction> instructions;
-        std::unordered_map<mips::rRegister, size_t> inDegree;
-        std::unordered_map<mips::rRegister, mips::rRegister> map;
-        std::unordered_map<mips::rRegister, std::vector<mips::rRegister>> edges;
-        std::unordered_map<mips::rRegister, int> loadImm;
+        std::unordered_map<rRegister, size_t> inDegree;
+        std::unordered_map<rRegister, rRegister> map;
+        std::unordered_map<rRegister, std::vector<rRegister>> edges;
+        std::unordered_map<rRegister, int> loadImm;
         for (auto &[dst, src] : pc) {
             if (std::holds_alternative<int>(src)) {
                 auto imm = std::get<int>(src);
                 loadImm[dst] = imm;
             } else {
-                auto src_reg = std::get<mips::rRegister>(src);
+                auto src_reg = std::get<rRegister>(src);
                 edges[dst].push_back(src_reg);
                 inDegree[dst];  // make sure dst in inDegree
                 inDegree[src_reg]++;
                 map[src_reg] = src_reg;
             }
         }
-        std::queue<mips::rRegister> queue;
+        std::queue<rRegister> queue;
         for (auto &[r, d] : inDegree)
             if (d == 0) queue.push(r);
         while (!inDegree.empty()) {
@@ -619,7 +618,7 @@ void Translator::compute_phi(const mir::Function *mirFunction) {
         for (auto &pre : bb->predecessors) {
             auto block = bMap[pre];
             if (pre->successors.size() > 1) {
-                auto newBlock = new mips::Block(block->parent);
+                auto newBlock = new Block(block->parent);
                 auto it = block->node;
                 newBlock->node = curFunc->blocks.emplace(++it, newBlock);
                 newBlock->push_back(
@@ -637,7 +636,7 @@ void Translator::compute_phi(const mir::Function *mirFunction) {
 
 void Translator::compute_func_start() const {
     auto &first_block = curFunc->blocks.front();
-    auto startB = new mips::Block(curFunc);
+    auto startB = new Block(curFunc);
     startB->node = curFunc->blocks.emplace(curFunc->blocks.begin(), startB);
 
     // addiu $sp, $sp, -(allocaSize+argSize)
@@ -679,16 +678,16 @@ void Translator::compute_func_exit() const {
 }
 
 void Translator::optimizeBeforeAlloc() const {
-    if (!opt_settings.force_no_opt) clearDeadCode(curFunc);
-    if (opt_settings.using_div2mul) div2mul(curFunc);
-    if (!opt_settings.force_no_opt) divisionFold(curFunc);
-    if (!opt_settings.force_no_opt) arithmeticFolding(curFunc);
-    clearDeadCode(curFunc);
+    if (!opt_settings.force_no_opt) mips::clearDeadCode(curFunc);
+    if (opt_settings.using_div2mul) mips::div2mul(curFunc);
+    if (!opt_settings.force_no_opt) mips::divisionFold(curFunc);
+    if (!opt_settings.force_no_opt) mips::arithmeticFolding(curFunc);
+    mips::clearDeadCode(curFunc);
 }
 
 void Translator::optimizeAfterAlloc() const {
-    if (!opt_settings.force_no_opt) clearDuplicateInst(curFunc);
-    if (opt_settings.using_block_relocation) relocateBlock(curFunc);
+    if (!opt_settings.force_no_opt) mips::clearDuplicateInst(curFunc);
+    if (opt_settings.using_block_relocation) mips::relocateBlock(curFunc);
 }
 
 void Translator::translate() {

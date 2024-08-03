@@ -2,12 +2,12 @@
 // Created by toby on 2023/11/8.
 //
 
-#include "mips.h"
+#include "backend/component.h"
 #include <algorithm>
 
-namespace mips {
+namespace backend {
 void Register::swapDefTo(rRegister other, rSubBlock block) {
-    std::unordered_set<rInstruction> temp{};
+    std::unordered_set<rInstructionBase> temp{};
     for (auto inst : defUsers) {
         if (block && inst->parent != block) continue;
         for (auto &r : inst->regDef)
@@ -18,7 +18,7 @@ void Register::swapDefTo(rRegister other, rSubBlock block) {
 }
 
 void Register::swapUseTo(rRegister other, rSubBlock block) {
-    std::unordered_set<rInstruction> temp{};
+    std::unordered_set<rInstructionBase> temp{};
     for (auto inst : useUsers) {
         if (block && inst->parent != block) continue;
         for (auto &r : inst->regUse)
@@ -28,7 +28,7 @@ void Register::swapUseTo(rRegister other, rSubBlock block) {
     std::for_each(temp.begin(), temp.end(), [this](auto &&x) { useUsers.erase(x); });
 }
 
-void Register::swapDefIn(rRegister other, rInstruction inst) {
+void Register::swapDefIn(rRegister other, rInstructionBase inst) {
     if (defUsers.count(inst) == 0) return;
     for (auto &r : inst->regDef)
         if (r == this) r = other;
@@ -36,7 +36,7 @@ void Register::swapDefIn(rRegister other, rInstruction inst) {
     other->defUsers.insert(inst);
 }
 
-void Register::swapUseIn(rRegister other, rInstruction inst) {
+void Register::swapUseIn(rRegister other, rInstructionBase inst) {
     if (useUsers.count(inst) == 0) return;
     for (auto &r : inst->regUse)
         if (r == this) r = other;
@@ -101,9 +101,9 @@ void Module::calcGlobalVarOffset() const {
     }
 }
 
-rInstruction Instruction::next() const {
+rInstructionBase InstructionBase::next() const {
     auto it = node;
     if (++it == parent->end()) return nullptr;
     return it->get();
 }
-}  // namespace mips
+}  // namespace backend

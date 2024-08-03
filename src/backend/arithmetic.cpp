@@ -9,11 +9,10 @@
 #define CASE_DO(ty) \
     case Instruction::Ty::ty: return do##ty()
 
-namespace mips {
-using backend::all_sub_blocks;
+namespace backend::mips {
 inline const auto zero = PhyRegister::get(0);
 
-inline inst_node_t substitute(rInstruction _old, pInstruction _new) {
+inline inst_node_t substitute(rInstructionBase _old, pInstructionBase _new) {
     _new->node = _old->node;
     _new->parent = _old->parent;
     _new.swap(*_old->node);
@@ -153,4 +152,4 @@ void arithmeticFolding(rFunction function) {
         }
     }
 }
-}  // namespace mips
+}  // namespace backend::mips

@@ -13,6 +13,9 @@ struct overloaded : Args... {
 template <typename... Args>
 overloaded(Args...) -> overloaded<Args...>;
 
+#define CLONED(BASE, SELF) \
+    std::unique_ptr<BASE> clone() const override { return std::make_unique<SELF>(*this); }
+
 #define TODO(msg) (std::cerr << "[" << __FILE__ << ":" << __LINE__ << "] " << "TODO: " << (msg) << std::endl, exit(-1))
 
 /// Some magic defines...

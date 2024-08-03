@@ -3,7 +3,7 @@
 #include "backend/translator.h"
 #include "frontend/parser.h"
 #include "frontend/visitor.h"
-#include "mips/component.h"
+#include "backend/component.h"
 #include "mir/manager.h"
 #include "settings.h"
 
@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
 
     frontend::message_queue_t message_queue;
     mir::Manager mir_manager;
-    mips::Module mips_module;
+    backend::Module mips_module;
 
     std::string src, s;
     while (std::getline(fin, s)) {
@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
     translator.translate();
 
     if (opt_settings.using_inline_printer)
-        inline_printer(fmips, mips_module);
+        backend::mips::inline_printer(fmips, mips_module);
     else
         fmips << mips_module;
     return 0;

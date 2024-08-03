@@ -13,25 +13,25 @@ const auto alloca_regs = mips::PhyRegister::get([](const auto &&phy) {
 });
 const auto temp_regs = mips::PhyRegister::get(
     [](const auto &&phy) { return phy->isArg() || phy->isRet() || phy->isTemp(); });
-constexpr auto should_color = [](mips::rRegister r) {
+constexpr auto should_color = [](rRegister r) {
     return r->isVirtual() || alloca_regs.count(dynamic_cast<mips::rPhyRegister>(r));
 };
 
-static mips::inst_pos_t load_at(mips::rFunction func, mips::rSubBlock block, mips::inst_pos_t it,
-                                mips::rRegister dst, int offset) {
+static inst_pos_t load_at(rFunction func, rSubBlock block, inst_pos_t it, rRegister dst,
+                          int offset) {
     return block->insert(it, std::make_unique<mips::LoadInst>(mips::Instruction::Ty::LW, dst,
                                                               mips::PhyRegister::get("$sp"), offset,
                                                               &func->stackOffset));
 }
 
-static mips::inst_pos_t store_at(mips::rFunction func, mips::rSubBlock block, mips::inst_pos_t it,
-                                 mips::rRegister src, int offset) {
+static inst_pos_t store_at(rFunction func, rSubBlock block, inst_pos_t it, rRegister src,
+                           int offset) {
     return block->insert(it, std::make_unique<mips::StoreInst>(mips::Instruction::Ty::SW, src,
                                                                mips::PhyRegister::get("$sp"),
                                                                offset, &func->stackOffset));
 }
 
-void register_alloca(mips::rFunction function) {
+void register_alloca(rFunction function) {
     for (;;) {
         compute_blocks_info(function);
         compute_instructions_info(function);
@@ -67,7 +67,7 @@ void register_alloca(mips::rFunction function) {
     }
 }
 
-void replace_register(mips::rFunction function, const Graph &graph) {
+void replace_register(rFunction function, const Graph &graph) {
     for (auto &&vertex : graph.vertexes_pool) {
         bool used = false;
         for (auto &&reg : vertex->regs)
@@ -87,7 +87,7 @@ void replace_register(mips::rFunction function, const Graph &graph) {
         }
 }
 
-void compute_blocks_info(mips::rFunction function) {
+void compute_blocks_info(rFunction function) {
     // 1. compute pre and suc
     function->calcBlockPreSuc();
     // 2. compute use and def
@@ -102,7 +102,7 @@ void compute_blocks_info(mips::rFunction function) {
     while (compute_liveIn_liveOut(function));
 }
 
-void compute_use_def(mips::rSubBlock block) {
+void compute_use_def(rSubBlock block) {
     for (auto &inst : *block) {
         for (auto reg : inst->regUse)
             if (block->def.count(reg) == 0) block->use.insert(reg);
@@ -111,7 +111,7 @@ void compute_use_def(mips::rSubBlock block) {
     }
 }
 
-bool compute_liveIn_liveOut(mips::rFunction function) {
+bool compute_liveIn_liveOut(rFunction function) {
     bool changed = false;
     auto vec = all_sub_blocks(function);
     for (auto it = vec.rbegin(); it != vec.rend(); ++it) {
@@ -127,14 +127,14 @@ bool compute_liveIn_liveOut(mips::rFunction function) {
     return changed;
 }
 
-void compute_instructions_info(mips::rFunction function) {
+void compute_instructions_info(rFunction function) {
     for (auto &&block : all_sub_blocks(function))
         for (auto &&inst : *block) inst->liveIn.clear(), inst->liveOut.clear();
     for (auto &&block : all_sub_blocks(function))
         while (compute_instructions_info(block));
 }
 
-bool compute_instructions_info(mips::rSubBlock block) {
+bool compute_instructions_info(rSubBlock block) {
     bool changed = false;
     for (auto it = block->instructions.rbegin(); it != block->instructions.rend(); ++it) {
         auto &&inst = *it;
@@ -172,7 +172,7 @@ void Graph::merge(VertexInfo *self, VertexInfo *other) {
     *other = {};
 }
 
-Graph::Graph(mips::rFunction function) {
+Graph::Graph(rFunction function) {
     const auto conflict = [this](auto &&set1, auto &&set2) {
         for (auto &&u : set1)
             if (should_color(u) && get_vertex(u))
@@ -195,12 +195,12 @@ Graph::Graph(mips::rFunction function) {
     conflict(alloca_regs, alloca_regs);
 }
 
-VertexInfo *Graph::get_vertex(mips::rRegister reg) {
+VertexInfo *Graph::get_vertex(rRegister reg) {
     if (auto v = reg2vertex[reg]) return v;
     return create_vertex(reg);
 }
 
-VertexInfo *Graph::create_vertex(mips::rRegister reg) {
+VertexInfo *Graph::create_vertex(rRegister reg) {
     assert(should_color(reg));
     auto vertex = new VertexInfo();
     vertex->regs.insert(reg);
