@@ -2,8 +2,8 @@
 // Created by toby on 2023/11/16.
 //
 
-#ifndef COMPILER_BACKEND_OPT_H
-#define COMPILER_BACKEND_OPT_H
+#ifndef COMPILER_MIPS_OPT_H
+#define COMPILER_MIPS_OPT_H
 
 #include <optional>
 #include "mips/instruction.h"
@@ -79,4 +79,4 @@ void clearDuplicateInst(rFunction function);
 void arithmeticFolding(rFunction function);
 }  // namespace backend::mips
 
-#endif  // COMPILER_BACKEND_OPT_H
+#endif  // COMPILER_MIPS_OPT_H

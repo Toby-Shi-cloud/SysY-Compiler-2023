@@ -12,4 +12,3 @@ AccessModifierOffset: -3
 IndentCaseLabels: false
 IndentCaseBlocks: false
 AllowShortCaseLabelsOnASingleLine: true
-

@@ -4,7 +4,7 @@
 
 #include "mips/translator.h"
 #include <queue>
-#include "mips/backend_opt.h"
+#include "mips/opt.h"
 #include "mips/reg_alloca.h"
 #include "settings.h"
 

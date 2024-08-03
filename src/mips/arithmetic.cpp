@@ -2,7 +2,7 @@
 // Created by toby on 2023/12/8.
 //
 
-#include "mips/backend_opt.h"
+#include "mips/opt.h"
 #include "mips/reg_alloca.h"
 
 #define CASE(ty) case Instruction::Ty::ty

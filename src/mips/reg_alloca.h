@@ -2,8 +2,8 @@
 // Created by toby on 2023/11/8.
 //
 
-#ifndef COMPILER_REG_ALLOCA_H
-#define COMPILER_REG_ALLOCA_H
+#ifndef COMPILER_MIPS_REG_ALLOCA_H
+#define COMPILER_MIPS_REG_ALLOCA_H
 
 #include <stack>
 #include <unordered_map>
@@ -94,4 +94,4 @@ inline bool pretty_print<backend::VertexInfo>(std::ostream &stream,
 }  // namespace dbg
 #endif
 
-#endif  // COMPILER_REG_ALLOCA_H
+#endif  // COMPILER_MIPS_REG_ALLOCA_H
