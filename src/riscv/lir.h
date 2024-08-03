@@ -78,10 +78,10 @@ struct Riscv1I1ONode : RiscvNode {
     struct NODE : Riscv1I1ONode {                                                         \
         NODE() : Riscv1I1ONode(mir::Type::get##rs##Type(), mir::Type::get##rd##Type()) {} \
         [[nodiscard]] std::string name() const override { return INST; }                  \
-    };
+    }
 
-Riscv1I1O(FMV_X_W, "fmv.x.w", Float, I64)      // fmv.x.w rd(x?), rs(f?)
-    Riscv1I1O(FMV_W_X, "fmv.w.x", I64, Float)  // fmv.w.x rd(f?), rs(x?)
+Riscv1I1O(FMV_X_W, "fmv.x.w", Float, I64);  // fmv.x.w rd(x?), rs(f?)
+Riscv1I1O(FMV_W_X, "fmv.w.x", I64, Float);  // fmv.w.x rd(f?), rs(x?)
 
 #undef Riscv1I1O
 }  // namespace riscv::node

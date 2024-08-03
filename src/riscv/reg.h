@@ -37,21 +37,19 @@ struct Register {
 };
 
 constexpr Register operator""_R(const char *str, size_t) {
+#define FIND(res, arr) auto res = std::find(std::begin(arr), std::end(arr), str); res != std::end(arr)
     if (str[0] == 'x' && isdigit(str[1])) {
         return {false, std::stoi(str + 1)};
     } else if (str[0] == 'f' && isdigit(str[1])) {
         return {true, std::stoi(str + 1)};
-    } else if (auto x = std::find_if(Register::x_name, Register::x_name + 32,
-                                     [=](auto n) { return std::strcmp(str, n) == 0; });
-               x != Register::x_name + 32) {
+    } else if (FIND(x, Register::x_name)) {
         return {false, static_cast<int>(x - Register::x_name)};
-    } else if (auto f = std::find_if(Register::f_name, Register::f_name + 32,
-                                     [=](auto n) { return std::strcmp(str, n) == 0; });
-               f != Register::f_name + 32) {
+    } else if (FIND(f, Register::f_name)) {
         return {true, static_cast<int>(f - Register::f_name)};
     } else {
         throw;
     }
+#undef FIND
 }
 
 inline std::ostream &operator<<(std::ostream &os, const Register &reg) { return os << reg.name(); }
