@@ -112,9 +112,10 @@ struct SubBlock {
         return instructions.erase(std::forward<decltype(args)>(args)...);
     }
 
-    std::ostream &output(std::ostream &os, bool sharp_last = false) const {
+    std::ostream &output(std::ostream &os, bool sharp_last = false,
+                         const char *sharp = "# ") const {
         for (auto &inst : instructions)
-            os << "\t" << (sharp_last && &inst == &instructions.back() ? "# " : "") << *inst
+            os << "\t" << (sharp_last && &inst == &instructions.back() ? sharp : "") << *inst
                << "\n";
         return os;
     }
@@ -279,43 +280,6 @@ inline std::ostream &operator<<(std::ostream &os, const Function &func) {
     os << func.label << ":" << "\n";
     for (auto &block : func) os << *block;
     os << *func.exitB;
-    return os;
-}
-
-inline std::ostream &operator<<(std::ostream &os, const GlobalVar &var) {
-    if (var.inExtern) return os << "\t.extern\t" << var.label << ", " << var.size << "\n";
-    os << var.label << ":" << "\n";
-    if (!var.isInit)
-        os << "\t.space\t" << var.size << "\n";
-    else if (var.isString) {
-        os << "\t.asciiz\t\"";
-        for (char ch : std::get<std::string>(var.elements)) {
-            if (ch == '\n')
-                os << "\\n";
-            else
-                os << ch;
-        }
-        os << "\"" << std::endl;
-    } else {
-        auto &elements = std::get<std::vector<int>>(var.elements);
-        os << "\t.word" << "\t";
-        bool first = true;
-        for (auto ele : elements) os << (first ? "" : ", ") << ele, first = false;
-        os << std::endl;
-    }
-    return os;
-}
-
-inline std::ostream &operator<<(std::ostream &os, const Module &module) {
-    os << "\t.data" << "\n";
-    for (auto &var : module.globalVars)
-        if (!var->isString) os << *var;
-    for (auto &var : module.globalVars)
-        if (var->isString) os << *var;
-    os << "\n"
-       << "\t.text" << "\n";
-    os << *module.main;
-    for (auto &func : module.functions) os << std::endl << *func;
     return os;
 }
 }  // namespace backend

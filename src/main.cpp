@@ -84,6 +84,7 @@ int main(int argc, char **argv) {
     backend::mips::Translator translator(&mir_manager, &mips_module);
     translator.translate();
 
+    using backend::mips::operator<<;
     if (opt_settings.using_inline_printer)
         backend::mips::inline_printer(fmips, mips_module);
     else

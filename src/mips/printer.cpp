@@ -7,7 +7,6 @@
 
 // inline printer is a special printer which will print some blocks several times (copy them) to
 // avoid jump
-
 namespace backend::mips {
 struct InlineBlockContext {
     using content_t = std::variant<rInstruction, rBlock>;
