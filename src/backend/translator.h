@@ -2,16 +2,17 @@
 // Created by toby on 2023/11/5.
 //
 
-#ifndef COMPILER_TRANSLATOR_H
-#define COMPILER_TRANSLATOR_H
+#ifndef COMPILER_BACKEND_TRANSLATOR_H
+#define COMPILER_BACKEND_TRANSLATOR_H
 
-#include "mips.h"
+#include "backend/component.h"
 #include "mir.h"
 
 namespace backend {
-class Translator {
+class TranslatorBase {
+ protected:
     mir::Manager *mirManager;
-    rModule mipsModule;
+    rModule assemblyModule;
     std::unordered_map<const mir::Function *, rFunction> fMap;
     std::unordered_map<const mir::BasicBlock *, rBlock> bMap;
     std::unordered_map<const mir::GlobalVar *, rGlobalVar> gMap;
@@ -32,32 +33,6 @@ class Translator {
         rMap[operand] = value;
     }
 
-    template <mips::Instruction::Ty rTy, mips::Instruction::Ty iTy>
-    rRegister createBinaryInstHelper(rRegister lhs, mir::Value *rhs);
-    template <mir::Instruction::InstrTy ty>
-    rRegister translateBinaryInstHelper(rRegister lhs, mir::Value *rhs);
-    rRegister addressCompute(rAddress addr) const;
-    void translateRetInst(const mir::Instruction::ret *retInst);
-    void translateBranchInst(const mir::Instruction::br *brInst);
-    template <mir::Instruction::InstrTy ty>
-    void translateBinaryInst(const mir::Instruction::_binary_instruction<ty> *binInst);
-    void translateAllocaInst(const mir::Instruction::alloca_ *allocaInst);
-    void translateLoadInst(const mir::Instruction::load *loadInst);
-    void translateStoreInst(const mir::Instruction::store *storeInst);
-    void translateGetPtrInst(const mir::Instruction::getelementptr *getPtrInst);
-    void translateConversionInst(const mir::Instruction::trunc *truncInst);
-    void translateConversionInst(const mir::Instruction::zext *zextInst);
-    void translateConversionInst(const mir::Instruction::sext *sextInst);
-    void translateIcmpInst(const mir::Instruction::icmp *icmpInst);
-    void translatePhiInst(const mir::Instruction::phi *phiInst);
-    void translateSelectInst(const mir::Instruction::select *selectInst);
-    void translateCallInst(const mir::Instruction::call *callInst);
-    void translateFunction(const mir::Function *mirFunction);
-    void translateBasicBlock(const mir::BasicBlock *mirBlock);
-    void translateInstruction(const mir::Instruction *mirInst);
-    void translateGlobalVar(const mir::GlobalVar *mirVar);
-    rOperand translateOperand(const mir::Value *mirValue);
-
     rRegister getRegister(const mir::Value *mirValue) {
         return dynamic_cast<rRegister>(translateOperand(mirValue));
     }
@@ -67,7 +42,7 @@ class Translator {
         if (auto addr = dynamic_cast<rAddress>(ptr)) return addr;
         if (auto reg = dynamic_cast<rRegister>(ptr)) return curFunc->newAddress(reg, 0);
         if (auto label = dynamic_cast<rLabel>(ptr))
-            return curFunc->newAddress(mips::PhyRegister::get(0), 0, label);
+            return curFunc->newAddress(getZeroRegister(), 0, label);
         return nullptr;
     }
 
@@ -83,18 +58,20 @@ class Translator {
         }
     }
 
-    void compute_phi(const mir::Function *mirFunction);
-    void compute_func_start() const;
-    void compute_func_exit() const;
-    void optimizeBeforeAlloc() const;
-    void optimizeAfterAlloc() const;
+    virtual rOperand translateOperand(const mir::Value *mirValue) = 0;
+    virtual void translateFunction(const mir::Function *mirFunction) = 0;
+    virtual void translateGlobalVar(const mir::GlobalVar *mirGlobalVar) = 0;
+    virtual rRegister getZeroRegister() const = 0;
 
  public:
-    explicit Translator(mir::Manager *mirManager, rModule mipsModule)
-        : mirManager(mirManager), mipsModule(mipsModule) {}
+    explicit TranslatorBase(mir::Manager *mirManager, rModule assemblyModule)
+        : mirManager(mirManager), assemblyModule(assemblyModule) {}
 
-    void translate();
+    virtual void translate() {
+        translateGlobalVars();
+        translateFunctions();
+    }
 };
 }  // namespace backend
 
-#endif  // COMPILER_TRANSLATOR_H
+#endif  // COMPILER_BACKEND_TRANSLATOR_H

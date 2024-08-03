@@ -1,9 +1,9 @@
 #include <fstream>
 #include <iostream>
-#include "backend/translator.h"
 #include "frontend/parser.h"
 #include "frontend/visitor.h"
-#include "backend/component.h"
+#include "mips/printer.h"
+#include "mips/translator.h"
 #include "mir/manager.h"
 #include "settings.h"
 
@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
     if (!assembly) return 0;
 
     std::ofstream fmips(llvm_ir ? outfile + ".asm" : outfile);
-    backend::Translator translator(&mir_manager, &mips_module);
+    backend::mips::Translator translator(&mir_manager, &mips_module);
     translator.translate();
 
     if (opt_settings.using_inline_printer)
