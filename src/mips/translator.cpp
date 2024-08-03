@@ -4,8 +4,8 @@
 
 #include "mips/translator.h"
 #include <queue>
-#include "backend/backend_opt.h"
-#include "backend/reg_alloca.h"
+#include "mips/backend_opt.h"
+#include "mips/reg_alloca.h"
 #include "settings.h"
 
 namespace backend::mips {

@@ -2,9 +2,8 @@
 // Created by toby on 2023/11/8.
 //
 
-#include "reg_alloca.h"
+#include "mips/reg_alloca.h"
 #include <algorithm>
-#include <fstream>
 #include <queue>
 
 namespace backend {
@@ -99,7 +98,8 @@ void compute_blocks_info(rFunction function) {
     }
     if (function->retValue)
         function->exitB->frontBlock()->liveIn.insert(mips::PhyRegister::get("$v0"));
-    while (compute_liveIn_liveOut(function));
+    while (compute_liveIn_liveOut(function))
+        ;
 }
 
 void compute_use_def(rSubBlock block) {
@@ -131,7 +131,8 @@ void compute_instructions_info(rFunction function) {
     for (auto &&block : all_sub_blocks(function))
         for (auto &&inst : *block) inst->liveIn.clear(), inst->liveOut.clear();
     for (auto &&block : all_sub_blocks(function))
-        while (compute_instructions_info(block));
+        while (compute_instructions_info(block))
+            ;
 }
 
 bool compute_instructions_info(rSubBlock block) {

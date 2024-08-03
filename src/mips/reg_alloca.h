@@ -8,7 +8,7 @@
 #include <stack>
 #include <unordered_map>
 #include <unordered_set>
-#include "mips.h"
+#include "mips/instruction.h"
 
 namespace backend {
 struct VertexInfo {

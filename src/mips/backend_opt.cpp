@@ -2,10 +2,10 @@
 // Created by toby on 2023/11/16.
 //
 
-#include "backend/backend_opt.h"
+#include "mips/backend_opt.h"
 #include <algorithm>
 #include <map>
-#include "backend/reg_alloca.h"
+#include "mips/reg_alloca.h"
 
 namespace backend::mips {
 void clearDeadCode(rFunction function) {
