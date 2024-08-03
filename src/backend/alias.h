@@ -2,13 +2,7 @@
 // Created by toby on 2023/11/7.
 //
 
-#ifndef COMPILER_BACKEND_ALIAS_H
-#define COMPILER_BACKEND_ALIAS_H
-
-#include <list>
-#include <memory>
-#include "enum.h"
-
+#ifndef def
 /**
  * @brief Define alias for pointer and reference of a type. <br>
  * p##T is alias for std::unique_ptr<T> (unique pointer T). <br>
@@ -19,6 +13,14 @@
     struct T;                        \
     using p##T = std::unique_ptr<T>; \
     using r##T = T *
+#endif
+
+#ifndef COMPILER_BACKEND_ALIAS_H
+#define COMPILER_BACKEND_ALIAS_H
+
+#include <list>
+#include <memory>
+#include "enum.h"
 
 // operand.h
 namespace backend {
@@ -40,8 +42,6 @@ def(GlobalVar);
 def(Module);
 }  // namespace backend
 
-#undef def
-
 namespace backend {
 using inst_node_t = std::list<pInstructionBase>::iterator;
 using inst_pos_t = std::list<pInstructionBase>::const_iterator;
@@ -56,3 +56,7 @@ std::unique_ptr<T> make_copy(const std::unique_ptr<T> &ptr) {
 }  // namespace backend
 
 #endif  // COMPILER_BACKEND_ALIAS_H
+
+#ifndef ALIAS_DEF
+#undef def
+#endif

@@ -4,6 +4,9 @@
 # vscode
 .vscode
 
+# clangd
+.cache
+
 # binary
 /out
 /bin
