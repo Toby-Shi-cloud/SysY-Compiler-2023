@@ -66,6 +66,8 @@ jobs:
           cd ../compiler2024-toby
           ./path.sh
           ./compile.sh
+          git config user.name "github-action"
+          git config user.email "github-action@github.com"
           git add .
           git commit -m "[actions]: auto update ${{ github.sha }}"
           git push
