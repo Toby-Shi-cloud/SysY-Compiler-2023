@@ -30,26 +30,6 @@ struct Label : Operand {
     std::ostream &output(std::ostream &os) const override { return os << name; }
 };
 
-struct Immediate : Operand {
-    int value;
-
-    explicit Immediate(int value) : value(value) {}
-    std::ostream &output(std::ostream &os) const override { return os << value; }
-    [[nodiscard]] virtual pImmediate clone() const { return std::make_unique<Immediate>(value); }
-    [[nodiscard]] virtual bool isDyn() const { return false; }  // 兼容实现
-};
-
-struct DynImmediate : Immediate {
-    const int *base;
-
-    explicit DynImmediate(int value, const int *base) : Immediate(value), base(base) {}
-    std::ostream &output(std::ostream &os) const override { return os << value + *base; }
-    [[nodiscard]] pImmediate clone() const override {
-        return std::make_unique<DynImmediate>(value, base);
-    }
-    [[nodiscard]] bool isDyn() const override { return true; }
-};
-
 struct Register : Operand {
     std::unordered_set<rInstructionBase> defUsers;
     std::unordered_set<rInstructionBase> useUsers;
@@ -73,28 +53,6 @@ struct VirRegister : Register {
     explicit VirRegister() : id(counter++) {}
     std::ostream &output(std::ostream &os) const override { return os << "$vr" << id << ""; }
     [[nodiscard]] bool isVirtual() const override { return true; };
-};
-
-struct Address : Operand {
-    rRegister base;
-    pImmediate offset;
-    rLabel label;
-
-    explicit Address(rRegister base, int offset, rLabel label = nullptr)
-        : base(base), offset(new Immediate(offset)), label(label) {}
-    explicit Address(rRegister base, int offset, const int *immBase, rLabel label = nullptr)
-        : base(base), offset(new DynImmediate(offset, immBase)), label(label) {}
-    explicit Address(rRegister base, pImmediate offset, rLabel label = nullptr)
-        : base(base), offset(std::move(offset)), label(label) {}
-
-    std::ostream &output(std::ostream &os) const override {
-        label->output(os);
-        os << " + ";
-        offset->output(os);
-        os << "(";
-        base->output(os);
-        return os << ")";
-    }
 };
 
 template <typename T, typename = std::enable_if_t<std::is_base_of_v<Operand, T>>>

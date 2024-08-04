@@ -16,6 +16,49 @@
 #include "mips/alias.h"
 
 namespace backend::mips {
+
+struct Immediate : Operand {
+    int value;
+
+    explicit Immediate(int value) : value(value) {}
+    std::ostream &output(std::ostream &os) const override { return os << value; }
+    [[nodiscard]] virtual pImmediate clone() const { return std::make_unique<Immediate>(value); }
+    [[nodiscard]] virtual bool isDyn() const { return false; }  // 兼容实现
+};
+
+struct DynImmediate : Immediate {
+    const int *base;
+
+    explicit DynImmediate(int value, const int *base) : Immediate(value), base(base) {}
+    std::ostream &output(std::ostream &os) const override { return os << value + *base; }
+    [[nodiscard]] pImmediate clone() const override {
+        return std::make_unique<DynImmediate>(value, base);
+    }
+    [[nodiscard]] bool isDyn() const override { return true; }
+};
+
+struct Address : Operand {
+    rRegister base;
+    pImmediate offset;
+    rLabel label;
+
+    explicit Address(rRegister base, int offset, rLabel label = nullptr)
+        : base(base), offset(new Immediate(offset)), label(label) {}
+    explicit Address(rRegister base, int offset, const int *immBase, rLabel label = nullptr)
+        : base(base), offset(new DynImmediate(offset, immBase)), label(label) {}
+    explicit Address(rRegister base, pImmediate offset, rLabel label = nullptr)
+        : base(base), offset(std::move(offset)), label(label) {}
+
+    std::ostream &output(std::ostream &os) const override {
+        label->output(os);
+        os << " + ";
+        offset->output(os);
+        os << "(";
+        base->output(os);
+        return os << ")";
+    }
+};
+
 struct PhyRegister : Register {
     static constexpr const char *names[] = {
         "$zero", "$at", "$v0", "$v1", "$a0", "$a1", "$a2", "$a3",  //

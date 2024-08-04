@@ -5,11 +5,29 @@
 #ifndef COMPILER_MIPS_TRANSLATOR_H
 #define COMPILER_MIPS_TRANSLATOR_H
 
+#include <queue>
 #include "backend/translator.h"
 #include "mips/instruction.h"
 
 namespace backend::mips {
 class Translator : public TranslatorBase {
+    std::queue<pAddress> usedAddress;
+
+    template <typename... Args>
+    auto newAddress(Args... args) -> decltype(new Address(std::forward<decltype(args)>(args)...)) {
+        auto addr = new Address(std::forward<decltype(args)>(args)...);
+        usedAddress.emplace(addr);
+        return addr;
+    }
+
+    rAddress getAddress(const mir::Value *mirValue) {
+        auto ptr = translateOperand(mirValue);
+        if (auto addr = dynamic_cast<rAddress>(ptr)) return addr;
+        if (auto reg = dynamic_cast<rRegister>(ptr)) return newAddress(reg, 0);
+        if (auto label = dynamic_cast<rLabel>(ptr)) return newAddress(getZeroRegister(), 0, label);
+        return nullptr;
+    }
+
     template <mips::Instruction::Ty rTy, mips::Instruction::Ty iTy>
     rRegister createBinaryInstHelper(rRegister lhs, mir::Value *rhs);
     template <mir::Instruction::InstrTy ty>

@@ -49,8 +49,17 @@ struct InstructionBase {
     virtual bool isFuncCall() const = 0;
     virtual void setJumpLabel(rLabel newLabel) = 0;
     virtual rLabel getJumpLabel() const = 0;
+
     virtual std::ostream &output(std::ostream &os) const = 0;
     [[nodiscard]] virtual pInstructionBase clone() const = 0;
+    
+    template<typename T>
+    [[nodiscard]] T clone_as() const {
+        auto ptr = clone().release();
+        auto inst = dynamic_cast<T>(ptr);
+        if (inst == nullptr) delete ptr;
+        return inst;
+    }
 
     [[nodiscard]] rInstructionBase next() const;
 };
@@ -189,7 +198,6 @@ struct Function {
     std::list<pBlock> blocks;
     pBlock exitB = std::make_unique<Block>(this);
     std::unordered_set<pVirRegister> usedVirRegs;
-    std::unordered_set<pAddress> usedAddress;
 
     explicit Function(std::string name, bool isMain, bool isLeaf, bool retValue)
         : Function(std::move(name), 0, 0, isMain, isLeaf, retValue) {}
@@ -207,13 +215,6 @@ struct Function {
         auto reg = new VirRegister();
         usedVirRegs.emplace(reg);
         return reg;
-    }
-
-    template <typename... Args>
-    auto newAddress(Args... args) -> decltype(new Address(std::forward<decltype(args)>(args)...)) {
-        auto addr = new Address(std::forward<decltype(args)>(args)...);
-        usedAddress.emplace(addr);
-        return addr;
     }
 
     [[nodiscard]] auto begin() const { return blocks.begin(); }

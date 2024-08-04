@@ -37,15 +37,6 @@ class TranslatorBase {
         return dynamic_cast<rRegister>(translateOperand(mirValue));
     }
 
-    rAddress getAddress(const mir::Value *mirValue) {
-        auto ptr = translateOperand(mirValue);
-        if (auto addr = dynamic_cast<rAddress>(ptr)) return addr;
-        if (auto reg = dynamic_cast<rRegister>(ptr)) return curFunc->newAddress(reg, 0);
-        if (auto label = dynamic_cast<rLabel>(ptr))
-            return curFunc->newAddress(getZeroRegister(), 0, label);
-        return nullptr;
-    }
-
     void translateFunctions() {
         for (auto func : mirManager->functions) {
             translateFunction(func);

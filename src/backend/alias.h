@@ -27,10 +27,7 @@ namespace backend {
 def(Operand);
 def(Register);
 def(Label);
-def(Immediate);
-def(DynImmediate);
 def(VirRegister);
-def(Address);
 }  // namespace backend
 
 namespace backend {

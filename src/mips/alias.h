@@ -11,6 +11,10 @@
 namespace backend::mips {
 using magic_enum::lowercase::operator<<;
 def(PhyRegister);
+def(Immediate);
+def(DynImmediate);
+def(Address);
+
 def(Instruction);
 def(BinaryRInst);
 def(BinaryIInst);

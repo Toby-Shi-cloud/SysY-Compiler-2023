@@ -157,8 +157,7 @@ void Translator::translateAllocaInst(const mir::Instruction::alloca_ *allocaInst
     auto alloca_size = allocaInst->type->size();
     assert(alloca_size % 4 == 0);
     curFunc->allocaSize += alloca_size;
-    auto addr =
-        curFunc->newAddress(PhyRegister::get("$sp"), -curFunc->allocaSize, &curFunc->stackOffset);
+    auto addr = newAddress(PhyRegister::get("$sp"), -curFunc->allocaSize, &curFunc->stackOffset);
     put(allocaInst, addr);
 }
 
@@ -201,7 +200,7 @@ void Translator::translateGetPtrInst(const mir::Instruction::getelementptr *getP
         if (auto imm = dynamic_cast<mir::IntegerLiteral *>(value)) {
             auto _new = addr->offset->clone();
             _new->value += imm->value * deduce_size;
-            addr = curFunc->newAddress(addr->base, std::move(_new), addr->label);
+            addr = newAddress(addr->base, std::move(_new), addr->label);
         } else {
             auto reg = getRegister(value);
             auto dst1 = translateBinaryInstHelper<mir::Instruction::MUL>(
@@ -209,7 +208,7 @@ void Translator::translateGetPtrInst(const mir::Instruction::getelementptr *getP
             auto dst2 = curFunc->newVirRegister();
             curBlock->push_back(
                 std::make_unique<BinaryRInst>(Instruction::Ty::ADDU, dst2, addr->base, dst1));
-            addr = curFunc->newAddress(dst2, addr->offset->clone(), addr->label);
+            addr = newAddress(dst2, addr->offset->clone(), addr->label);
         }
     }
     put(getPtrInst, addr);
@@ -521,8 +520,7 @@ rOperand Translator::translateOperand(const mir::Value *mirValue) {
     }
     if (auto op = oMap.find(mirValue); op != oMap.end()) return op->second;
     if (auto gv = dynamic_cast<const mir::GlobalVar *>(mirValue)) {
-        if (gMap[gv]->inExtern)
-            return curFunc->newAddress(PhyRegister::get("$gp"), gMap[gv]->offsetofGp);
+        if (gMap[gv]->inExtern) return newAddress(PhyRegister::get("$gp"), gMap[gv]->offsetofGp);
         return gMap[gv]->label.get();
     }
     if (auto bb = dynamic_cast<const mir::BasicBlock *>(mirValue)) return bMap[bb]->label.get();
