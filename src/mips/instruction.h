@@ -6,6 +6,7 @@
 #define COMPILER_MIPS_INSTRUCTION_H
 
 #include "backend/component.h"
+#include "dbg.h"
 #include "mips/operand.h"
 
 namespace backend::mips {
