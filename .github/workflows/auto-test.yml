@@ -48,6 +48,28 @@ jobs:
                 -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++
           cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
+  push-gitlab:
+    needs: compile
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Clone from GitLab
+        run: |
+          git clone https://pat:${{ secrets.GITLABTOKEN }}@gitlab.eduxiji.net/T202410006203585/compiler2024-toby.git ../compiler2024-toby
+          rm -rf ../compiler2024-toby/src
+          cp -r src ../compiler2024-toby
+      
+      - name: Push to GitLab
+        run: |
+          cd ../compiler2024-toby
+          ./path.sh
+          ./compile.sh
+          git add .
+          git commit -m "[actions]: auto update ${{ github.sha }}"
+          git push
+
   functional-test:
     needs: compile
     runs-on: ubuntu-latest
