@@ -7,8 +7,11 @@
 
 #include <memory>
 #include <utility>
+#include <variant>
+#include <vector>
 #include "backend/operand.h"  // IWYU pragma: export
 #include "riscv/alias.h"      // IWYU pragma: export
+#include "util.h"
 
 namespace backend::riscv {
 
@@ -26,15 +29,70 @@ struct IntImmediate : Immediate {
 };
 
 struct LabelImmediate : Immediate {
-    rLabel label;
-    enum Partition { HI, LO } part;
+    std::variant<rLabel, pImmediate> label;
+    enum Partition { HI, LO, FULL } part;
     LabelImmediate(rLabel label, Partition part) : label{label}, part{part} {}
+    LabelImmediate(pImmediate label, Partition part) : label{std::move(label)}, part{part} {}
+
     std::ostream &output(std::ostream &os) const override {
         using magic_enum::uppercase::operator<<;
-        return os << "%" << part << "(" << label << ")";
+        os << "%" << part << "(";
+        visit([&os](auto &&lbl) { os << lbl; }, label);
+        return os << ")";
     }
+
     [[nodiscard]] pImmediate clone() const override {
-        return std::make_unique<LabelImmediate>(label, part);
+        return visit(
+            overloaded{
+                [this](rLabel lbl) { return std::make_unique<LabelImmediate>(lbl, part); },
+                [this](auto &imm) { return std::make_unique<LabelImmediate>(imm->clone(), part); }},
+            label);
+    }
+};
+
+struct JoinImmediate : Immediate {
+    std::vector<pImmediate> values;
+    explicit JoinImmediate(std::vector<pImmediate> values) : values{std::move(values)} {}
+
+    [[nodiscard]] std::pair<rLabelImmediate, int> accumulate() const {
+        rLabelImmediate label = nullptr;
+        int acc = 0;
+        for (auto &&imm : values) {
+            if (auto lbl = dynamic_cast<rLabelImmediate>(imm.get())) {
+                assert(label == nullptr);
+                label = lbl;
+            } else if (auto val = dynamic_cast<rIntImmediate>(imm.get())) {
+                acc += val->value;
+            } else if (auto join = dynamic_cast<rJoinImmediate>(imm.get())) {
+                auto [l, a] = join->accumulate();
+                if (l != nullptr) {
+                    assert(label == nullptr);
+                    label = l;
+                }
+                acc += a;
+            } else {
+                __builtin_unreachable();
+            }
+        }
+        return {label, acc};
+    }
+
+    std::ostream &output(std::ostream &os) const override {
+        auto [lbl, acc] = accumulate();
+        if (lbl != nullptr) {
+            os << lbl;
+            if (acc) os << '+' << acc;
+        } else {
+            os << acc;
+        }
+        return os;
+    }
+
+    [[nodiscard]] pImmediate clone() const override {
+        std::vector<pImmediate> new_values;
+        new_values.reserve(values.size());
+        for (auto &&value : values) new_values.push_back(value->clone());
+        return std::make_unique<JoinImmediate>(std::move(new_values));
     }
 };
 
@@ -42,9 +100,35 @@ inline pIntImmediate create_imm(int value) { return std::make_unique<IntImmediat
 inline pLabelImmediate create_imm(rLabel label, LabelImmediate::Partition part) {
     return std::make_unique<LabelImmediate>(label, part);
 }
+inline auto create_imm(rLabel label) { return create_imm(label, LabelImmediate::FULL); }
+inline auto create_imm_hi(rLabel label) { return create_imm(label, LabelImmediate::HI); }
+inline auto create_imm_lo(rLabel label) { return create_imm(label, LabelImmediate::LO); }
 inline pIntImmediate operator""_I(unsigned long long value) {
     return create_imm(static_cast<int>(value));
 }
+
+inline pJoinImmediate join_imm(pImmediate x, pImmediate y) {
+    if (auto join = dynamic_cast<rJoinImmediate>(x.get())) {
+        join->values.push_back(std::move(y));
+        (void)(join == x.release());  // release
+        return pJoinImmediate{join};
+    } else if (dynamic_cast<rJoinImmediate>(y.get())) {
+        return join_imm(std::move(y), std::move(x));
+    } else {
+        std::vector<pImmediate> vec;
+        vec.push_back(std::move(x)), vec.push_back(std::move(y));
+        return std::make_unique<JoinImmediate>(std::move(vec));
+    }
+}
+
+struct Address : Operand {
+    rRegister base;
+    pImmediate offset;
+    Address(rRegister base, pImmediate offset) : base{base}, offset{std::move(offset)} {}
+    std::ostream &output(std::ostream &os) const override {
+        return os << offset << '(' << base << ')';
+    }
+};
 
 struct PhyRegister : Register {
     unsigned id;

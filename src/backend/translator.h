@@ -5,7 +5,7 @@
 #ifndef COMPILER_BACKEND_TRANSLATOR_H
 #define COMPILER_BACKEND_TRANSLATOR_H
 
-#include "backend/component.h"
+#include "backend/operand.h"
 #include "mir.h"
 
 namespace backend {
@@ -52,7 +52,6 @@ class TranslatorBase {
     virtual rOperand translateOperand(const mir::Value *mirValue) = 0;
     virtual void translateFunction(const mir::Function *mirFunction) = 0;
     virtual void translateGlobalVar(const mir::GlobalVar *mirGlobalVar) = 0;
-    virtual rRegister getZeroRegister() const = 0;
 
  public:
     explicit TranslatorBase(mir::Manager *mirManager, rModule assemblyModule)

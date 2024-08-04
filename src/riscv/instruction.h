@@ -5,6 +5,7 @@
 #ifndef COMPILER_RISCV_INSTRUCTION_H
 #define COMPILER_RISCV_INSTRUCTION_H
 
+#include "backend/operand.h"
 #include "dbg.h"
 
 #include "backend/component.h"  // IWYU pragma: export
@@ -14,6 +15,7 @@ namespace backend::riscv {
 struct Instruction : InstructionBase {
     // clang-format off
     enum class Ty {
+        NOP,
         // basic (RV32I)
         LUI, AUIPC, JAL, JALR,
         BEQ, BNE, BLT, BGE, BLTU, BGEU,
@@ -35,9 +37,10 @@ struct Instruction : InstructionBase {
         // float (RV64F)
         FCVT_L_S, FCVT_LU_S, FCVT_S_L, FCVT_S_LU,
         // useful pseudo instructions
-        CALL, RET, LI,
+        CALL, RET, J, MV,
     } ty;
     // clang-format on
+    friend constexpr bool floatOp(Ty ty) { return ty >= Ty::FLW && ty <= Ty::FCVT_S_LU; }
 
     enum class InstType { R, I, S, B, U, J, Pseudo };
     virtual InstType getInstType() const = 0;
@@ -57,12 +60,12 @@ struct Instruction : InstructionBase {
 
     [[nodiscard]] bool isFuncCall() const override { return isFuncCallImpl(); }
     [[nodiscard]] bool isJumpBranch() const override {
-        return ty >= Ty::JAL && ty <= Ty::BGEU || ty == Ty::CALL || ty == Ty::RET;
+        return ty >= Ty::JAL && ty <= Ty::BGEU || ty >= Ty::CALL && ty <= Ty::J;
     }
 
     [[nodiscard]] bool isConditionalBranch() const { return ty >= Ty::BEQ && ty <= Ty::BGEU; }
     [[nodiscard]] bool isUnconditionalJump() const {
-        return ty == Ty::CALL || ty == Ty::JAL || ty == Ty::JALR;
+        return ty == Ty::CALL || ty == Ty::RET || ty == Ty::JAL || ty == Ty::JALR || ty == Ty::J;
     }
 
     [[nodiscard]] bool isStore() const {
@@ -81,7 +84,7 @@ struct Instruction : InstructionBase {
 
 inline std::ostream &operator<<(std::ostream &os, Instruction::Ty ty) {
     auto name = magic_enum::enum_name(ty);
-    for (auto c : name) os << (c == '_' ? '.' : ::tolower(c));
+    for (auto c : name) os << (char)(c == '_' ? '.' : ::tolower(c));
     return os;
 }
 
@@ -215,13 +218,22 @@ struct RetInstruction : Instruction {
     std::ostream &output(std::ostream &os) const override { return os << ty; }
 };
 
-struct LiInstruction : Instruction {
-    pImmediate imm;
-    LiInstruction(const LiInstruction &inst) : Instruction{inst}, imm{inst.imm->clone()} {}
-    CLONE_DECL(LiInstruction);
+struct JumpInstruction : Instruction {
+    rLabel label;
+    CLONE_DECL(JumpInstruction);
     InstType getInstType() const override { return InstType::Pseudo; }
-    explicit LiInstruction(pImmediate imm) : Instruction(Ty::LI), imm{std::move(imm)} {}
-    std::ostream &output(std::ostream &os) const override { return os << ty << '\t' << imm; }
+    explicit JumpInstruction(rLabel label) : Instruction(Ty::J), label{label} {}
+    std::ostream &output(std::ostream &os) const override { return os << ty << '\t' << label; }
+};
+
+struct MoveInstruction : Instruction {
+    rRegister rd, rs;
+    CLONE_DECL(MoveInstruction);
+    InstType getInstType() const override { return InstType::Pseudo; }
+    MoveInstruction(rRegister rd, rRegister rs) : Instruction(Ty::MV), rd{rd}, rs{rs} {}
+    std::ostream &output(std::ostream &os) const override {
+        return os << ty << '\t' << rd << ", " << rs;
+    }
 };
 
 #undef CLONE_DECL

@@ -1,38 +1,42 @@
 //
-// Created by toby on 2023/11/5.
+// Created by toby on 2024/8/4.
 //
 
-#ifndef COMPILER_MIPS_TRANSLATOR_H
-#define COMPILER_MIPS_TRANSLATOR_H
+#ifndef COMPILER_RISCV_TRANSLATOR_H
+#define COMPILER_RISCV_TRANSLATOR_H
 
-#include <queue>
+#include <memory>
+#include <stack>
+#include <utility>
 #include "backend/translator.h"
-#include "mips/instruction.h"
+#include "riscv/alias.h"
+#include "riscv/instruction.h"
 
-namespace backend::mips {
+namespace backend::riscv {
 class Translator : public TranslatorBase {
-    std::queue<pAddress> usedAddress;
+    // 在函数进行第一次 translate 的时候，将 sp 视作为函数进入前的值，因此需要再翻译。
+    std::stack<int *> stack_imm_pointers;
+    // 使用到的但是没有被其他指令持有的
+    std::stack<pOperand> usedOperands;
 
-    template <typename... Args>
-    auto newAddress(Args... args) -> decltype(new Address(std::forward<decltype(args)>(args)...)) {
-        auto addr = new Address(std::forward<decltype(args)>(args)...);
-        usedAddress.emplace(addr);
-        return addr;
+    rAddress newAddress(rRegister base, pImmediate offset) {
+        usedOperands.push(std::make_unique<Address>(base, std::move(offset)));
+        return dynamic_cast<rAddress>(usedOperands.top().get());
     }
 
     rAddress getAddress(const mir::Value *mirValue) {
         auto ptr = translateOperand(mirValue);
         if (auto addr = dynamic_cast<rAddress>(ptr)) return addr;
-        if (auto reg = dynamic_cast<rRegister>(ptr)) return newAddress(reg, 0);
-        if (auto label = dynamic_cast<rLabel>(ptr)) return newAddress(getZeroRegister(), 0, label);
+        if (auto reg = dynamic_cast<rRegister>(ptr)) return newAddress(reg, 0_I);
+        if (auto label = dynamic_cast<rLabel>(ptr)) return newAddress("x0"_R, create_imm(label));
         return nullptr;
     }
 
-    template <mips::Instruction::Ty rTy, mips::Instruction::Ty iTy>
-    rRegister createBinaryInstHelper(rRegister lhs, mir::Value *rhs);
-    template <mir::Instruction::InstrTy ty>
+    template <Instruction::Ty rTy, Instruction::Ty iTy>
+    rRegister createBinaryInstHelperX(rRegister lhs, mir::Value *rhs);
+    template <mir::Instruction::InstrTy ty, size_t XLEN>
     rRegister translateBinaryInstHelper(rRegister lhs, mir::Value *rhs);
-    rRegister addressCompute(rAddress addr) const;
+
     void translateRetInst(const mir::Instruction::ret *retInst);
     void translateBranchInst(const mir::Instruction::br *brInst);
     template <mir::Instruction::InstrTy ty>
@@ -54,7 +58,6 @@ class Translator : public TranslatorBase {
     void translateFunction(const mir::Function *mirFunction) override;
     void translateGlobalVar(const mir::GlobalVar *mirVar) override;
     rOperand translateOperand(const mir::Value *mirValue) override;
-    static rRegister getZeroRegister() { return PhyRegister::get(0); }
 
     void compute_phi(const mir::Function *mirFunction);
     void compute_func_start() const;
@@ -64,8 +67,7 @@ class Translator : public TranslatorBase {
 
  public:
     using TranslatorBase::TranslatorBase;
-    void translate() override;
 };
-}  // namespace backend::mips
+}  // namespace backend::riscv
 
-#endif  // COMPILER_MIPS_TRANSLATOR_H
+#endif  // COMPILER_RISCV_TRANSLATOR_H

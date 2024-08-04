@@ -40,10 +40,11 @@ struct Instruction::ret : Instruction {
 };
 
 struct Instruction::br : Instruction {
-    explicit br(BasicBlock *target) : Instruction(Type::getVoidType(), BR, target) {}
+    double likely = 0.5;  // probability of condition being true
 
-    explicit br(Value *cond, BasicBlock *ifTrue, BasicBlock *ifFalse)
-        : Instruction(Type::getVoidType(), BR, cond, ifTrue, ifFalse) {}
+    explicit br(BasicBlock *target) : Instruction(Type::getVoidType(), BR, target) {}
+    explicit br(Value *cond, BasicBlock *ifTrue, BasicBlock *ifFalse, double likely = 0.5)
+        : Instruction(Type::getVoidType(), BR, cond, ifTrue, ifFalse), likely{likely} {}
 
     [[nodiscard]] bool hasCondition() const { return getNumOperands() == 3; }
 
@@ -247,6 +248,21 @@ struct Instruction::_conversion_instruction : Instruction {
 
 struct Instruction::icmp : Instruction {
     enum Cond { EQ, NE, UGT, UGE, ULT, ULE, SGT, SGE, SLT, SLE } cond;
+    friend Cond operator~(Cond cond) {
+        switch (cond) {
+        case EQ: return NE;
+        case NE: return EQ;
+        case UGT: return ULE;
+        case UGE: return ULT;
+        case ULT: return UGE;
+        case ULE: return UGT;
+        case SGT: return SLE;
+        case SGE: return SLT;
+        case SLT: return SGE;
+        case SLE: return SGT;
+        default: __builtin_unreachable();
+        }
+    }
 
     explicit icmp(Cond cond, Value *lhs, Value *rhs)
         : Instruction(Type::getI1Type(), ICMP, lhs, rhs), cond(cond) {
@@ -284,8 +300,20 @@ struct Instruction::icmp : Instruction {
 struct Instruction::fcmp : Instruction {
     enum Cond {
         FALSE,
-        OEQ, OGT, OGE, OLT, OLE, ONE, ORD,
-        UEQ, UGT, UGE, ULT, ULE, UNE, UNO,
+        OEQ,
+        OGT,
+        OGE,
+        OLT,
+        OLE,
+        ONE,
+        ORD,
+        UEQ,
+        UGT,
+        UGE,
+        ULT,
+        ULE,
+        UNE,
+        UNO,
         TRUE,
     } cond;
 

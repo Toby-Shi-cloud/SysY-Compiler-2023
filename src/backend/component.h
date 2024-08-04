@@ -52,8 +52,8 @@ struct InstructionBase {
 
     virtual std::ostream &output(std::ostream &os) const = 0;
     [[nodiscard]] virtual pInstructionBase clone() const = 0;
-    
-    template<typename T>
+
+    template <typename T>
     [[nodiscard]] T clone_as() const {
         auto ptr = clone().release();
         auto inst = dynamic_cast<T>(ptr);
@@ -121,11 +121,11 @@ struct SubBlock {
         return instructions.erase(std::forward<decltype(args)>(args)...);
     }
 
-    std::ostream &output(std::ostream &os, bool sharp_last = false,
-                         const char *sharp = "# ") const {
-        for (auto &inst : instructions)
-            os << "\t" << (sharp_last && &inst == &instructions.back() ? sharp : "") << *inst
-               << "\n";
+    std::ostream &output(std::ostream &os, bool skip_last = false) const {
+        for (auto &inst : instructions) {
+            if (skip_last && &inst == &instructions.back()) break;
+            os << "\t" << *inst << "\n";
+        }
         return os;
     }
 
@@ -229,8 +229,8 @@ struct Function {
     void allocName() const {
         size_t counter = 0;
         for (auto &bb : *this)
-            bb->label->name = "$." + label->name + "_" + std::to_string(counter++);
-        exitB->label->name = "$." + label->name + ".end";
+            bb->label->name = '.' + label->name + "_" + std::to_string(counter++);
+        exitB->label->name = '.' + label->name + "_end";
         blocks.front()->label->name = "";
     }
 };

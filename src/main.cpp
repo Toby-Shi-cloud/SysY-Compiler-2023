@@ -2,9 +2,9 @@
 #include <iostream>
 #include "frontend/parser.h"
 #include "frontend/visitor.h"
-#include "mips/printer.h"
-#include "mips/translator.h"
 #include "mir/manager.h"
+#include "riscv/printer.h"
+#include "riscv/translator.h"
 #include "settings.h"
 
 #include <clipp.h>
@@ -80,14 +80,10 @@ int main(int argc, char **argv) {
 
     if (!assembly) return 0;
 
-    std::ofstream fmips(llvm_ir ? outfile + ".asm" : outfile);
-    backend::mips::Translator translator(&mir_manager, &mips_module);
+    std::ofstream fasm(llvm_ir ? outfile + ".asm" : outfile);
+    backend::riscv::Translator translator(&mir_manager, &mips_module);
     translator.translate();
 
-    using backend::mips::operator<<;
-    if (opt_settings.using_inline_printer)
-        backend::mips::inline_printer(fmips, mips_module);
-    else
-        fmips << mips_module;
+    backend::riscv::operator<<(fasm, mips_module);
     return 0;
 }
