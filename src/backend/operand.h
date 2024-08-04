@@ -47,11 +47,14 @@ struct Register : Operand {
 };
 
 struct VirRegister : Register {
-    size_t id;
-    static inline size_t counter = 0;
+    bool is_float;
+    uint32_t id;
+    static inline uint32_t counter = 0;
 
-    explicit VirRegister() : id(counter++) {}
-    std::ostream &output(std::ostream &os) const override { return os << "$vr" << id << ""; }
+    explicit VirRegister(bool is_float = false) : is_float(is_float), id(counter++) {}
+    std::ostream &output(std::ostream &os) const override {
+        return os << "vr" << (is_float ? "f" : "") << id << "";
+    }
     [[nodiscard]] bool isVirtual() const override { return true; };
 };
 

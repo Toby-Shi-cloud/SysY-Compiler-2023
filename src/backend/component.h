@@ -211,8 +211,8 @@ struct Function {
           isLeaf(isLeaf),
           retValue(retValue) {}
 
-    rVirRegister newVirRegister() {
-        auto reg = new VirRegister();
+    rVirRegister newVirRegister(bool is_float = false) {
+        auto reg = new VirRegister(is_float);
         usedVirRegs.emplace(reg);
         return reg;
     }

@@ -5,11 +5,47 @@
 #ifndef COMPILER_RISCV_OPERAND_H
 #define COMPILER_RISCV_OPERAND_H
 
+#include <memory>
 #include <utility>
-#include "backend/operand.h"
-#include "riscv/alias.h"
+#include "backend/operand.h"  // IWYU pragma: export
+#include "riscv/alias.h"      // IWYU pragma: export
 
 namespace backend::riscv {
+
+struct Immediate : Operand {
+    [[nodiscard]] virtual pImmediate clone() const = 0;
+};
+
+struct IntImmediate : Immediate {
+    int value;
+    explicit IntImmediate(int value) : value{value} {}
+    std::ostream &output(std::ostream &os) const override { return os << value; }
+    [[nodiscard]] pImmediate clone() const override {
+        return std::make_unique<IntImmediate>(value);
+    }
+};
+
+struct LabelImmediate : Immediate {
+    rLabel label;
+    enum Partition { HI, LO } part;
+    LabelImmediate(rLabel label, Partition part) : label{label}, part{part} {}
+    std::ostream &output(std::ostream &os) const override {
+        using magic_enum::uppercase::operator<<;
+        return os << "%" << part << "(" << label << ")";
+    }
+    [[nodiscard]] pImmediate clone() const override {
+        return std::make_unique<LabelImmediate>(label, part);
+    }
+};
+
+inline pIntImmediate create_imm(int value) { return std::make_unique<IntImmediate>(value); }
+inline pLabelImmediate create_imm(rLabel label, LabelImmediate::Partition part) {
+    return std::make_unique<LabelImmediate>(label, part);
+}
+inline pIntImmediate operator""_I(unsigned long long value) {
+    return create_imm(static_cast<int>(value));
+}
+
 struct PhyRegister : Register {
     unsigned id;
 
@@ -162,6 +198,8 @@ inline auto PhyRegister::gets(Func &&pred)
         if (std::invoke(pred, reg.get())) regs.insert(reg.get());
     return regs;
 }
+
+inline rPhyRegister operator""_R(const char *str, size_t) { return PhyRegister::get(str); }
 
 }  // namespace backend::riscv
 

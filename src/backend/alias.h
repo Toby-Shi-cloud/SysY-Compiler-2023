@@ -20,7 +20,7 @@
 
 #include <list>
 #include <memory>
-#include "enum.h"
+#include "enum.h"  // IWYU pragma: export
 
 // operand.h
 namespace backend {

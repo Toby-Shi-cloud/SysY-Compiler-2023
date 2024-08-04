@@ -6,15 +6,25 @@
 #define COMPILER_RISCV_ALIAS_H
 
 #define ALIAS_DEF
-#include "backend/alias.h"
+#include "backend/alias.h"  // IWYU pragma: export
 
 namespace backend::riscv {
-using magic_enum::lowercase::operator<<;
+def(Immediate);
+def(IntImmediate);
+def(LabelImmediate);
+
 def(PhyRegister);
 def(XPhyRegister);
 def(FPhyRegister);
+
 def(Instruction);
-}
+def(RInstruction);
+def(IInstruction);
+def(SInstruction);
+def(BInstruction);
+def(UInstruction);
+def(JInstruction);
+}  // namespace backend::riscv
 
 #undef ALIAS_DEF
 #undef def

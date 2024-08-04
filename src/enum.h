@@ -5,7 +5,9 @@
 #ifndef COMPILER_ENUM_H
 #define COMPILER_ENUM_H
 
-#include <magic_enum.hpp>
+#include <ostream>
+
+#include <magic_enum.hpp>  // IWYU pragma: export
 
 namespace magic_enum {
 template <typename Enum>
