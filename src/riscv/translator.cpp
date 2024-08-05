@@ -12,9 +12,11 @@
 #include "riscv/alias.h"
 #include "riscv/instruction.h"
 #include "riscv/operand.h"
+#include "riscv/opt.h"
 #include "riscv/reg_alloca.h"
 #include "util.h"
 
+namespace backend::riscv {
 namespace {
 void flatten(mir::Literal *literal, std::vector<int> &result) {
     if (auto v = dynamic_cast<mir::IntegerLiteral *>(literal)) return result.push_back(v->value);
@@ -30,7 +32,6 @@ std::vector<int> flatten(mir::Literal *literal) {
 }
 }  // namespace
 
-namespace backend::riscv {
 template <Instruction::Ty rTy, Instruction::Ty iTy>
 rRegister Translator::createBinaryInstHelperX(rRegister lhs, mir::Value *rhs) {
     assert(rTy != Instruction::Ty::NOP);
@@ -147,6 +148,13 @@ void Translator::translateBinaryInst(const mir::Instruction::_binary_instruction
     put(binInst, reg);
 }
 
+void Translator::translateFnegInst(const mir::Instruction::fneg *fnegInst) {
+    auto reg = getRegister(fnegInst->getOperand());
+    auto dst = curFunc->newVirRegister(true);
+    curBlock->push_back(std::make_unique<FnegInstruction>(dst, reg));
+    put(fnegInst, dst);
+}
+
 void Translator::translateAllocaInst(const mir::Instruction::alloca_ *allocaInst) {
     auto alloca_size = allocaInst->type->size();
     assert(alloca_size % 4 == 0);
@@ -240,6 +248,23 @@ void Translator::translateConversionInst(const mir::Instruction::sext *sextInst)
     put(sextInst, reg);
 }
 
+template <mir::Instruction::InstrTy ty>
+void Translator::translateFpConvInst(
+    const mir::Instruction::_conversion_instruction<ty> *fpConvInst) {
+    constexpr Instruction::Ty fpConvTy[] = {
+        Instruction::Ty::FCVT_S_WU,
+        Instruction::Ty::FCVT_S_W,
+        Instruction::Ty::FCVT_WU_S,
+        Instruction::Ty::FCVT_W_S,
+    };
+    constexpr size_t indexTy = ty - mir::Instruction::FPTOUI;
+    static_assert(indexTy < 4, "wrong mir::Instruction::InstrTy");
+    auto reg = getRegister(fpConvInst->getValueOperand());
+    auto dst = curFunc->newVirRegister(fpConvInst->type->isFloatTy());
+    curBlock->push_back(std::make_unique<FpConvInstruction>(fpConvTy[indexTy], dst, reg));
+    put(fpConvInst, dst);
+}
+
 void Translator::translateIcmpInst(const mir::Instruction::icmp *icmpInst) {
     auto lhs = icmpInst->getLhs();
     auto rhs = icmpInst->getRhs();
@@ -300,6 +325,48 @@ void Translator::translateIcmpInst(const mir::Instruction::icmp *icmpInst) {
     put(icmpInst, reg);
 }
 
+void Translator::translateFcmpInst(const mir::Instruction::fcmp *fcmpInst) {
+    auto lhs = getRegister(fcmpInst->getLhs());
+    auto rhs = getRegister(fcmpInst->getRhs());
+    auto reg = curFunc->newVirRegister();
+    using Ty = Instruction::Ty;
+    Ty condTy{};
+    switch (fcmpInst->cond) {
+    case mir::Instruction::fcmp::FALSE:
+        curBlock->push_back(std::make_unique<MoveInstruction>(reg, "x0"_R));
+        break;
+    case mir::Instruction::fcmp::OEQ: condTy = Ty::FEQ_S; break;
+    case mir::Instruction::fcmp::OGT:
+        condTy = Ty::FLT_S;
+        std::swap(lhs, rhs);
+        break;
+    case mir::Instruction::fcmp::OGE:
+        condTy = Ty::FLE_S;
+        std::swap(lhs, rhs);
+        break;
+    case mir::Instruction::fcmp::OLT: condTy = Ty::FLT_S; break;
+    case mir::Instruction::fcmp::OLE: condTy = Ty::FLE_S; break;
+    case mir::Instruction::fcmp::ONE:
+        curBlock->push_back(std::make_unique<RInstruction>(Ty::FEQ_S, reg, lhs, rhs));
+        curBlock->push_back(std::make_unique<IInstruction>(Ty::XORI, reg, reg, 1_I));
+        break;
+    case mir::Instruction::fcmp::ORD:
+    case mir::Instruction::fcmp::UEQ:
+    case mir::Instruction::fcmp::UGT:
+    case mir::Instruction::fcmp::UGE:
+    case mir::Instruction::fcmp::ULT:
+    case mir::Instruction::fcmp::ULE:
+    case mir::Instruction::fcmp::UNE:
+    case mir::Instruction::fcmp::UNO: TODO("not implemented");
+    case mir::Instruction::fcmp::TRUE:
+        curBlock->push_back(std::make_unique<IInstruction>(Ty::ADDI, reg, "x0"_R, 1_I));
+        break;
+    }
+    if (condTy != Ty::NOP)
+        curBlock->push_back(std::make_unique<RInstruction>(condTy, reg, lhs, rhs));
+    put(fcmpInst, reg);
+}
+
 void Translator::translatePhiInst(const mir::Instruction::phi *phiInst) {
     // Put a new virtual register to indicate the phi instruction,
     // and we will translate it later.
@@ -352,6 +419,26 @@ void Translator::translateCallInst(const mir::Instruction::call *callInst) {
         curBlock->push_back(std::make_unique<MoveInstruction>(temp, "fa0"_R));
         put(callInst, temp);
     }
+}
+
+void Translator::translateMemsetInst(const mir::Instruction::memset *memsetInst) {
+    if (memsetInst->size <= 0) return;
+    if (memsetInst->val != 0) TODO("not implemented for memset none zero");
+    if (memsetInst->size % 4 != 0) TODO("not implemented for memset size not multiple of 4");
+    auto addr = getAddress(memsetInst->getBase());
+    if (memsetInst->size / 4 <= 32) {
+        for (int i = 0; i < memsetInst->size / 4; i++) {
+            curBlock->push_back(
+                std::make_unique<SInstruction>(Instruction::Ty::SW, "x0"_R, addr->base,
+                                               join_imm(addr->offset->clone(), create_imm(i * 4))));
+        }
+        return;
+    }
+    for (auto &inst : translateImmAs("a1"_R, memsetInst->size / 4))
+        curBlock->push_back(std::move(inst));
+    auto ptr = addr2reg(addr);
+    curBlock->push_back(std::make_unique<MoveInstruction>("a0"_R, ptr));
+    curBlock->push_back(std::make_unique<CallInstruction>(getLibLabel("@sysy.memset0")));
 }
 
 void Translator::translateFunction(const mir::Function *mirFunction) {
@@ -481,6 +568,18 @@ void Translator::translateInstruction(const mir::Instruction *mirInst) {
         return translateBinaryInst(dynamic_cast<const mir::Instruction::or_ *>(mirInst));
     case mir::Instruction::XOR:
         return translateBinaryInst(dynamic_cast<const mir::Instruction::xor_ *>(mirInst));
+    case mir::Instruction::FADD:
+        return translateBinaryInst(dynamic_cast<const mir::Instruction::fadd *>(mirInst));
+    case mir::Instruction::FSUB:
+        return translateBinaryInst(dynamic_cast<const mir::Instruction::fsub *>(mirInst));
+    case mir::Instruction::FMUL:
+        return translateBinaryInst(dynamic_cast<const mir::Instruction::fmul *>(mirInst));
+    case mir::Instruction::FDIV:
+        return translateBinaryInst(dynamic_cast<const mir::Instruction::fdiv *>(mirInst));
+    case mir::Instruction::FREM:
+        return translateBinaryInst(dynamic_cast<const mir::Instruction::frem *>(mirInst));
+    case mir::Instruction::FNEG:
+        return translateFnegInst(dynamic_cast<const mir::Instruction::fneg *>(mirInst));
     case mir::Instruction::ALLOCA:
         return translateAllocaInst(dynamic_cast<const mir::Instruction::alloca_ *>(mirInst));
     case mir::Instruction::LOAD:
@@ -495,15 +594,26 @@ void Translator::translateInstruction(const mir::Instruction *mirInst) {
         return translateConversionInst(dynamic_cast<const mir::Instruction::zext *>(mirInst));
     case mir::Instruction::SEXT:
         return translateConversionInst(dynamic_cast<const mir::Instruction::sext *>(mirInst));
+    case mir::Instruction::FPTOSI:
+        return translateFpConvInst(dynamic_cast<const mir::Instruction::fptosi *>(mirInst));
+    case mir::Instruction::FPTOUI:
+        return translateFpConvInst(dynamic_cast<const mir::Instruction::fptoui *>(mirInst));
+    case mir::Instruction::SITOFP:
+        return translateFpConvInst(dynamic_cast<const mir::Instruction::sitofp *>(mirInst));
+    case mir::Instruction::UITOFP:
+        return translateFpConvInst(dynamic_cast<const mir::Instruction::uitofp *>(mirInst));
     case mir::Instruction::ICMP:
         return translateIcmpInst(dynamic_cast<const mir::Instruction::icmp *>(mirInst));
+    case mir::Instruction::FCMP:
+        return translateFcmpInst(dynamic_cast<const mir::Instruction::fcmp *>(mirInst));
     case mir::Instruction::PHI:
         return translatePhiInst(dynamic_cast<const mir::Instruction::phi *>(mirInst));
     case mir::Instruction::SELECT:
         return translateSelectInst(dynamic_cast<const mir::Instruction::select *>(mirInst));
     case mir::Instruction::CALL:
         return translateCallInst(dynamic_cast<const mir::Instruction::call *>(mirInst));
-    default: TODO("not implemented");
+    case mir::Instruction::MEMSET:
+        return translateMemsetInst(dynamic_cast<const mir::Instruction::memset *>(mirInst));
     }
 }
 
@@ -529,31 +639,11 @@ void Translator::translateGlobalVar(const mir::GlobalVar *mirVar) {
     assemblyModule->globalVars.emplace_back(result);
 }
 
-static std::list<pInstruction> translateImmAs(rRegister reg, int imm) {
-    std::list<pInstruction> instructions;
-    if (imm == 0) {
-        instructions.push_back(std::make_unique<MoveInstruction>(reg, "x0"_R));
-        return instructions;
-    }
-    bool has_hi = (imm & ~0x0fff) != 0;
-    if (has_hi) {
-        instructions.push_back(
-            std::make_unique<UInstruction>(Instruction::Ty::LUI, reg, create_imm(imm & ~0x0fff)));
-    }
-    if ((imm & 0x0fff) != 0) {
-        instructions.push_back(std::make_unique<IInstruction>(
-            Instruction::Ty::ADDIW, reg, has_hi ? (rRegister)reg : (rRegister) "x0"_R,
-            create_imm(imm & 0x0fff)));
-    }
-    return instructions;
-}
-
 rOperand Translator::translateOperand(const mir::Value *mirValue) {
     if (auto imm = dynamic_cast<const mir::IntegerLiteral *>(mirValue)) {
         if (imm->value == 0) return "x0"_R;
         auto reg = curFunc->newVirRegister();
         for (auto &inst : translateImmAs(reg, imm->value)) curBlock->push_back(std::move(inst));
-
         return reg;
     }
     if (auto imm = dynamic_cast<const mir::FloatLiteral *>(mirValue)) {
@@ -693,6 +783,9 @@ void Translator::compute_func_exit() const {
     curFunc->exitB->push_back(std::make_unique<RetInstruction>());
 }
 
-void Translator::optimizeBeforeAlloc() const {}  // TODO opt
-void Translator::optimizeAfterAlloc() const {}   // TODO opt
+void Translator::optimizeBeforeAlloc() const {  // TODO opt
+    clearDeadCode(curFunc);
+}
+
+void Translator::optimizeAfterAlloc() const {}  // TODO opt
 }  // namespace backend::riscv

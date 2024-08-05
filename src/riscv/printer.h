@@ -33,7 +33,11 @@ inline std::ostream &operator<<(std::ostream &os, const Module &module) {
     for (auto &func : module.functions) os << *func << std::endl;
     // vars
     for (auto &var : module.globalVars) os << *var;
-    return os;
+    // memset0
+    constexpr char memset0[] = (
+#include "riscv/memset0.asm"
+    );
+    return os << memset0 << std::endl;
 }
 }  // namespace backend::riscv
 

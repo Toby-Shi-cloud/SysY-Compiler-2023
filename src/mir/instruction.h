@@ -298,24 +298,14 @@ struct Instruction::icmp : Instruction {
 };
 
 struct Instruction::fcmp : Instruction {
+    // clang-format off
     enum Cond {
         FALSE,
-        OEQ,
-        OGT,
-        OGE,
-        OLT,
-        OLE,
-        ONE,
-        ORD,
-        UEQ,
-        UGT,
-        UGE,
-        ULT,
-        ULE,
-        UNE,
-        UNO,
+        OEQ, OGT, OGE, OLT, OLE, ONE, ORD,
+        UEQ, UGT, UGE, ULT, ULE, UNE, UNO,
         TRUE,
     } cond;
+    // clang-format on
 
     explicit fcmp(Cond cond, Value *lhs, Value *rhs)
         : Instruction(Type::getI1Type(), FCMP, lhs, rhs), cond(cond) {

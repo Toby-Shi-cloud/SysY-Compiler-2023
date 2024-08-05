@@ -37,7 +37,7 @@ struct Instruction : InstructionBase {
         // float (RV64F)
         FCVT_L_S, FCVT_LU_S, FCVT_S_L, FCVT_S_LU,
         // useful pseudo instructions
-        CALL, RET, J, MV,
+        CALL, RET, J, MV, FNEG_S,
     } ty;
     // clang-format on
     friend constexpr bool floatOp(Ty ty) { return ty >= Ty::FLW && ty <= Ty::FCVT_S_LU; }
@@ -178,8 +178,7 @@ struct BInstruction : Instruction {
 // lui
 struct UInstruction : Instruction {
     pImmediate imm;
-    UInstruction(const UInstruction &inst)
-        : Instruction{inst}, imm{inst.imm->clone()} {}
+    UInstruction(const UInstruction &inst) : Instruction{inst}, imm{inst.imm->clone()} {}
 
     CLONE_DECL(UInstruction);
     InstType getInstType() const override { return InstType::U; }
@@ -204,13 +203,25 @@ struct JInstruction : Instruction {
     rLabel getJumpLabel() const override { return label; }
     void setJumpLabel(rLabel newLabel) override { label = newLabel; }
 
-    JInstruction(Ty ty, rRegister rd, rLabel label)
-        : Instruction(ty, {rd}, {}), label{label} {}
+    JInstruction(Ty ty, rRegister rd, rLabel label) : Instruction(ty, {rd}, {}), label{label} {}
 
     rRegister rd() const { return regDef[0]; }
 
     std::ostream &output(std::ostream &os) const override {
         return os << ty << '\t' << rd() << ", " << label;
+    }
+};
+
+// rd = (T)rs
+// FCVT, FMV, etc
+struct FpConvInstruction : Instruction {
+    CLONE_DECL(FpConvInstruction);
+    InstType getInstType() const override { return InstType::I; }
+    FpConvInstruction(Ty ty, rRegister rd, rRegister rs1) : Instruction(ty, {rd}, {rs1}) {}
+    rRegister rd() const { return regDef[0]; }
+    rRegister rs1() const { return regUse[0]; }
+    std::ostream &output(std::ostream &os) const override {
+        return os << ty << '\t' << rd() << ", " << rs1();
     }
 };
 
@@ -244,6 +255,17 @@ struct MoveInstruction : Instruction {
     CLONE_DECL(MoveInstruction);
     InstType getInstType() const override { return InstType::Pseudo; }
     MoveInstruction(rRegister rd, rRegister rs) : Instruction(Ty::MV, {rd}, {rs}) {}
+    rRegister rd() const { return regDef[0]; }
+    rRegister rs() const { return regUse[0]; }
+    std::ostream &output(std::ostream &os) const override {
+        return os << ty << '\t' << rd() << ", " << rs();
+    }
+};
+
+struct FnegInstruction : Instruction {
+    CLONE_DECL(FnegInstruction);
+    InstType getInstType() const override { return InstType::Pseudo; }
+    FnegInstruction(rRegister rd, rRegister rs) : Instruction(Ty::FNEG_S, {rd}, {rs}) {}
     rRegister rd() const { return regDef[0]; }
     rRegister rs() const { return regUse[0]; }
     std::ostream &output(std::ostream &os) const override {
