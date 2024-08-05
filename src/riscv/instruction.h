@@ -156,12 +156,11 @@ struct BInstruction : Instruction {
 
     CLONE_DECL(BInstruction);
     InstType getInstType() const override { return InstType::B; }
+    rLabel getJumpLabel() const override { return label; }
+    void setJumpLabel(rLabel newLabel) override { label = newLabel; }
 
     BInstruction(Ty ty, rRegister rs1, rRegister rs2, rLabel label)
         : Instruction(ty, {}, {rs1, rs2}), rs1{rs1}, rs2{rs2}, label{label} {}
-
-    rLabel getJumpLabel() const override { return label; }
-    void setJumpLabel(rLabel newLabel) override {}
 
     std::ostream &output(std::ostream &os) const override {
         return os << ty << '\t' << rs1 << ", " << rs2 << ", " << label;
@@ -195,6 +194,8 @@ struct JInstruction : Instruction {
 
     CLONE_DECL(JInstruction);
     InstType getInstType() const override { return InstType::J; }
+    rLabel getJumpLabel() const override { return label; }
+    void setJumpLabel(rLabel newLabel) override { label = newLabel; }
 
     JInstruction(Ty ty, rRegister rd, rLabel label)
         : Instruction(ty, {rd}, {}), rd{rd}, label{label} {}
@@ -223,6 +224,8 @@ struct JumpInstruction : Instruction {
     CLONE_DECL(JumpInstruction);
     InstType getInstType() const override { return InstType::Pseudo; }
     explicit JumpInstruction(rLabel label) : Instruction(Ty::J), label{label} {}
+    rLabel getJumpLabel() const override { return label; }
+    void setJumpLabel(rLabel newLabel) override { label = newLabel; }
     std::ostream &output(std::ostream &os) const override { return os << ty << '\t' << label; }
 };
 
