@@ -81,7 +81,7 @@ def main():
         print("Error: invalid test type:", sys.argv[1])
         usage()
     global obj_suffix
-    obj_suffix = ('.ll' if sys.argv[1] == 'llvm' else '.s')
+    obj_suffix = ('.ll' if sys.argv[1] == 'llvm' else '.S')
 
     run_sh = f"./run_{sys.argv[1]}.sh"
     path_to_compiler = ''

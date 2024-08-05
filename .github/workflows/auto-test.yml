@@ -60,7 +60,7 @@ jobs:
           git clone https://pat:${{ secrets.GITLABTOKEN }}@gitlab.eduxiji.net/T202410006203585/compiler2024-toby.git ../compiler2024-toby
           rm -rf ../compiler2024-toby/src
           cp -r src ../compiler2024-toby
-      
+
       - name: Push to GitLab
         run: |
           cd ../compiler2024-toby
@@ -78,6 +78,7 @@ jobs:
     strategy:
       matrix:
         optimizer: [O0, O2]
+        arch: [LLVM, ASM]
 
     steps:
       - uses: actions/checkout@v3
@@ -91,15 +92,20 @@ jobs:
         with:
           path: ${{github.workspace}}/build
           key: ${{ runner.os }}-cmake-${{ github.sha }}
-  
+
       - name: If Cache Missed
         if: steps.cache-cmake.outputs.cache-hit != 'true'
         run: exit 1
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
+        if: ${{matrix.arch}} == llvm
         with:
           version: "16.0"
+
+      - name: Pull RISC-V docker
+        if: ${{matrix.arch}} == asm
+        run: docker pull ghcr.io/tobisc-v/sysy:riscv
 
       - name: Download Test Data
         working-directory: ${{github.workspace}}/tests
@@ -114,12 +120,12 @@ jobs:
         run: |
           chmod +x ${{github.workspace}}/tests/*.sh
           chmod +x ${{github.workspace}}/tests/*.py
-          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-LLVM-${{matrix.optimizer}}-*
+          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-${{matrix.arch}}-${{matrix.optimizer}}-*
 
       - name: Summary
         if: always()
         run: |
-          echo "## Functional Test Summary (-${{matrix.optimizer}}):" >> $GITHUB_STEP_SUMMARY
+          echo "## Functional Test Summary (${{matrix.arch}}) (-${{matrix.optimizer}}):" >> $GITHUB_STEP_SUMMARY
           echo "| Test Name | Passed | Failed |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
           cat ${{github.workspace}}/tests/functional.log >> $GITHUB_STEP_SUMMARY || true

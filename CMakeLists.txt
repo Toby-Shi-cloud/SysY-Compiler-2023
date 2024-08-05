@@ -33,3 +33,9 @@ add_test(NAME Functional-LLVM-O2-HIDDEN
 # add_test(NAME Performance-LLVM-O2-Final
 #         COMMAND ./auto_test.py llvm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d final_performance
 #         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+add_test(NAME Functional-ASM
+        COMMAND ./auto_test.py asm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d functional
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+add_test(NAME Functional-ASM-HIDDEN
+        COMMAND ./auto_test.py asm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d hidden_functional
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)

@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
 
     if (!assembly) return 0;
 
-    std::ofstream fasm(llvm_ir ? outfile + ".asm" : outfile);
+    std::ofstream fasm(llvm_ir ? outfile + ".S" : outfile);
     backend::riscv::Translator translator(&mir_manager, &mips_module);
     translator.translate();
 
