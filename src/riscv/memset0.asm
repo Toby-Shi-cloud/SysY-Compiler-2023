@@ -1,4 +1,7 @@
 R"EOF(
+        .text
+        .globl  memset0
+        .type   memset0, @function
 memset0:
         andi    a5,a1,7
         lui     a4,%hi(.L4)
@@ -9,6 +12,8 @@ memset0:
         andi    a1,a1,-8
         addi    a5,a1,8
         jr      a4
+        .section        .rodata
+        .align  4
 .L4:
         .word   .L2
         .word   .L10
@@ -18,6 +23,7 @@ memset0:
         .word   .L6
         .word   .L5
         .word   .L3
+        .text
 .L18:
         slli    a5,a1,2
         add     a5,a0,a5

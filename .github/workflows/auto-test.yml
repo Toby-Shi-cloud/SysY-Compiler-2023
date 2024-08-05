@@ -77,8 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        optimizer: [O0, O2]
-        arch: [LLVM, ASM]
+        type: [LLVM-O0, LLVM-O2, ASM]
 
     steps:
       - uses: actions/checkout@v3
@@ -99,12 +98,12 @@ jobs:
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
-        if: ${{matrix.arch}} == llvm
+        if: ${{ matrix.type == 'LLVM-O0' || matrix.type == 'LLVM-O2' }}
         with:
           version: "16.0"
 
       - name: Pull RISC-V docker
-        if: ${{matrix.arch}} == asm
+        if: ${{ matrix.type == 'ASM' }}
         run: docker pull ghcr.io/tobisc-v/sysy:riscv
 
       - name: Download Test Data
@@ -120,12 +119,12 @@ jobs:
         run: |
           chmod +x ${{github.workspace}}/tests/*.sh
           chmod +x ${{github.workspace}}/tests/*.py
-          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-${{matrix.arch}}-${{matrix.optimizer}}-*
+          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-${{matrix.type}}-*
 
       - name: Summary
         if: always()
         run: |
-          echo "## Functional Test Summary (${{matrix.arch}}) (-${{matrix.optimizer}}):" >> $GITHUB_STEP_SUMMARY
+          echo "## Functional Test Summary (${{matrix.type}}):" >> $GITHUB_STEP_SUMMARY
           echo "| Test Name | Passed | Failed |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
           cat ${{github.workspace}}/tests/functional.log >> $GITHUB_STEP_SUMMARY || true

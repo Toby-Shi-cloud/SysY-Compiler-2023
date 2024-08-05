@@ -29,10 +29,26 @@ inline std::ostream &operator<<(std::ostream &os, const GlobalVar &var) {
 
 inline std::ostream &operator<<(std::ostream &os, const Module &module) {
     // funcs
-    os << *module.main << std::endl;
-    for (auto &func : module.functions) os << *func << std::endl;
+    os << "\t.text\n"
+       << "\t.globl\tmain\n"
+       << "\t.type\tmain, @function\n";
+    os << *module.main << "\t.size\tmain, .-main\n\n";
+    for (auto &func : module.functions) {
+        const auto &name = func->label->name;
+        os << "\t.globl\t" << name << "\n"
+           << "\t.type\t" << name << ", @function\n";
+        os << *func << "\t.size\t" << name << ", .-" << name << "\n\n";
+    }
     // vars
-    for (auto &var : module.globalVars) os << *var;
+    for (auto &var : module.globalVars) {
+        const auto &name = var->label->name;
+        os << "\t.globl\t" << name << "\n"
+           << "\t.bss\n"
+           << "\t.align\t4\n"
+           << "\t.type\t" << name << ", @object\n"
+           << "\t.size\t" << name << ", " << var->size << "\n"
+           << *var;
+    }
     // memset0
     constexpr char memset0[] = (
 #include "riscv/memset0.asm"
