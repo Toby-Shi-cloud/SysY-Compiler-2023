@@ -5,8 +5,11 @@
 #ifndef COMPILER_SETTINGS_H
 #define COMPILER_SETTINGS_H
 
+#include <string>
+
 inline struct OptSettings {
     bool force_no_opt;
+    bool using_select;
     bool using_gp;
     bool using_mem2reg;
     bool using_gvn;
@@ -22,22 +25,24 @@ inline struct OptSettings {
     bool using_inline_global_var;
 } opt_settings;
 
-inline void set_optimize_level(int level) {
+inline void set_optimize_level(int level, const std::string &arch) {
 #define SET(f) opt_settings.f = true
+#define SET_(f, t) (arch == (t)) && (SET(f))
     opt_settings = {};
     switch (level) {
     case 3: [[fallthrough]];
     case 2:
-        SET(using_gp);
+        SET_(using_gp, "mips");
         SET(using_gvn);
         SET(using_gcm);
         SET(using_force_inline);
         SET(using_div2mul);
-        SET(using_inline_printer);
+        SET_(using_inline_printer, "mips");
         SET(using_array_splitting);
         SET(using_inline_global_var);
         [[fallthrough]];
     case 1:
+        SET_(using_select, "mips");
         SET(using_mem2reg);
         SET(using_constant_folding);
         SET(using_arithmetic_folding);
@@ -47,6 +52,7 @@ inline void set_optimize_level(int level) {
     default: SET(force_no_opt); break;
     }
 #undef SET
+#undef SET_
 }
 
 #endif  // COMPILER_SETTINGS_H

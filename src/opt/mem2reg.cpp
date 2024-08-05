@@ -5,6 +5,7 @@
 #include <queue>
 #include <stack>
 #include "opt/opt.h"
+#include "settings.h"
 
 namespace mir {
 void Function::calcDominators() const {
@@ -220,6 +221,7 @@ void mergeEmptyBlock(Function *func) {
             // should check phi here
             if (bb->successors.count(target)) {
                 assert(br && br->hasCondition());
+                if (!opt_settings.using_select && target->instructions.front()->isPhy()) continue;
                 auto create_select = [&br](auto &&self, auto &&other) {
                     auto &&cond = br->getCondition();
                     if (br->getIfTrue() == other.second) {

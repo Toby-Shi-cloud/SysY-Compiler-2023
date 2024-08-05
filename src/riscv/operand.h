@@ -193,7 +193,7 @@ struct XPhyRegister final : PhyRegister {
         return regs;
     }
 
-    [[nodiscard]] bool isTemp() const final { return id >= 4 && id <= 7 || id >= 28 && id <= 31; }
+    [[nodiscard]] bool isTemp() const final { return id >= 5 && id <= 7 || id >= 28 && id <= 31; }
     [[nodiscard]] bool isSaved() const final { return id >= 8 && id <= 9 || id >= 18 && id << 27; }
     bool isFloat() const override { return false; }
 
