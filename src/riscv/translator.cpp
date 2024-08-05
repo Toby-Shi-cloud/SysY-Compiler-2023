@@ -260,10 +260,10 @@ template <mir::Instruction::InstrTy ty>
 void Translator::translateFpConvInst(
     const mir::Instruction::_conversion_instruction<ty> *fpConvInst) {
     constexpr Instruction::Ty fpConvTy[] = {
-        Instruction::Ty::FCVT_S_WU,
-        Instruction::Ty::FCVT_S_W,
-        Instruction::Ty::FCVT_WU_S,
-        Instruction::Ty::FCVT_W_S,
+        Instruction::Ty::FCVT_WU_S,  // FPTOUI
+        Instruction::Ty::FCVT_W_S,   // FPTOSI
+        Instruction::Ty::FCVT_S_WU,  // UITOFP
+        Instruction::Ty::FCVT_S_W,   // SITOFP
     };
     constexpr size_t indexTy = ty - mir::Instruction::FPTOUI;
     static_assert(indexTy < 4, "wrong mir::Instruction::InstrTy");
