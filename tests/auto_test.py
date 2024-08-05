@@ -5,8 +5,11 @@ import subprocess
 import multiprocessing
 
 
+obj_suffix = ''
+
+
 def usage():
-    print('Usage: ./auto_test.py <llvm/mips> [-O opt_level] [-s path_to_compiler] {-d test_suit}')
+    print('Usage: ./auto_test.py <llvm/asm> [-O opt_level] [-s path_to_compiler] {-d test_suit}')
     exit(-1)
 
 
@@ -15,12 +18,12 @@ def test_runner(args):
 
 
 def run_test(run_sh, opt_level, test_file, input_file, output_file):
-    obj_file = test_file + '.o'
+    obj_file = test_file + obj_suffix
     ans_file = test_file + '.ans'
     err_file = test_file + '.err'
     try:
         p = subprocess.run([run_sh, test_file, obj_file, input_file, ans_file, err_file, f'-O{opt_level}'],
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=40, check=True)
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120, check=True)
         t = p.stderr.decode()
     except subprocess.CalledProcessError as err:
         return False, err.stdout.decode() + '\n' + err.stderr.decode()
@@ -74,9 +77,11 @@ def main():
         print("Error:", e)
         usage()
 
-    if sys.argv[1] not in ["llvm", "mips"]:
+    if sys.argv[1] not in ["llvm", "asm"]:
         print("Error: invalid test type:", sys.argv[1])
         usage()
+    global obj_suffix
+    obj_suffix = ('.ll' if sys.argv[1] == 'llvm' else '.s')
 
     run_sh = f"./run_{sys.argv[1]}.sh"
     path_to_compiler = ''

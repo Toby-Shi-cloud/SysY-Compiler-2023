@@ -5,7 +5,6 @@
 #ifndef COMPILER_RISCV_OPERAND_H
 #define COMPILER_RISCV_OPERAND_H
 
-#include <initializer_list>
 #include <memory>
 #include <set>
 #include <utility>
