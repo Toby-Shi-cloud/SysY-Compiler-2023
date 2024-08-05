@@ -5,11 +5,7 @@
 #ifndef COMPILER_BACKEND_OPERAND_H
 #define COMPILER_BACKEND_OPERAND_H
 
-#include <array>
-#include <functional>
 #include <ostream>
-#include <set>
-#include <unordered_map>
 #include <unordered_set>
 #include <variant>
 #include "backend/alias.h"
@@ -42,8 +38,9 @@ struct Register : Operand {
     }
     void swapDefIn(rRegister other, rInstructionBase inst);
     void swapUseIn(rRegister other, rInstructionBase inst);
-    [[nodiscard]] virtual bool isVirtual() const { return false; };
-    [[nodiscard]] virtual bool isPhysical() const { return false; };
+    virtual bool isFloat() const = 0;
+    virtual bool isVirtual() const { return false; };
+    virtual bool isPhysical() const { return false; };
 };
 
 struct VirRegister : Register {
@@ -55,7 +52,8 @@ struct VirRegister : Register {
     std::ostream &output(std::ostream &os) const override {
         return os << "vr" << (is_float ? "f" : "") << id << "";
     }
-    [[nodiscard]] bool isVirtual() const override { return true; };
+    bool isVirtual() const override { return true; };
+    bool isFloat() const override { return is_float; }
 };
 
 template <typename T, typename = std::enable_if_t<std::is_base_of_v<Operand, T>>>

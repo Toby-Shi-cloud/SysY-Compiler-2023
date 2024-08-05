@@ -1,36 +1,66 @@
 //
-// Created by toby on 2023/11/8.
+// Created by toby on 2024/8/5.
 //
 
-#include "mips/reg_alloca.h"
+#include "riscv/reg_alloca.h"
 #include <algorithm>
+#include <functional>
 #include <queue>
+#include <stack>
+#include "backend/operand.h"
+#include "riscv/instruction.h"
+#include "riscv/operand.h"
 
-namespace backend::mips {
-const auto alloca_regs = PhyRegister::get([](const auto &&phy) {
+namespace backend::riscv {
+
+namespace {
+std::stack<int *> *stack_imm_ptr = nullptr;
+PhyRegister::phy_set_t alloca_regs{}, temp_regs{};
+
+constexpr auto alloca_regs_pred = [](const auto phy) {
     return phy->isArg() || phy->isRet() || phy->isTemp() || phy->isSaved();
-});
-const auto temp_regs = PhyRegister::get(
-    [](const auto &&phy) { return phy->isArg() || phy->isRet() || phy->isTemp(); });
-constexpr auto should_color = [](rRegister r) {
+};
+constexpr auto temp_regs_pred = [](const auto phy) {
+    return phy->isArg() || phy->isRet() || phy->isTemp();
+};
+
+std::function<bool(rRegister)> should_color;
+constexpr auto should_color_precond = [](rRegister r) {
     return r->isVirtual() || alloca_regs.count(dynamic_cast<rPhyRegister>(r));
 };
+}  // namespace
 
 static inst_pos_t load_at(rFunction func, rSubBlock block, inst_pos_t it, rRegister dst,
                           int offset) {
-    return block->insert(
-        it, std::make_unique<LoadInst>(Instruction::Ty::LW, dst, PhyRegister::get("$sp"), offset,
-                                       &func->stackOffset));
+    auto imm = create_imm(offset);
+    stack_imm_ptr->push(&imm->value);
+    auto load_ty = dst->isFloat() ? Instruction::Ty::FLW : Instruction::Ty::LD;
+    return block->insert(it, std::make_unique<IInstruction>(load_ty, dst, "sp"_R, std::move(imm)));
 }
 
 static inst_pos_t store_at(rFunction func, rSubBlock block, inst_pos_t it, rRegister src,
                            int offset) {
-    return block->insert(
-        it, std::make_unique<StoreInst>(Instruction::Ty::SW, src, PhyRegister::get("$sp"), offset,
-                                        &func->stackOffset));
+    auto imm = create_imm(offset);
+    stack_imm_ptr->push(&imm->value);
+    auto store_ty = src->isFloat() ? Instruction::Ty::FSW : Instruction::Ty::SD;
+    return block->insert(it, std::make_unique<SInstruction>(store_ty, src, "sp"_R, std::move(imm)));
 }
 
-void register_alloca(rFunction function) {
+void register_alloca(rFunction function, std::stack<int *> &stack_imm) {
+    stack_imm_ptr = &stack_imm;
+    // for X reg
+    alloca_regs = XPhyRegister::gets(alloca_regs_pred);
+    temp_regs = XPhyRegister::gets(temp_regs_pred);
+    should_color = [](rRegister r) { return !r->isFloat() && should_color_precond(r); };
+    register_alloca_impl(function);
+    // for F reg
+    alloca_regs = FPhyRegister::gets(alloca_regs_pred);
+    temp_regs = FPhyRegister::gets(temp_regs_pred);
+    should_color = [](rRegister r) { return r->isFloat() && should_color_precond(r); };
+    register_alloca_impl(function);
+}
+
+void register_alloca_impl(rFunction function) {
     for (;;) {
         compute_blocks_info(function);
         compute_instructions_info(function);
@@ -48,7 +78,7 @@ void register_alloca(rFunction function) {
         // spill to memory
         for (auto reg : graph.spilled_regs) {
             assert(reg->isVirtual());
-            function->allocaSize += 4;
+            function->allocaSize += 8;
             int offset = -static_cast<int>(function->allocaSize);
             auto vir = function->newVirRegister();
             while (!reg->useUsers.empty()) {
@@ -78,11 +108,12 @@ void replace_register(rFunction function, const Graph &graph) {
     }
     for (auto &block : all_sub_blocks(function))
         for (auto it = block->begin(); it != block->end();) {
-            if (auto move = dynamic_cast<MoveInst *>(it->get());
-                move && move->dst() == move->src()) {
+            if (auto move = dynamic_cast<MoveInstruction *>(it->get());
+                move && move->rd() == move->rs()) {
                 it = block->erase(it);
-            } else
+            } else {
                 ++it;
+            }
         }
 }
 
@@ -94,9 +125,9 @@ void compute_blocks_info(rFunction function) {
     // 3. compute liveIn and liveOut
     for (auto &block : all_sub_blocks(function)) {
         block->liveIn.insert(block->use.begin(), block->use.end());
-        block->liveIn.erase(PhyRegister::get(0));
+        block->liveIn.erase("x0"_R);
     }
-    if (function->retValue) function->exitB->frontBlock()->liveIn.insert(PhyRegister::get("$v0"));
+    if (function->retValue) function->exitB->frontBlock()->liveIn.insert("a0"_R);
     while (compute_liveIn_liveOut(function));
 }
 
@@ -205,11 +236,11 @@ VertexInfo *Graph::create_vertex(rRegister reg) {
     reg2vertex[reg] = vertex;
     vertex->color = dynamic_cast<rPhyRegister>(reg);
     for (auto &&inst : reg->defUsers)
-        if (auto move = dynamic_cast<rMoveInst>(inst); move && should_color(move->src()))
-            vertex->moves.insert(move->src());
+        if (auto move = dynamic_cast<MoveInstruction *>(inst); move && should_color(move->rs()))
+            vertex->moves.insert(move->rs());
     for (auto &&inst : reg->useUsers)
-        if (auto move = dynamic_cast<rMoveInst>(inst); move && should_color(move->dst()))
-            vertex->moves.insert(move->dst());
+        if (auto move = dynamic_cast<MoveInstruction *>(inst); move && should_color(move->rd()))
+            vertex->moves.insert(move->rd());
     vertexes.insert(vertex);
     vertexes_pool.emplace_back(vertex);
     return vertex;
@@ -333,4 +364,4 @@ void Graph::select() {
             u->color = *avail.begin();
     }
 }
-}  // namespace backend::mips
+}  // namespace backend::riscv

@@ -6,6 +6,7 @@
 #define COMPILER_RISCV_OPERAND_H
 
 #include <memory>
+#include <set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -150,14 +151,12 @@ struct PhyRegister : Register {
 
  public:
     using phy_set_t = std::set<rPhyRegister, Comparator>;
-    using xphy_set_t = std::set<rXPhyRegister, Comparator>;
-    using fphy_set_t = std::set<rFPhyRegister, Comparator>;
 
     [[nodiscard]] static rPhyRegister get(const std::string &name);
 
     template <typename Func>
-    static inline auto gets(Func &&pred)
-        -> decltype((bool)std::invoke(pred, std::declval<PhyRegister>()), phy_set_t{});
+    static inline auto gets(Func &&pred) -> decltype((bool)std::invoke(pred, rPhyRegister(nullptr)),
+                                                     phy_set_t{});
 
     [[nodiscard]] bool isPhysical() const override { return true; };
     [[nodiscard]] virtual const char *name() const = 0;
@@ -187,8 +186,8 @@ struct XPhyRegister final : PhyRegister {
     [[nodiscard]] const char *name() const final { return names[id]; }
 
     template <typename Func>
-    static auto gets(Func &&pred) -> decltype((bool)std::invoke(pred, get(0)), xphy_set_t{}) {
-        xphy_set_t regs;
+    static auto gets(Func &&pred) -> decltype((bool)std::invoke(pred, get(0)), phy_set_t{}) {
+        phy_set_t regs;
         for (auto &&reg : registers())
             if (std::invoke(pred, reg.get())) regs.insert(reg.get());
         return regs;
@@ -196,6 +195,7 @@ struct XPhyRegister final : PhyRegister {
 
     [[nodiscard]] bool isTemp() const final { return id >= 4 && id <= 7 || id >= 28 && id <= 31; }
     [[nodiscard]] bool isSaved() const final { return id >= 8 && id <= 9 || id >= 18 && id << 27; }
+    bool isFloat() const override { return false; }
 
  private:
     friend PhyRegister;
@@ -221,10 +221,11 @@ struct FPhyRegister final : PhyRegister {
 
     [[nodiscard]] bool isTemp() const final { return id >= 0 && id <= 7 || id >= 28 && id <= 31; }
     [[nodiscard]] bool isSaved() const final { return id >= 8 && id <= 9 || id >= 18 && id << 27; }
+    bool isFloat() const override { return true; }
 
     template <typename Func>
-    static auto gets(Func &&pred) -> decltype((bool)std::invoke(pred, get(0)), fphy_set_t{}) {
-        fphy_set_t regs;
+    static auto gets(Func &&pred) -> decltype((bool)std::invoke(pred, get(0)), phy_set_t{}) {
+        phy_set_t regs;
         for (auto &&reg : registers())
             if (std::invoke(pred, reg.get())) regs.insert(reg.get());
         return regs;
@@ -274,7 +275,7 @@ inline rPhyRegister PhyRegister::get(const std::string &name) {
 
 template <typename Func>
 inline auto PhyRegister::gets(Func &&pred)
-    -> decltype((bool)std::invoke(pred, std::declval<PhyRegister>()), phy_set_t{}) {
+    -> decltype((bool)std::invoke(pred, rPhyRegister(nullptr)), phy_set_t{}) {
     phy_set_t regs;
     for (auto &&reg : XPhyRegister::registers())
         if (std::invoke(pred, reg.get())) regs.insert(reg.get());

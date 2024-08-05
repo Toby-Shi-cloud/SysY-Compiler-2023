@@ -7,6 +7,7 @@
 
 #include <list>
 #include <ostream>
+#include <set>
 #include <unordered_set>
 #include <vector>
 #include "backend/operand.h"
@@ -210,6 +211,13 @@ struct Function {
           isMain(isMain),
           isLeaf(isLeaf),
           retValue(retValue) {}
+    
+    ~Function() noexcept {
+        // 强制先析构 blocks
+        blocks.clear();
+        exitB.reset();
+        usedVirRegs.clear();
+    }
 
     rVirRegister newVirRegister(bool is_float = false) {
         auto reg = new VirRegister(is_float);

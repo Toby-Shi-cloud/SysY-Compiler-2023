@@ -1,16 +1,16 @@
 //
-// Created by toby on 2023/11/8.
+// Created by toby on 2024/8/5.
 //
 
-#ifndef COMPILER_MIPS_REG_ALLOCA_H
-#define COMPILER_MIPS_REG_ALLOCA_H
+#ifndef COMPILER_RISCV_REG_ALLOCA_H
+#define COMPILER_RISCV_REG_ALLOCA_H
 
 #include <stack>
 #include <unordered_map>
 #include <unordered_set>
-#include "mips/instruction.h"
+#include "riscv/instruction.h"
 
-namespace backend::mips {
+namespace backend::riscv {
 struct VertexInfo {
     std::unordered_set<rRegister> regs;
     std::unordered_set<rRegister> moves;
@@ -60,20 +60,21 @@ struct Graph {
     return ret;
 }
 
-void register_alloca(rFunction function);
+void register_alloca(rFunction function, std::stack<int *> &stack_imm);
+void register_alloca_impl(rFunction function);
 void replace_register(rFunction function, const Graph &graph);
 void compute_blocks_info(rFunction function);
 void compute_use_def(rSubBlock block);
 bool compute_liveIn_liveOut(rFunction function);
 void compute_instructions_info(rFunction function);
 bool compute_instructions_info(rSubBlock block);
-}  // namespace backend::mips
+}  // namespace backend::riscv
 
 #ifdef DBG_ENABLE
 namespace dbg {
 template <>
-inline bool pretty_print<backend::mips::VertexInfo>(std::ostream &stream,
-                                                    const backend::mips::VertexInfo &value) {
+inline bool pretty_print<backend::riscv::VertexInfo>(std::ostream &stream,
+                                                     const backend::riscv::VertexInfo &value) {
     stream << "{";
     stream << "regs: ", pretty_print(stream, value.regs), stream << ", ";
     stream << "moves: ", pretty_print(stream, value.moves), stream << ", ";
@@ -85,8 +86,8 @@ inline bool pretty_print<backend::mips::VertexInfo>(std::ostream &stream,
     return true;
 }
 template <>
-inline bool pretty_print<backend::mips::VertexInfo>(std::ostream &stream,
-                                                    backend::mips::VertexInfo *const &value) {
+inline bool pretty_print<backend::riscv::VertexInfo>(std::ostream &stream,
+                                                     backend::riscv::VertexInfo *const &value) {
     stream << "(Vertex)";
     pretty_print(stream, value->regs);
     return true;
@@ -94,4 +95,4 @@ inline bool pretty_print<backend::mips::VertexInfo>(std::ostream &stream,
 }  // namespace dbg
 #endif
 
-#endif  // COMPILER_MIPS_REG_ALLOCA_H
+#endif  // COMPILER_RISCV_REG_ALLOCA_H

@@ -97,62 +97,65 @@ inline std::ostream &operator<<(std::ostream &os, Instruction::InstType t) {
 // rd = rs1 op rs2
 // add, sub, etc
 struct RInstruction : Instruction {
-    rRegister rd, rs1, rs2;
-
     CLONE_DECL(RInstruction);
     InstType getInstType() const override { return InstType::R; }
 
     RInstruction(Ty ty, rRegister rd, rRegister rs1, rRegister rs2)
-        : Instruction(ty, {rd}, {rs1, rs2}), rd{rd}, rs1{rs1}, rs2{rs2} {}
+        : Instruction(ty, {rd}, {rs1, rs2}) {}
+
+    rRegister rd() const { return regDef[0]; }
+    rRegister rs1() const { return regUse[0]; }
+    rRegister rs2() const { return regUse[1]; }
 
     std::ostream &output(std::ostream &os) const override {
-        return os << ty << '\t' << rd << ", " << rs1 << ", " << rs2;
+        return os << ty << '\t' << rd() << ", " << rs1() << ", " << rs2();
     }
 };
 
 // rd = rs1 op imm(12)
 // load, addi, etc
 struct IInstruction : Instruction {
-    rRegister rd, rs1;
     pImmediate imm;
-    IInstruction(const IInstruction &inst)
-        : Instruction{inst}, rd{inst.rd}, rs1{inst.rs1}, imm{inst.imm->clone()} {}
+    IInstruction(const IInstruction &inst) : Instruction{inst}, imm{inst.imm->clone()} {}
 
     CLONE_DECL(IInstruction);
     InstType getInstType() const override { return InstType::I; }
 
     IInstruction(Ty ty, rRegister rd, rRegister rs1, pImmediate imm)
-        : Instruction(ty, {rd}, {rs1}), rd{rd}, rs1{rs1}, imm{std::move(imm)} {}
+        : Instruction(ty, {rd}, {rs1}), imm{std::move(imm)} {}
+
+    rRegister rd() const { return regDef[0]; }
+    rRegister rs1() const { return regUse[0]; }
 
     std::ostream &output(std::ostream &os) const override {
-        return isLoad() ? os << ty << '\t' << rd << ", " << imm << '(' << rs1 << ')'
-                        : os << ty << '\t' << rd << ", " << rs1 << ", " << imm;
+        return isLoad() ? os << ty << '\t' << rd() << ", " << imm << '(' << rs1() << ')'
+                        : os << ty << '\t' << rd() << ", " << rs1() << ", " << imm;
     }
 };
 
 // rs1, rs2, imm(12)
 // store
 struct SInstruction : Instruction {
-    rRegister rs1, rs2;
     pImmediate imm;
-    SInstruction(const SInstruction &inst)
-        : Instruction{inst}, rs1{inst.rs1}, rs2{inst.rs2}, imm{inst.imm->clone()} {}
+    SInstruction(const SInstruction &inst) : Instruction{inst}, imm{inst.imm->clone()} {}
 
     CLONE_DECL(SInstruction);
     InstType getInstType() const override { return InstType::S; }
 
     SInstruction(Ty ty, rRegister rs1, rRegister rs2, pImmediate imm)
-        : Instruction(ty, {}, {rs1, rs2}), rs1{rs1}, rs2{rs2}, imm{std::move(imm)} {}
+        : Instruction(ty, {}, {rs1, rs2}), imm{std::move(imm)} {}
+
+    rRegister rs1() const { return regUse[0]; }
+    rRegister rs2() const { return regUse[1]; }
 
     std::ostream &output(std::ostream &os) const override {
-        return os << ty << '\t' << rs1 << ", " << imm << "(" << rs2 << ")";
+        return os << ty << '\t' << rs1() << ", " << imm << "(" << rs2() << ")";
     }
 };
 
 // rs1, rs2, label
 // branch
 struct BInstruction : Instruction {
-    rRegister rs1, rs2;
     rLabel label;
 
     CLONE_DECL(BInstruction);
@@ -161,36 +164,39 @@ struct BInstruction : Instruction {
     void setJumpLabel(rLabel newLabel) override { label = newLabel; }
 
     BInstruction(Ty ty, rRegister rs1, rRegister rs2, rLabel label)
-        : Instruction(ty, {}, {rs1, rs2}), rs1{rs1}, rs2{rs2}, label{label} {}
+        : Instruction(ty, {}, {rs1, rs2}), label{label} {}
+
+    rRegister rs1() const { return regUse[0]; }
+    rRegister rs2() const { return regUse[1]; }
 
     std::ostream &output(std::ostream &os) const override {
-        return os << ty << '\t' << rs1 << ", " << rs2 << ", " << label;
+        return os << ty << '\t' << rs1() << ", " << rs2() << ", " << label;
     }
 };
 
 // rd = imm(31:12)
 // lui
 struct UInstruction : Instruction {
-    rRegister rd;
     pImmediate imm;
     UInstruction(const UInstruction &inst)
-        : Instruction{inst}, rd{inst.rd}, imm{inst.imm->clone()} {}
+        : Instruction{inst}, imm{inst.imm->clone()} {}
 
     CLONE_DECL(UInstruction);
     InstType getInstType() const override { return InstType::U; }
 
     UInstruction(Ty ty, rRegister rd, pImmediate imm)
-        : Instruction(ty, {rd}, {}), rd{rd}, imm{std::move(imm)} {}
+        : Instruction(ty, {rd}, {}), imm{std::move(imm)} {}
+
+    rRegister rd() const { return regDef[0]; }
 
     std::ostream &output(std::ostream &os) const override {
-        return os << ty << '\t' << rd << ", " << imm;
+        return os << ty << '\t' << rd() << ", " << imm;
     }
 };
 
 // rd = $pc
 // jal
 struct JInstruction : Instruction {
-    rRegister rd;
     rLabel label;
 
     CLONE_DECL(JInstruction);
@@ -199,10 +205,12 @@ struct JInstruction : Instruction {
     void setJumpLabel(rLabel newLabel) override { label = newLabel; }
 
     JInstruction(Ty ty, rRegister rd, rLabel label)
-        : Instruction(ty, {rd}, {}), rd{rd}, label{label} {}
+        : Instruction(ty, {rd}, {}), label{label} {}
+
+    rRegister rd() const { return regDef[0]; }
 
     std::ostream &output(std::ostream &os) const override {
-        return os << ty << '\t' << rd << ", " << label;
+        return os << ty << '\t' << rd() << ", " << label;
     }
 };
 
@@ -233,12 +241,13 @@ struct JumpInstruction : Instruction {
 };
 
 struct MoveInstruction : Instruction {
-    rRegister rd, rs;
     CLONE_DECL(MoveInstruction);
     InstType getInstType() const override { return InstType::Pseudo; }
-    MoveInstruction(rRegister rd, rRegister rs) : Instruction(Ty::MV), rd{rd}, rs{rs} {}
+    MoveInstruction(rRegister rd, rRegister rs) : Instruction(Ty::MV, {rd}, {rs}) {}
+    rRegister rd() const { return regDef[0]; }
+    rRegister rs() const { return regUse[0]; }
     std::ostream &output(std::ostream &os) const override {
-        return os << ty << '\t' << rd << ", " << rs;
+        return os << ty << '\t' << rd() << ", " << rs();
     }
 };
 

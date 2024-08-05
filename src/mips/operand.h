@@ -10,8 +10,6 @@
 #include <ostream>
 #include <set>
 #include <unordered_map>
-#include <unordered_set>
-#include <variant>
 #include "backend/operand.h"
 #include "mips/alias.h"
 
@@ -75,6 +73,8 @@ struct PhyRegister : Register {
     }();
 
     unsigned id;
+
+    bool isFloat() const override { return false; }
 
  private:
     static const std::array<pPhyRegister, 34> &registers();

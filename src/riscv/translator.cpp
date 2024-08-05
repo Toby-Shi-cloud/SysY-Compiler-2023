@@ -12,6 +12,7 @@
 #include "riscv/alias.h"
 #include "riscv/instruction.h"
 #include "riscv/operand.h"
+#include "riscv/reg_alloca.h"
 #include "util.h"
 
 namespace {
@@ -427,7 +428,7 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
     // reformat blocks & alloca registers
     assert((curFunc->allocName(), true));
     optimizeBeforeAlloc();
-    // TODO register_alloca(curFunc);
+    register_alloca(curFunc, stack_imm_pointers);
 
     // save registers before function & restore registers
     compute_func_start();
