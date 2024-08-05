@@ -7,6 +7,8 @@
 
 #include <memory>
 #include <stack>
+#include <string>
+#include <unordered_map>
 #include <utility>
 #include "backend/translator.h"
 #include "riscv/alias.h"
@@ -17,11 +19,13 @@ class Translator : public TranslatorBase {
     // 在函数进行第一次 translate 的时候，将 sp 视作为函数进入前的值，因此需要再翻译。
     std::stack<int *> stack_imm_pointers;
     // 使用到的但是没有被其他指令持有的
-    std::stack<pOperand> usedOperands;
+    std::stack<pOperand> used_operands;
+    // 库函数 Label
+    std::unordered_map<std::string, pLabel> lib_labels;
 
     rAddress newAddress(rRegister base, pImmediate offset) {
-        usedOperands.push(std::make_unique<Address>(base, std::move(offset)));
-        return dynamic_cast<rAddress>(usedOperands.top().get());
+        used_operands.push(std::make_unique<Address>(base, std::move(offset)));
+        return dynamic_cast<rAddress>(used_operands.top().get());
     }
 
     rAddress getAddress(const mir::Value *mirValue) {
@@ -30,6 +34,12 @@ class Translator : public TranslatorBase {
         if (auto reg = dynamic_cast<rRegister>(ptr)) return newAddress(reg, 0_I);
         if (auto label = dynamic_cast<rLabel>(ptr)) return newAddress("x0"_R, create_imm(label));
         return nullptr;
+    }
+
+    rLabel getLibLabel(const std::string &name) {
+        auto &label = lib_labels[name];
+        if (label == nullptr) label = std::make_unique<Label>(name.substr(1));
+        return label.get();
     }
 
     template <Instruction::Ty rTy, Instruction::Ty iTy>

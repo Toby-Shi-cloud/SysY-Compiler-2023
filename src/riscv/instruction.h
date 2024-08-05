@@ -125,7 +125,8 @@ struct IInstruction : Instruction {
         : Instruction(ty, {rd}, {rs1}), rd{rd}, rs1{rs1}, imm{std::move(imm)} {}
 
     std::ostream &output(std::ostream &os) const override {
-        return os << ty << '\t' << rd << ", " << rs1 << ", " << imm;
+        return isLoad() ? os << ty << '\t' << rd << ", " << imm << '(' << rs1 << ')'
+                        : os << ty << '\t' << rd << ", " << rs1 << ", " << imm;
     }
 };
 
@@ -206,10 +207,12 @@ struct JInstruction : Instruction {
 };
 
 struct CallInstruction : Instruction {
+    rLabel label;
     CLONE_DECL(CallInstruction);
     InstType getInstType() const override { return InstType::Pseudo; }
-    CallInstruction() : Instruction(Ty::CALL) {}
-    std::ostream &output(std::ostream &os) const override { return os << ty; }
+    explicit CallInstruction(rLabel label) : Instruction(Ty::CALL), label{label} {}
+    rLabel getJumpLabel() const override { return label; }
+    std::ostream &output(std::ostream &os) const override { return os << ty << '\t' << label; }
 };
 
 struct RetInstruction : Instruction {

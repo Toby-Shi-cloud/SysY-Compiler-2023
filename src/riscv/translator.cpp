@@ -89,7 +89,7 @@ void Translator::translateRetInst(const mir::Instruction::ret *retInst) {
         assert(reg);
         curBlock->push_back(std::make_unique<MoveInstruction>("a0"_R, reg));
     }
-    curBlock->push_back(std::make_unique<RetInstruction>());
+    curBlock->push_back(std::make_unique<JumpInstruction>(curFunc->exitB->label.get()));
 }
 
 void Translator::translateBranchInst(const mir::Instruction::br *brInst) {
@@ -152,8 +152,8 @@ void Translator::translateAllocaInst(const mir::Instruction::alloca_ *allocaInst
     curFunc->allocaSize += alloca_size;
     auto imm = create_imm((int)curFunc->allocaSize);
     stack_imm_pointers.push(&imm->value);
-    usedOperands.push(std::make_unique<Address>("sp"_R, std::move(imm)));
-    auto addr = usedOperands.top().get();
+    used_operands.push(std::make_unique<Address>("sp"_R, std::move(imm)));
+    auto addr = used_operands.top().get();
     put(allocaInst, addr);
 }
 
@@ -313,13 +313,13 @@ void Translator::translateSelectInst(const mir::Instruction::select *selectInst)
 
 void Translator::translateCallInst(const mir::Instruction::call *callInst) {
     auto func = callInst->getFunction();
-    auto callee = fMap[func];
+    auto label = func->isLibrary() ? getLibLabel(func->name) : fMap.at(func)->label.get();
     unsigned use_stack = 0, x_cnt = 0, f_cnt = 0;
     for (int i = 0; i < callInst->getNumArgs(); i++) {
         auto arg = callInst->getArg(i);
         bool isFloat = arg->type->isFloatTy();
         auto reg = getRegister(arg);
-        if (isFloat) {
+        if (!isFloat) {
             if (++x_cnt > 8) {
                 curBlock->push_back(std::make_unique<SInstruction>(Instruction::Ty::SW, reg, "sp"_R,
                                                                    create_imm((int)use_stack)));
@@ -340,12 +340,23 @@ void Translator::translateCallInst(const mir::Instruction::call *callInst) {
         }
     }
     curFunc->argSize = std::max(curFunc->argSize, use_stack);
+    curBlock->push_back(std::make_unique<CallInstruction>(label));
+    // get return value
+    if (func->retType->isIntegerTy()) {
+        auto temp = curFunc->newVirRegister(false);
+        curBlock->push_back(std::make_unique<MoveInstruction>(temp, "a0"_R));
+        put(callInst, temp);
+    } else if (func->retType->isFloatTy()) {
+        auto temp = curFunc->newVirRegister(true);
+        curBlock->push_back(std::make_unique<MoveInstruction>(temp, "fa0"_R));
+        put(callInst, temp);
+    }
 }
 
 void Translator::translateFunction(const mir::Function *mirFunction) {
     const bool isMain = mirFunction->isMain();
     const bool isLeaf = mirFunction->isLeaf();
-    const bool retValue = mirFunction->retType == mir::Type::getI32Type() && !isMain;
+    const bool retValue = !mirFunction->retType->isVoidTy();
     std::string name = mirFunction->name.substr(1);
     curFunc = new Function{std::move(name), isMain, isLeaf, retValue};
     fMap[mirFunction] = curFunc;
@@ -365,10 +376,10 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
     // arguments
     assert(mirFunction->bbs.front()->predecessors.empty());
     unsigned use_stack = 0, x_cnt = 0, f_cnt = 0;
-    for (int i = 0; i < mirFunction->args.size(); ++i) {
-        bool isFloat = mirFunction->args[i]->type->isFloatTy();
+    for (auto arg : mirFunction->args) {
+        bool isFloat = arg->type->isFloatTy();
         auto reg = curFunc->newVirRegister(isFloat);
-        if (isFloat) {
+        if (!isFloat) {
             if (++x_cnt < 8) {
                 // move %vr, ax
                 curFunc->blocks.front()->push_back(std::make_unique<MoveInstruction>(
@@ -395,7 +406,7 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
                 use_stack += 8;
             }
         }
-        put(mirFunction->args[i], reg);
+        put(arg, reg);
     }
 
     // translate
@@ -419,7 +430,6 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
     // TODO register_alloca(curFunc);
 
     // save registers before function & restore registers
-    if (isMain) curFunc->shouldSave.clear();  // save nothing
     compute_func_start();
     compute_func_exit();
 
