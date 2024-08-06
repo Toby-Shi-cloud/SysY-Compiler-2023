@@ -88,7 +88,7 @@ def main():
     run_sh = f"./run_{sys.argv[1]}.sh"
     path_to_compiler = ''
     test_suit = []
-    opt_level = 2
+    opt_level = 1
     for opt, arg in opts[0]:
         if opt == '-s':
             path_to_compiler = arg
