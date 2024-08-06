@@ -6,6 +6,7 @@
 #define COMPILER_RISCV_TRANSLATOR_H
 
 #include <memory>
+#include <stack>
 #include <string>
 #include <unordered_map>
 #include <utility>
