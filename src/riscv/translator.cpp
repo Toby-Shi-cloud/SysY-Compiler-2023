@@ -174,9 +174,8 @@ void Translator::translateAllocaInst(const mir::Instruction::alloca_ *allocaInst
     auto alloca_size = allocaInst->type->size();
     assert(alloca_size % 4 == 0);
     curFunc->allocaSize += alloca_size;
-    auto imm = create_stack_imm((int)curFunc->allocaSize);
-    used_operands.push(std::make_unique<Address>("sp"_R, std::move(imm)));
-    auto addr = used_operands.top().get();
+    auto imm = create_stack_imm(-(int)curFunc->allocaSize);
+    auto addr = newAddress("sp"_R, std::move(imm));
     put(allocaInst, addr);
 }
 
@@ -237,6 +236,7 @@ void Translator::translateGetPtrInst(const mir::Instruction::getelementptr *getP
             addr = newAddress(dst2, addr->offset->clone());
         }
     }
+    auto imm = dynamic_cast<rJoinImmediate>(addr->offset.get());
     put(getPtrInst, addr);
 }
 
@@ -535,11 +535,9 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
     compute_func_exit();
 
     // stack
-    while (!IntImmediate::stack_vals.empty()) {
-        auto ptr = IntImmediate::stack_vals.top();
-        IntImmediate::stack_vals.pop();
-        ptr->value += curFunc->stackOffset;
-    }
+    for (auto &&ptr : IntImmediate::stack_vals)
+        ptr->value += curFunc->stackOffset - (int)curFunc->shouldSave.size() * 8;
+    IntImmediate::stack_vals.clear();
 
     // legalize
     auto sub_blk = all_sub_blocks(curFunc);
@@ -667,7 +665,8 @@ rOperand Translator::translateOperand(const mir::Value *mirValue) {
     if (auto i1 = dynamic_cast<const mir::BooleanLiteral *>(mirValue)) {
         if (i1->value) {
             auto reg = curFunc->newVirRegister();
-            curBlock->push_back(std::make_unique<IInstruction>(Instruction::Ty::ADDI, reg, "x0"_R, 1_I));
+            curBlock->push_back(
+                std::make_unique<IInstruction>(Instruction::Ty::ADDI, reg, "x0"_R, 1_I));
             return reg;
         } else {
             return "x0"_R;
@@ -793,7 +792,7 @@ void Translator::compute_func_start() const {
     for (auto reg : curFunc->shouldSave) {
         startB->push_back(std::make_unique<SInstruction>(
             Instruction::Ty::SD, reg, "sp"_R,
-            create_imm(static_cast<int>(curFunc->stackOffset - curFunc->allocaSize - ++cnt * 8))));
+            create_imm(static_cast<int>(curFunc->stackOffset - ++cnt * 8))));
     }
     startB->push_back(std::make_unique<JumpInstruction>(first_block->label.get()));
 }
@@ -803,7 +802,7 @@ void Translator::compute_func_exit() const {
     for (auto reg : curFunc->shouldSave) {
         curFunc->exitB->push_back(std::make_unique<IInstruction>(
             Instruction::Ty::LD, reg, "sp"_R,
-            create_imm(static_cast<int>(curFunc->stackOffset - curFunc->allocaSize - ++cnt * 8))));
+            create_imm(static_cast<int>(curFunc->stackOffset - ++cnt * 8))));
     }
     if (curFunc->stackOffset)
         curFunc->exitB->push_back(std::make_unique<IInstruction>(

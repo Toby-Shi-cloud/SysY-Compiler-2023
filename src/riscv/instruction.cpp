@@ -47,11 +47,11 @@ std::pair<pImmediate, pImmediate> splitImm(rImmediate imm) {
 
 // split imm to x31 and push to parent
 template <typename Func>
-void splitAndPush(rImmediate imm, Func &&push) {
+void splitAndPush(rImmediate imm, Func &&push, rRegister x31 = "x31"_R) {
     auto [hi, lo] = splitImm(imm);
-    push(std::make_unique<UInstruction>(Instruction::Ty::LUI, "x31"_R, std::move(hi)));
+    push(std::make_unique<UInstruction>(Instruction::Ty::LUI, x31, std::move(hi)));
     if (auto i = dynamic_cast<rIntImmediate>(lo.get()); i && i->value == 0) return;
-    push(std::make_unique<IInstruction>(Instruction::Ty::ADDI, "x31"_R, "x31"_R, std::move(lo)));
+    push(std::make_unique<IInstruction>(Instruction::Ty::ADDI, x31, x31, std::move(lo)));
 }
 
 // split imm+reg to x31+lo and push to parent
@@ -90,6 +90,8 @@ inst_node_t IInstruction::legalize() {
     if (isLoad()) {
         auto offset = splitAndPush(imm.get(), rs1(), push);
         push(std::make_unique<IInstruction>(ty, rd(), "x31"_R, std::move(offset)));
+    } else if (rs1() == "x0"_R) {
+        splitAndPush(imm.get(), push, rd());
     } else {
         splitAndPush(imm.get(), push);
         auto new_ty = TyI2R(ty);

@@ -8,12 +8,13 @@
 #include <memory>
 #include <numeric>
 #include <set>
-#include <stack>
 #include <type_traits>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 #include "backend/operand.h"  // IWYU pragma: export
-#include "riscv/alias.h"      // IWYU pragma: export
+#include "dbg.h"
+#include "riscv/alias.h"  // IWYU pragma: export
 
 namespace backend::riscv {
 
@@ -22,12 +23,15 @@ struct Immediate : Operand {
 };
 
 struct IntImmediate : Immediate {
-    static inline std::stack<rIntImmediate> stack_vals = {};
+    static inline std::unordered_set<rIntImmediate> stack_vals = {};
     bool in_stack;
     int value;
     explicit IntImmediate(int value, bool in_stack = false) : value{value}, in_stack{in_stack} {
-        if (in_stack) stack_vals.push(this);
+        if (in_stack) stack_vals.insert(this);
     }
+    IntImmediate(const IntImmediate &other) : IntImmediate(other.value, other.in_stack) {}
+    IntImmediate(IntImmediate &&other) noexcept = delete;
+    ~IntImmediate() override { stack_vals.erase(this); }
     std::ostream &output(std::ostream &os) const override { return os << value; }
     [[nodiscard]] pImmediate clone() const override {
         return std::make_unique<IntImmediate>(value, in_stack);
@@ -299,5 +303,17 @@ inline auto PhyRegister::gets(Func &&pred)
 inline rPhyRegister operator""_R(const char *str, size_t) { return PhyRegister::get(str); }
 
 }  // namespace backend::riscv
+
+#ifdef DBG_ENABLE
+namespace dbg {
+template <>
+[[maybe_unused]]
+inline bool pretty_print(std::ostream &stream, const backend::riscv::pIntImmediate &value) {
+    stream << value->value;
+    if (value->in_stack) stream << "(s)";
+    return true;
+}
+}  // namespace dbg
+#endif
 
 #endif  // COMPILER_RISCV_OPERAND_H

@@ -56,13 +56,9 @@ class Translator : public TranslatorBase {
     }
 
     rRegister addr2reg(rAddress addr) {
-        JoinImmediate imm{addr->offset};
-        auto offset = imm.accumulate();
-        if (imm.label != nullptr) TODO("not implemented for label2reg");
         auto temp = curFunc->newVirRegister();
-        for (auto &inst : translateImmAs(temp, offset)) curBlock->push_back(std::move(inst));
-        curBlock->push_back(
-            std::make_unique<RInstruction>(Instruction::Ty::ADD, temp, temp, addr->base));
+        curBlock->push_back(std::make_unique<IInstruction>(Instruction::Ty::ADDI, temp, addr->base,
+                                                           addr->offset->clone()));
         return temp;
     }
 
