@@ -6,9 +6,9 @@
 #define COMPILER_MIR_DERIVED_VALUE_H
 
 #include <algorithm>
+#include <cmath>
 #include <iomanip>
 #include <list>
-#include <memory>
 #include <set>
 #include <sstream>
 #include <unordered_set>
@@ -259,6 +259,7 @@ struct GlobalVar : Value {
  * instructions. <br>
  */
 struct Instruction : User {
+    // clang-format off
     enum InstrTy {
         // Terminator instructions
         RET, BR,
@@ -276,6 +277,7 @@ struct Instruction : User {
         // Other Operations
         ICMP, FCMP, PHI, SELECT, CALL, MEMSET
     } instrTy;
+    // clang-format on
 
     BasicBlock *parent = nullptr;
     inst_node_t node{};
@@ -430,9 +432,16 @@ inline Literal *getLiteral(calculate_t value) {
     return std::visit([](auto v) { return getLiteral(v); }, value.as());
 }
 
-#define BIN_CALC_OP(op, ty)                                                                     \
-    inline ty operator op(const calculate_t &lhs, const calculate_t &rhs) {                     \
-        return std::visit([](auto v1, auto v2) -> ty { return v1 op v2; }, lhs.as(), rhs.as()); \
+#define BIN_CALC_OP(op, ty)                                                 \
+    inline ty operator op(const calculate_t &lhs, const calculate_t &rhs) { \
+        return std::visit(                                                  \
+            [](auto v1, auto v2) -> ty {                                    \
+                if constexpr (std::is_same_v<decltype(v1), decltype(v2)>)   \
+                    return v1 op v2;                                        \
+                else                                                        \
+                    return (float)v1 op(float) v2;                          \
+            },                                                              \
+            lhs.as(), rhs.as());                                            \
     }
 
 #define BIN_LIT_OP_calculate_t(op)                                           \
@@ -464,9 +473,7 @@ inline calculate_t operator%(const calculate_t &lhs, const calculate_t &rhs) {
         [](auto v1, auto v2) -> calculate_t {
             if constexpr (std::is_same_v<decltype(v1), float> ||
                           std::is_same_v<decltype(v2), float>) {
-                using namespace std::literals::string_literals;
-                throw std::runtime_error("Cannot apply operator % between "s + typeid(v1).name() +
-                                         " and " + typeid(v2).name());
+                return std::fmod(v1, v2);
             } else {
                 return {v1 % v2};
             }
@@ -521,7 +528,7 @@ struct ArrayValue : Value {
     mutable size_t refCounter = 0;
 
     explicit ArrayValue(std::vector<Value *> values)
-        : Value(ArrayType::getArrayType(values.size(),
+        : Value(ArrayType::getArrayType((int)values.size(),
                                         values.empty() ? Type::getI32Type() : values[0]->type)),
           values(std::move(values)) {
         for (auto v : this->values)

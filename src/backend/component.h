@@ -197,17 +197,18 @@ struct Function {
     pLabel label;
     int stackOffset = 0;
     unsigned allocaSize, argSize;
-    bool isMain, isLeaf, retValue;
+    bool isMain, isLeaf;
+    int retValue;  // 0: none, 1: int, 2: float
     std::set<rRegister> shouldSave;
     std::list<pBlock> blocks;
     pBlock exitB = std::make_unique<Block>(this);
     std::unordered_set<pVirRegister> usedVirRegs;
 
-    explicit Function(std::string name, bool isMain, bool isLeaf, bool retValue)
+    explicit Function(std::string name, bool isMain, bool isLeaf, int retValue)
         : Function(std::move(name), 0, 0, isMain, isLeaf, retValue) {}
 
     explicit Function(std::string name, unsigned allocaSize, unsigned argSize, bool isMain,
-                      bool isLeaf, bool retValue)
+                      bool isLeaf, int retValue)
         : label(std::make_unique<Label>(std::move(name), this)),
           allocaSize(allocaSize),
           argSize(argSize),

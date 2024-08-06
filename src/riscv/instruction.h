@@ -37,7 +37,7 @@ struct Instruction : InstructionBase {
         // float (RV64F)
         FCVT_L_S, FCVT_LU_S, FCVT_S_L, FCVT_S_LU,
         // useful pseudo instructions
-        CALL, RET, J, MV, FNEG_S,
+        CALL, RET, J, MV, FMV_S, FNEG_S, FSCSR,
     } ty;
     // clang-format on
     friend constexpr bool floatOp(Ty ty) { return ty >= Ty::FLW && ty <= Ty::FCVT_S_LU; }
@@ -50,8 +50,10 @@ struct Instruction : InstructionBase {
     Instruction(Ty ty, std::vector<rRegister> regDef, std::vector<rRegister> regUse) noexcept
         : InstructionBase(std::move(regDef), std::move(regUse)), ty{ty} {
         if (isFuncCallImpl()) {
-            for (auto reg : PhyRegister::gets(&PhyRegister::isArg)) reg_use_push_back(reg);
-            for (auto reg : PhyRegister::gets(&PhyRegister::isRet)) reg_def_push_back(reg);
+            static const auto arg_reg_set = PhyRegister::gets(&PhyRegister::isArg);
+            static const auto ret_reg_set = PhyRegister::gets(&PhyRegister::isRet);
+            for (auto reg : arg_reg_set) reg_use_push_back(reg);
+            for (auto reg : ret_reg_set) reg_def_push_back(reg);
         }
     }
 
@@ -253,7 +255,8 @@ struct JumpInstruction : Instruction {
 struct MoveInstruction : Instruction {
     CLONE_DECL(MoveInstruction);
     InstType getInstType() const override { return InstType::Pseudo; }
-    MoveInstruction(rRegister rd, rRegister rs) : Instruction(Ty::MV, {rd}, {rs}) {}
+    MoveInstruction(rRegister rd, rRegister rs)
+        : Instruction(rd->isFloat() ? Ty::FMV_S : Ty::MV, {rd}, {rs}) {}
     rRegister rd() const { return regDef[0]; }
     rRegister rs() const { return regUse[0]; }
     std::ostream &output(std::ostream &os) const override {
@@ -265,6 +268,17 @@ struct FnegInstruction : Instruction {
     CLONE_DECL(FnegInstruction);
     InstType getInstType() const override { return InstType::Pseudo; }
     FnegInstruction(rRegister rd, rRegister rs) : Instruction(Ty::FNEG_S, {rd}, {rs}) {}
+    rRegister rd() const { return regDef[0]; }
+    rRegister rs() const { return regUse[0]; }
+    std::ostream &output(std::ostream &os) const override {
+        return os << ty << '\t' << rd() << ", " << rs();
+    }
+};
+
+struct FscsrInstruction : Instruction {
+    CLONE_DECL(FscsrInstruction);
+    InstType getInstType() const override { return InstType::Pseudo; }
+    FscsrInstruction(rRegister rd, rRegister rs) : Instruction(Ty::FSCSR, {rd}, {rs}) {}
     rRegister rd() const { return regDef[0]; }
     rRegister rs() const { return regUse[0]; }
     std::ostream &output(std::ostream &os) const override {

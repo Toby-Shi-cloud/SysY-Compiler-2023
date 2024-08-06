@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <sstream>
 #include "mir/derived_value.h"
 
 namespace mir {
@@ -437,6 +436,7 @@ struct Instruction::call : Instruction {
 
     void interpret(Interpreter &interpreter) const override {
         std::vector<calculate_t> args;
+        args.reserve(getNumArgs());
         for (int i = 0; i < getNumArgs(); i++) args.push_back(interpreter.getValue(getArg(i)));
         interpreter.map[this] = getFunction()->interpret(args);
     }

@@ -123,7 +123,8 @@ void compute_blocks_info(rFunction function) {
         block->liveIn.insert(block->use.begin(), block->use.end());
         block->liveIn.erase("x0"_R);
     }
-    if (function->retValue) function->exitB->frontBlock()->liveIn.insert("a0"_R);
+    if (function->retValue == 1) function->exitB->frontBlock()->liveIn.insert("a0"_R);
+    if (function->retValue == 2) function->exitB->frontBlock()->liveIn.insert("fa0"_R);
     while (compute_liveIn_liveOut(function));
 }
 

@@ -156,6 +156,8 @@ struct PhyRegister : Register {
         bool operator()(rPhyRegister x, rPhyRegister y) const {
             if (x == nullptr) return y != nullptr;
             if (y == nullptr) return false;
+            if (x->isFloat() && !y->isFloat()) return false;
+            if (!x->isFloat() && y->isFloat()) return true;
             constexpr auto priority = [](rPhyRegister reg) {
                 return reg->isTemp() << 0 | reg->isArg() << 1 | reg->isRet() << 2 |
                        reg->isSaved() << 3;
@@ -232,7 +234,7 @@ struct FPhyRegister final : PhyRegister {
         return name2id;
     }();
 
-    [[nodiscard]] static rPhyRegister get(unsigned id) { return registers()[id].get(); }
+    [[nodiscard]] static rFPhyRegister get(unsigned id) { return registers()[id].get(); }
     [[nodiscard]] const char *name() const final { return names[id]; }
 
     [[nodiscard]] bool isTemp() const final { return id >= 0 && id <= 7 || id >= 28 && id <= 31; }

@@ -102,7 +102,8 @@ rRegister Translator::translateBinaryInstHelper(rRegister lhs, mir::Value *rhs) 
 void Translator::translateRetInst(const mir::Instruction::ret *retInst) {
     if (auto v = retInst->getReturnValue()) {
         auto reg = getRegister(v);
-        curBlock->push_back(std::make_unique<MoveInstruction>("a0"_R, reg));
+        auto isFloat = reg->isFloat();
+        curBlock->push_back(std::make_unique<MoveInstruction>(isFloat ? "fa0"_R : "a0"_R, reg));
     }
     curBlock->push_back(std::make_unique<JumpInstruction>(curFunc->exitB->label.get()));
 }
@@ -148,6 +149,17 @@ void Translator::translateBranchInst(const mir::Instruction::br *brInst) {
             break;
         }
         curBlock->push_back(std::make_unique<BInstruction>(riscvTy, lhs, rhs, trueLabel));
+        curBlock->push_back(std::make_unique<JumpInstruction>(falseLabel));
+    } else {
+        auto trueLabel = bMap[brInst->getIfTrue()]->label.get();
+        auto falseLabel = bMap[brInst->getIfFalse()]->label.get();
+        auto creg = getRegister(brInst->getCondition());
+        auto cond_ty = Instruction::Ty::BNE;
+        if (brInst->likely < 0.5) {
+            cond_ty = Instruction::Ty::BEQ;
+            std::swap(trueLabel, falseLabel);
+        }
+        curBlock->push_back(std::make_unique<BInstruction>(cond_ty, creg, "x0"_R, trueLabel));
         curBlock->push_back(std::make_unique<JumpInstruction>(falseLabel));
     }
 }
@@ -457,7 +469,9 @@ void Translator::translateMemsetInst(const mir::Instruction::memset *memsetInst)
 void Translator::translateFunction(const mir::Function *mirFunction) {
     const bool isMain = mirFunction->isMain();
     const bool isLeaf = mirFunction->isLeaf();
-    const bool retValue = !mirFunction->retType->isVoidTy();
+    const int retValue = mirFunction->retType->isVoidTy()      ? 0
+                         : mirFunction->retType->isIntegerTy() ? 1
+                                                               : 2;
     std::string name = mirFunction->name.substr(1);
     curFunc = new Function{std::move(name), isMain, isLeaf, retValue};
     fMap[mirFunction] = curFunc;
@@ -679,7 +693,16 @@ rOperand Translator::translateOperand(const mir::Value *mirValue) {
         return reg;
     }
     if (auto imm = dynamic_cast<const mir::FloatLiteral *>(mirValue)) {
-        TODO("translate float literal");
+        auto reg = curFunc->newVirRegister(true);
+        if (imm == mir::getFloatLiteral(.0f)) {
+            curBlock->push_back(
+                std::make_unique<FpConvInstruction>(Instruction::Ty::FMV_W_X, reg, "x0"_R));
+            return reg;
+        }
+        auto label = create_float_const(imm->value);
+        curBlock->push_back(
+            std::make_unique<IInstruction>(Instruction::Ty::FLW, reg, "x0"_R, std::move(label)));
+        return reg;
     }
     if (auto op = oMap.find(mirValue); op != oMap.end()) return op->second;
     if (auto gv = dynamic_cast<const mir::GlobalVar *>(mirValue)) return gMap[gv]->label.get();
@@ -791,8 +814,13 @@ void Translator::compute_func_start() const {
     int cnt = 0;
     for (auto reg : curFunc->shouldSave) {
         startB->push_back(std::make_unique<SInstruction>(
-            Instruction::Ty::SD, reg, "sp"_R,
+            reg->isFloat() ? Instruction::Ty::FSW : Instruction::Ty::SD, reg, "sp"_R,
             create_imm(static_cast<int>(curFunc->stackOffset - ++cnt * 8))));
+    }
+    if (curFunc->isMain) {  // set round-mode
+        startB->push_back(
+            std::make_unique<IInstruction>(Instruction::Ty::ADDIW, "x31"_R, "x0"_R, 0b010'00000_I));
+        startB->push_back(std::make_unique<FscsrInstruction>("x0"_R, "x31"_R));
     }
     startB->push_back(std::make_unique<JumpInstruction>(first_block->label.get()));
 }
@@ -801,7 +829,7 @@ void Translator::compute_func_exit() const {
     int cnt = 0;
     for (auto reg : curFunc->shouldSave) {
         curFunc->exitB->push_back(std::make_unique<IInstruction>(
-            Instruction::Ty::LD, reg, "sp"_R,
+            reg->isFloat() ? Instruction::Ty::FLW : Instruction::Ty::LD, reg, "sp"_R,
             create_imm(static_cast<int>(curFunc->stackOffset - ++cnt * 8))));
     }
     if (curFunc->stackOffset)
