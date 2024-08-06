@@ -63,7 +63,6 @@ rRegister Translator::createBinaryInstHelperX(rRegister lhs, mir::Value *rhs) {
         }
     }
     auto rop = getRegister(rhs);
-    assert(rop);
     curBlock->push_back(std::make_unique<RInstruction>(rTy, dst, lhs, rop));
     return dst;
 }
@@ -103,7 +102,6 @@ rRegister Translator::translateBinaryInstHelper(rRegister lhs, mir::Value *rhs) 
 void Translator::translateRetInst(const mir::Instruction::ret *retInst) {
     if (auto v = retInst->getReturnValue()) {
         auto reg = getRegister(v);
-        assert(reg);
         curBlock->push_back(std::make_unique<MoveInstruction>("a0"_R, reg));
     }
     curBlock->push_back(std::make_unique<JumpInstruction>(curFunc->exitB->label.get()));
@@ -116,7 +114,6 @@ void Translator::translateBranchInst(const mir::Instruction::br *brInst) {
     } else if (auto cond = dynamic_cast<mir::Instruction::icmp *>(brInst->getCondition())) {
         auto lhs = getRegister(cond->getLhs());
         auto rhs = getRegister(cond->getRhs());
-        assert(lhs && rhs);
         auto trueLabel = bMap[brInst->getIfTrue()]->label.get();
         auto falseLabel = bMap[brInst->getIfFalse()]->label.get();
         assert(trueLabel && falseLabel);
@@ -158,7 +155,6 @@ void Translator::translateBranchInst(const mir::Instruction::br *brInst) {
 template <mir::Instruction::InstrTy ty>
 void Translator::translateBinaryInst(const mir::Instruction::_binary_instruction<ty> *binInst) {
     auto lhs = getRegister(binInst->getLhs());
-    assert(lhs);
     auto reg = translateBinaryInstHelper<ty, 32>(lhs, binInst->getRhs());
     put(binInst, reg);
 }

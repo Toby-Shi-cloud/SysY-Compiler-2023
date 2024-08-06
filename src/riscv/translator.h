@@ -13,6 +13,7 @@
 #include "backend/translator.h"
 #include "riscv/alias.h"
 #include "riscv/instruction.h"
+#include "util.h"
 
 namespace backend::riscv {
 inline std::list<pInstruction> translateImmAs(rRegister reg, int imm) {
@@ -74,8 +75,14 @@ class Translator : public TranslatorBase {
             return reg;
         } else if (auto addr = dynamic_cast<rAddress>(result)) {
             return addr2reg(addr);
+        } else if (auto lbl = dynamic_cast<rLabel>(result)) {
+            auto imm = create_imm(lbl);
+            auto reg = curFunc->newVirRegister();
+            curBlock->push_back(
+                std::make_unique<IInstruction>(Instruction::Ty::ADDI, reg, "x0"_R, std::move(imm)));
+            return reg;
         }
-        return nullptr;
+        TODO("get register failed!!!");
     }
 
     template <Instruction::Ty rTy, Instruction::Ty iTy>
