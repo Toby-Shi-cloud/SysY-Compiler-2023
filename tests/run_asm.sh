@@ -20,7 +20,7 @@ cp "$2" $temp
 # link with libsysy
 docker run --rm $name $mount -e ARCH=riscv ghcr.io/tobisc-v/sysy:riscv /usr/bin/sysy-elf.sh $f2 || my-exit
 # run elf
-docker run --rm $name $mount -e ARCH=riscv -a STDIN -a STDOUT -a STDERR ghcr.io/tobisc-v/sysy:riscv /usr/bin/sysy-run-elf.sh /root/sysy/$file.elf <$3 >$4 2>$5
+docker run -i --rm $name $mount -e ARCH=riscv ghcr.io/tobisc-v/sysy:riscv /usr/bin/sysy-run-elf.sh /root/sysy/$file.elf <$3 >$4 2>$5
 code=$?
 if [ ! -z "$(cat "$4")" ] && [ $(tail -n1 "$4" | wc -l) -eq 0 ]; then
     echo '' >> "$4"
