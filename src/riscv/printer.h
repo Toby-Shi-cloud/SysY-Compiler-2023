@@ -32,10 +32,6 @@ inline std::ostream &operator<<(std::ostream &os, const GlobalVar &var) {
 
 inline std::ostream &operator<<(std::ostream &os, const Module &module) {
     // funcs
-    os << "\t.text\n"
-       << "\t.globl\tmain\n"
-       << "\t.type\tmain, @function\n";
-    os << *module.main << "\t.size\tmain, .-main\n\n";
     for (auto &func : module.functions) {
         const auto &name = func->label->name;
         os << "\t.globl\t" << name << "\n"

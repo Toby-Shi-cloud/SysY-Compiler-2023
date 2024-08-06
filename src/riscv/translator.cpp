@@ -400,7 +400,9 @@ void Translator::translateCallInst(const mir::Instruction::call *callInst) {
         assert(reg);
         if (!isFloat) {
             if (++x_cnt > 8) {
-                curBlock->push_back(std::make_unique<SInstruction>(Instruction::Ty::SW, reg, "sp"_R,
+                auto store_ty =
+                    arg->type->isIntegerTy() ? Instruction::Ty::SW : Instruction::Ty::SD;
+                curBlock->push_back(std::make_unique<SInstruction>(store_ty, reg, "sp"_R,
                                                                    create_imm((int)use_stack)));
                 use_stack += 8;
             } else {
@@ -460,10 +462,8 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
     curFunc = new Function{std::move(name), isMain, isLeaf, retValue};
     fMap[mirFunction] = curFunc;
     if (!isLeaf) curFunc->shouldSave.insert("ra"_R);
-    if (isMain)
-        assemblyModule->main = pFunction(curFunc);
-    else
-        assemblyModule->functions.emplace_back(curFunc);
+    // 不需要区分 main
+    assemblyModule->functions.emplace_back(curFunc);
 
     // blocks
     for (auto bb : mirFunction->bbs) {
@@ -479,25 +479,26 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
         bool isFloat = arg->type->isFloatTy();
         auto reg = curFunc->newVirRegister(isFloat);
         if (!isFloat) {
-            if (++x_cnt < 8) {
+            if (x_cnt++ < 8) {
                 // move %vr, ax
                 curFunc->blocks.front()->push_back(std::make_unique<MoveInstruction>(
                     reg, PhyRegister::get("a" + std::to_string(x_cnt - 1))));
             } else {
                 // lw %vr, x(sp)
-                auto offset = create_stack_imm((int)use_stack);
-                curFunc->blocks.front()->push_back(std::make_unique<IInstruction>(
-                    Instruction::Ty::LW, reg, "sp"_R, std::move(offset)));
+                auto load_ty = arg->type->isIntegerTy() ? Instruction::Ty::LW : Instruction::Ty::LD;
+                auto offset = create_param_imm((int)use_stack);
+                curFunc->blocks.front()->push_back(
+                    std::make_unique<IInstruction>(load_ty, reg, "sp"_R, std::move(offset)));
                 use_stack += 8;
             }
         } else {
-            if (++f_cnt < 8) {
+            if (f_cnt++ < 8) {
                 // move %vr, ax
                 curFunc->blocks.front()->push_back(std::make_unique<MoveInstruction>(
                     reg, PhyRegister::get("fa" + std::to_string(f_cnt - 1))));
             } else {
                 // lw %vr, x(sp)
-                auto offset = create_stack_imm((int)use_stack);
+                auto offset = create_param_imm((int)use_stack);
                 curFunc->blocks.front()->push_back(std::make_unique<IInstruction>(
                     Instruction::Ty::FLW, reg, "sp"_R, std::move(offset)));
                 use_stack += 8;
@@ -531,8 +532,11 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
     compute_func_exit();
 
     // stack
-    for (auto &&ptr : IntImmediate::stack_vals)
-        ptr->value += curFunc->stackOffset - (int)curFunc->shouldSave.size() * 8;
+    for (auto &&ptr : IntImmediate::stack_vals) {
+        assert(ptr->in_stack == 1 || ptr->in_stack == 2);
+        ptr->value += curFunc->stackOffset;
+        if (ptr->in_stack == 1) ptr->value -= (int)curFunc->shouldSave.size() * 8;
+    }
     IntImmediate::stack_vals.clear();
 
     // legalize

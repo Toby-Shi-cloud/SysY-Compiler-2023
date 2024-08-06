@@ -24,9 +24,9 @@ struct Immediate : Operand {
 
 struct IntImmediate : Immediate {
     static inline std::unordered_set<rIntImmediate> stack_vals = {};
-    bool in_stack;
+    int in_stack;  // 0: none, 1: stack alloc, 2: stack param
     int value;
-    explicit IntImmediate(int value, bool in_stack = false) : value{value}, in_stack{in_stack} {
+    explicit IntImmediate(int value, int in_stack = 0) : value{value}, in_stack{in_stack} {
         if (in_stack) stack_vals.insert(this);
     }
     IntImmediate(const IntImmediate &other) : IntImmediate(other.value, other.in_stack) {}
@@ -97,13 +97,13 @@ struct JoinImmediate : Immediate {
 
 inline pIntImmediate create_imm(int value) { return std::make_unique<IntImmediate>(value); }
 inline pIntImmediate create_stack_imm(int value) {
-    return std::make_unique<IntImmediate>(value, true);
+    return std::make_unique<IntImmediate>(value, 1);
+}
+inline pIntImmediate create_param_imm(int value) {
+    return std::make_unique<IntImmediate>(value, 2);
 }
 inline pIntImmediate operator""_I(unsigned long long value) {
     return create_imm(static_cast<int>(value));
-}
-inline pIntImmediate operator""_IS(unsigned long long value) {
-    return create_stack_imm(static_cast<int>(value));
 }
 
 inline pSplitImmediate create_imm(pImmediate imm, SplitImmediate::Partition part) {
@@ -186,9 +186,9 @@ struct PhyRegister : Register {
 
 struct XPhyRegister final : PhyRegister {
     constexpr static const char *names[] = {
-        "zero", "ra", "sp",  "gp",  "tp", "t0", "t1", "t2",  //
-        "s0",   "s1", "a0",  "a1",  "a2", "a3", "a4", "a5",  //
-        "a6",   "a7", "s2",  "s3",  "s4", "s5", "s6", "s7",  //
+        "zero", "ra", "sp",  "gp",  "tp", "t0", "t1", "t2",   //
+        "s0",   "s1", "a0",  "a1",  "a2", "a3", "a4", "a5",   //
+        "a6",   "a7", "s2",  "s3",  "s4", "s5", "s6", "s7",   //
         "s8",   "s9", "s10", "s11", "t3", "t4", "t5", "x31",  //
     };
     static inline const std::unordered_map<std::string, unsigned> name2id = [] {
