@@ -121,6 +121,16 @@ static inst_node_t arithmeticFolding(Instruction::_binary_instruction<ty> *binar
             return substitute(binary, getIntegerLiteral(0));
         else
             return substitute(binary, binary->getLhs());
+    } else if (binary->getRhs() == getBooleanLiteral(false)) {
+        if constexpr (ty == Instruction::AND)
+            return substitute(binary, getBooleanLiteral(false));
+        else
+            return substitute(binary, binary->getLhs());
+    } else if (binary->getRhs() == getBooleanLiteral(true)) {
+        if constexpr (ty == Instruction::OR)
+            return substitute(binary, getBooleanLiteral(true));
+        else if constexpr (ty == Instruction::AND)
+            return substitute(binary, binary->getLhs());
     }
     return binary->node;
 }
@@ -139,8 +149,8 @@ inst_node_t constantFolding(Instruction::br *br) {
 
 template <Instruction::InstrTy ty>
 inst_node_t constantFolding(Instruction::_binary_instruction<ty> *binary) {
-    auto lhs = dynamic_cast<IntegerLiteral *>(binary->getLhs());
-    auto rhs = dynamic_cast<IntegerLiteral *>(binary->getRhs());
+    auto lhs = dynamic_cast<Literal *>(binary->getLhs());
+    auto rhs = dynamic_cast<Literal *>(binary->getRhs());
     if constexpr (ty == Instruction::ADD || ty == Instruction::MUL || ty == Instruction::AND ||
                   ty == Instruction::OR || ty == Instruction::XOR) {
         if (lhs && !rhs) {

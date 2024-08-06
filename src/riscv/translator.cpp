@@ -664,6 +664,15 @@ void Translator::translateGlobalVar(const mir::GlobalVar *mirVar) {
 }
 
 rOperand Translator::translateOperand(const mir::Value *mirValue) {
+    if (auto i1 = dynamic_cast<const mir::BooleanLiteral *>(mirValue)) {
+        if (i1->value) {
+            auto reg = curFunc->newVirRegister();
+            curBlock->push_back(std::make_unique<IInstruction>(Instruction::Ty::ADDI, reg, "x0"_R, 1_I));
+            return reg;
+        } else {
+            return "x0"_R;
+        }
+    }
     if (auto imm = dynamic_cast<const mir::IntegerLiteral *>(mirValue)) {
         if (imm->value == 0) return "x0"_R;
         auto reg = curFunc->newVirRegister();

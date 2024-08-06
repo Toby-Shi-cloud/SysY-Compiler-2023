@@ -116,7 +116,9 @@ struct Instruction::_binary_instruction : Instruction {
     [[nodiscard]] Literal *calc() const {
         Interpreter interpreter{};
         interpret(interpreter);
-        return getLiteral(interpreter.getValue(this));
+        auto result = interpreter.getValue(this);
+        if (type == Type::getI1Type()) return getBooleanLiteral((bool)result);
+        return getLiteral(result);
     }
 
     [[nodiscard]] std::vector<Value *> getOperands() const override {
