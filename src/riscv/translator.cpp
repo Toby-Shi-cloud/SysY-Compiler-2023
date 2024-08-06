@@ -18,23 +18,29 @@
 
 namespace backend::riscv {
 namespace {
-void flatten(mir::Literal *literal, std::vector<int> &result) {
+void flatten(mir::Literal *literal, std::vector<std::pair<int, int>> &result) {
+    const auto emplace_back = [&result](auto val, auto times) {
+        if (result.empty() || result.back().first != val) {
+            result.emplace_back(val, times);
+        } else {
+            result.back().second += times;
+        }
+    };
     if (auto v = dynamic_cast<mir::IntegerLiteral *>(literal)) {
-        result.push_back(v->value);
+        emplace_back(v->value, 1);
     } else if (auto f = dynamic_cast<mir::FloatLiteral *>(literal)) {
-        result.push_back(*reinterpret_cast<const int *>(&f->value));
+        emplace_back(*reinterpret_cast<const int *>(&f->value), 1);
     } else if (auto arr = dynamic_cast<mir::ArrayLiteral *>(literal)) {
         for (auto ele : arr->values) flatten(ele, result);
     } else if (auto zero = dynamic_cast<mir::ZeroInitializer *>(literal)) {
-        auto size = zero->type->size() / 4;
-        while (size--) result.push_back(0);
+        emplace_back(0, zero->type->size() / 4);
     } else {
         __builtin_unreachable();
     }
 }
 
-std::vector<int> flatten(mir::Literal *literal) {
-    std::vector<int> result;
+auto flatten(mir::Literal *literal) {
+    std::vector<std::pair<int, int>> result;
     flatten(literal, result);
     return result;
 }

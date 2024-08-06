@@ -18,10 +18,13 @@ inline std::ostream &operator<<(std::ostream &os, const GlobalVar &var) {
     } else if (var.isString) {
         TODO("no string");
     } else {
-        auto &elements = std::get<std::vector<int>>(var.elements);
-        os << "\t.word" << "\t";
-        bool first = true;
-        for (auto ele : elements) os << (first ? "" : ", ") << ele, first = false;
+        auto &elements = std::get<std::vector<std::pair<int, int>>>(var.elements);
+        for (auto [val, times] : elements) {
+            if (val == 0)
+                os << "\t.zero\t" << times * 4 << "\n";
+            else
+                while (times--) os << "\t.word\t" << val << "\n";
+        }
         os << std::endl;
     }
     return os;
@@ -43,7 +46,7 @@ inline std::ostream &operator<<(std::ostream &os, const Module &module) {
     for (auto &var : module.globalVars) {
         const auto &name = var->label->name;
         os << "\t.globl\t" << name << "\n"
-           << "\t.bss\n"
+           << "\t.data\n"
            << "\t.align\t4\n"
            << "\t.type\t" << name << ", @object\n"
            << "\t.size\t" << name << ", " << var->size << "\n"

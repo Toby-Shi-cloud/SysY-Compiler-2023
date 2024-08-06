@@ -1,8 +1,8 @@
 R"EOF(
         .text
-        .globl  memset0
-        .type   memset0, @function
-memset0:
+        .globl  sysy.memset0
+        .type   sysy.memset0, @function
+sysy.memset0:
         andi    a5,a1,7
         lui     a4,%hi(.L4)
         addi    a4,a4,%lo(.L4)
@@ -80,4 +80,5 @@ memset0:
         add     a5,a0,a5
         sw      zero,-8(a5)
         j       .L11
+        .size   sysy.memset0, .-sysy.memset0
 )EOF"

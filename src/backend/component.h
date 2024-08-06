@@ -211,7 +211,7 @@ struct Function {
           isMain(isMain),
           isLeaf(isLeaf),
           retValue(retValue) {}
-    
+
     ~Function() noexcept {
         // 强制先析构 blocks
         blocks.clear();
@@ -244,14 +244,16 @@ struct Function {
 };
 
 struct GlobalVar {
+    // 字符串，逐字内存，pair<字，重复次数>
+    using ElementT = std::variant<std::string, std::vector<int>, std::vector<std::pair<int, int>>>;
     pLabel label;
     bool isInit, isString, isConst, inExtern{};
     int offsetofGp = 0;
     unsigned size;
-    std::variant<std::string, std::vector<int>> elements;
+    ElementT elements;
 
     explicit GlobalVar(std::string name, bool isInit, bool isString, bool isConst, unsigned size,
-                       std::variant<std::string, std::vector<int>> elements)
+                       ElementT elements)
         : label(std::make_unique<Label>(std::move(name), this)),
           isInit(isInit),
           isString(isString),
