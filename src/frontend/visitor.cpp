@@ -3,7 +3,6 @@
 //
 
 #include "frontend/visitor.h"
-#include <iostream>
 
 // Symbol Table
 namespace frontend::visitor {

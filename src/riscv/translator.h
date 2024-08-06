@@ -21,15 +21,17 @@ inline std::list<pInstruction> translateImmAs(rRegister reg, int imm) {
         instructions.push_back(std::make_unique<MoveInstruction>(reg, "x0"_R));
         return instructions;
     }
-    bool has_hi = (imm & ~0x0fff) != 0;
-    if (has_hi) {
+    auto u = static_cast<unsigned>(imm);
+    auto hi = u >> 12, lo = u & 0xFFF;
+    if (lo & 0x800) hi = (hi + 1) & 0xFFFFF, lo |= 0xFFFF'F000;
+    if (hi) {
         instructions.push_back(
-            std::make_unique<UInstruction>(Instruction::Ty::LUI, reg, create_imm(imm & ~0x0fff)));
+            std::make_unique<UInstruction>(Instruction::Ty::LUI, reg, create_imm((int)hi)));
     }
     if ((imm & 0x0fff) != 0) {
         instructions.push_back(std::make_unique<IInstruction>(
-            Instruction::Ty::ADDIW, reg, has_hi ? (rRegister)reg : (rRegister) "x0"_R,
-            create_imm(imm & 0x0fff)));
+            Instruction::Ty::ADDIW, reg, hi ? (rRegister)reg : (rRegister) "x0"_R,
+            create_imm((int)lo)));
     }
     return instructions;
 }
@@ -59,7 +61,8 @@ class Translator : public TranslatorBase {
         if (imm.label != nullptr) TODO("not implemented for label2reg");
         auto temp = curFunc->newVirRegister();
         for (auto &inst : translateImmAs(temp, offset)) curBlock->push_back(std::move(inst));
-        curBlock->push_back(std::make_unique<RInstruction>(Instruction::Ty::ADD, temp, temp, addr->base));
+        curBlock->push_back(
+            std::make_unique<RInstruction>(Instruction::Ty::ADD, temp, temp, addr->base));
         return temp;
     }
 
@@ -67,6 +70,16 @@ class Translator : public TranslatorBase {
         auto &label = lib_labels[name];
         if (label == nullptr) label = std::make_unique<Label>(name.substr(1));
         return label.get();
+    }
+
+    rRegister getRegister(const mir::Value *mirValue) {
+        auto result = translateOperand(mirValue);
+        if (auto reg = dynamic_cast<rRegister>(result)) {
+            return reg;
+        } else if (auto addr = dynamic_cast<rAddress>(result)) {
+            return addr2reg(addr);
+        }
+        return nullptr;
     }
 
     template <Instruction::Ty rTy, Instruction::Ty iTy>

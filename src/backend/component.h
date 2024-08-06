@@ -46,6 +46,9 @@ struct InstructionBase {
         reg->useUsers.insert(this);
     }
 
+    // 自动合法化指令。会在当前指令前加入新的指令，并删掉当前指令。
+    [[nodiscard]] virtual inst_node_t legalize() { return std::next(node); }
+
     virtual bool isJumpBranch() const = 0;
     virtual bool isFuncCall() const = 0;
     virtual void setJumpLabel(rLabel newLabel) = 0;

@@ -40,7 +40,7 @@ struct SplitImmediate : Immediate {
     SplitImmediate(pImmediate origin, Partition part) : origin{std::move(origin)}, part{part} {}
 
     std::ostream &output(std::ostream &os) const override {
-        using magic_enum::uppercase::operator<<;
+        using magic_enum::lowercase::operator<<;
         return os << "%" << part << "(" << origin << ")";
     }
 
@@ -204,7 +204,8 @@ struct XPhyRegister final : PhyRegister {
         return regs;
     }
 
-    [[nodiscard]] bool isTemp() const final { return id >= 5 && id <= 7 || id >= 28 && id <= 31; }
+    // "x31" 用来作为伪指令的备用寄存器，所以从 temp 删掉了 （避免被错误的分配）
+    [[nodiscard]] bool isTemp() const final { return id >= 5 && id <= 7 || id >= 28 && id <= 30; }
     [[nodiscard]] bool isSaved() const final { return id >= 8 && id <= 9 || id >= 18 && id << 27; }
     bool isFloat() const override { return false; }
 

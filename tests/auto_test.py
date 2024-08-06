@@ -28,6 +28,7 @@ def run_test(run_sh, opt_level, test_file, input_file, output_file):
     except subprocess.CalledProcessError as err:
         return False, err.stdout.decode() + '\n' + err.stderr.decode()
     except subprocess.TimeoutExpired:
+        if obj_suffix == ".S": os.system(f"docker kill sysy-`basename {test_file}`")
         return False, 'Time Limit Exceeded'
     try:
         subprocess.run(['diff', output_file, ans_file], capture_output=True, check=True)
@@ -50,6 +51,7 @@ def run_suit(test_dir, run_sh, opt_level):
     results = pool.map(test_runner, map(lambda t: ((run_sh, opt_level), t), tasks))
     pool.close()
     pool.join()
+    os.system("rm -r temp-*")
     passed = sum(map(lambda res: 1 if res[0] else 0, results))
     with open(f"{test_dir}.log", 'w') as f:
         print(f"| {test_dir} | {passed} | {len(results) - passed} |", file=f)

@@ -117,9 +117,9 @@ struct RInstruction : Instruction {
 struct IInstruction : Instruction {
     pImmediate imm;
     IInstruction(const IInstruction &inst) : Instruction{inst}, imm{inst.imm->clone()} {}
-
     CLONE_DECL(IInstruction);
     InstType getInstType() const override { return InstType::I; }
+    inst_node_t legalize() override;
 
     IInstruction(Ty ty, rRegister rd, rRegister rs1, pImmediate imm)
         : Instruction(ty, {rd}, {rs1}), imm{std::move(imm)} {}
@@ -138,9 +138,9 @@ struct IInstruction : Instruction {
 struct SInstruction : Instruction {
     pImmediate imm;
     SInstruction(const SInstruction &inst) : Instruction{inst}, imm{inst.imm->clone()} {}
-
     CLONE_DECL(SInstruction);
     InstType getInstType() const override { return InstType::S; }
+    inst_node_t legalize() override;
 
     SInstruction(Ty ty, rRegister rs1, rRegister rs2, pImmediate imm)
         : Instruction(ty, {}, {rs1, rs2}), imm{std::move(imm)} {}
@@ -157,7 +157,6 @@ struct SInstruction : Instruction {
 // branch
 struct BInstruction : Instruction {
     rLabel label;
-
     CLONE_DECL(BInstruction);
     InstType getInstType() const override { return InstType::B; }
     rLabel getJumpLabel() const override { return label; }
@@ -179,9 +178,9 @@ struct BInstruction : Instruction {
 struct UInstruction : Instruction {
     pImmediate imm;
     UInstruction(const UInstruction &inst) : Instruction{inst}, imm{inst.imm->clone()} {}
-
     CLONE_DECL(UInstruction);
     InstType getInstType() const override { return InstType::U; }
+    inst_node_t legalize() override;
 
     UInstruction(Ty ty, rRegister rd, pImmediate imm)
         : Instruction(ty, {rd}, {}), imm{std::move(imm)} {}

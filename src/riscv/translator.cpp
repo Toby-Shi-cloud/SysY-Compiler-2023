@@ -14,6 +14,7 @@
 #include "riscv/operand.h"
 #include "riscv/opt.h"
 #include "riscv/reg_alloca.h"
+#include "settings.h"
 #include "util.h"
 
 namespace backend::riscv {
@@ -54,11 +55,11 @@ rRegister Translator::createBinaryInstHelperX(rRegister lhs, mir::Value *rhs) {
         if (auto literal = dynamic_cast<mir::IntegerLiteral *>(rhs)) {
             // rhs is immediate
             int imm = literal->value;
-            if constexpr (rTy == Instruction::Ty::SUB) imm = -imm;  // use addi instead
-            if (imm >= -2048 && imm < 2048) {
-                curBlock->push_back(std::make_unique<IInstruction>(iTy, dst, lhs, create_imm(imm)));
-                return dst;
-            }
+            if constexpr (rTy == Instruction::Ty::SUB || rTy == Instruction::Ty::SUBW)
+                imm = -imm;  // use addi instead
+            // imm >= -2048 && imm < 2048 这里不检查，合法化阶段自动搞
+            curBlock->push_back(std::make_unique<IInstruction>(iTy, dst, lhs, create_imm(imm)));
+            return dst;
         }
     }
     auto rop = getRegister(rhs);
@@ -120,7 +121,7 @@ void Translator::translateBranchInst(const mir::Instruction::br *brInst) {
         auto falseLabel = bMap[brInst->getIfFalse()]->label.get();
         assert(trueLabel && falseLabel);
         auto cond_ty = cond->cond;
-        if (brInst->likely >= 0.5) {
+        if (brInst->likely < 0.5) {
             cond_ty = ~cond_ty;
             std::swap(trueLabel, falseLabel);
         }
@@ -400,6 +401,7 @@ void Translator::translateCallInst(const mir::Instruction::call *callInst) {
         auto arg = callInst->getArg(i);
         bool isFloat = arg->type->isFloatTy();
         auto reg = getRegister(arg);
+        assert(reg);
         if (!isFloat) {
             if (++x_cnt > 8) {
                 curBlock->push_back(std::make_unique<SInstruction>(Instruction::Ty::SW, reg, "sp"_R,
@@ -539,6 +541,17 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
         ptr->value += curFunc->stackOffset;
     }
 
+    // legalize
+    auto sub_blk = all_sub_blocks(curFunc);
+    for (auto &&blk : curFunc->exitB->subBlocks) sub_blk.push_back(blk.get());
+    for (auto &&block : sub_blk) {
+        auto it = block->begin();
+        while (it != block->end()) {
+            auto inst = it->get();
+            it = inst->legalize();
+        }
+    }
+
     optimizeAfterAlloc();
 }
 
@@ -661,11 +674,7 @@ rOperand Translator::translateOperand(const mir::Value *mirValue) {
         TODO("translate float literal");
     }
     if (auto op = oMap.find(mirValue); op != oMap.end()) return op->second;
-    if (auto gv = dynamic_cast<const mir::GlobalVar *>(mirValue)) {
-        if (gMap[gv]->inExtern)
-            return newAddress(PhyRegister::get("$gp"), create_imm(gMap[gv]->offsetofGp));
-        return gMap[gv]->label.get();
-    }
+    if (auto gv = dynamic_cast<const mir::GlobalVar *>(mirValue)) return gMap[gv]->label.get();
     if (auto bb = dynamic_cast<const mir::BasicBlock *>(mirValue)) return bMap[bb]->label.get();
     if (auto func = dynamic_cast<const mir::Function *>(mirValue)) return fMap[func]->label.get();
     put(mirValue, curFunc->newVirRegister());
@@ -798,5 +807,7 @@ void Translator::optimizeBeforeAlloc() const {  // TODO opt
     clearDeadCode(curFunc);
 }
 
-void Translator::optimizeAfterAlloc() const {}  // TODO opt
+void Translator::optimizeAfterAlloc() const {  // TODO opt
+    if (opt_settings.using_block_relocation) relocateBlock(curFunc);
+}
 }  // namespace backend::riscv

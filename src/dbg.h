@@ -6,6 +6,7 @@
 #define COMPILER_DBG_H
 
 #if defined(_DEBUG_)
+#undef NDEBUG
 #define DBG_ENABLE
 #define DBG_MACRO_NO_WARNING
 #include <dbg_macro.h>  // IWYU pragma: export
