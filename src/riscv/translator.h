@@ -35,8 +35,6 @@ inline std::list<pInstruction> translateImmAs(rRegister reg, int imm) {
 }
 
 class Translator : public TranslatorBase {
-    // 在函数进行第一次 translate 的时候，将 sp 视作为函数进入前的值，因此需要再翻译。
-    std::stack<int *> stack_imm_pointers;
     // 使用到的但是没有被其他指令持有的
     std::stack<pOperand> used_operands;
     // 库函数 Label
@@ -56,10 +54,9 @@ class Translator : public TranslatorBase {
     }
 
     rRegister addr2reg(rAddress addr) {
-        JoinImmediate imm{{}};
-        imm.values.push_back(addr->offset->clone());
-        auto [lbl, offset] = imm.accumulate();
-        if (lbl != nullptr) TODO("not implemented for label2reg");
+        JoinImmediate imm{addr->offset};
+        auto offset = imm.accumulate();
+        if (imm.label != nullptr) TODO("not implemented for label2reg");
         auto temp = curFunc->newVirRegister();
         for (auto &inst : translateImmAs(temp, offset)) curBlock->push_back(std::move(inst));
         curBlock->push_back(std::make_unique<RInstruction>(Instruction::Ty::ADD, temp, temp, addr->base));

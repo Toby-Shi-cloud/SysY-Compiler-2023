@@ -14,7 +14,6 @@
 namespace backend::riscv {
 
 namespace {
-std::stack<int *> *stack_imm_ptr = nullptr;
 PhyRegister::phy_set_t alloca_regs{}, temp_regs{};
 
 constexpr auto alloca_regs_pred = [](const auto phy) {
@@ -32,22 +31,19 @@ constexpr auto should_color_precond = [](rRegister r) {
 
 static inst_pos_t load_at(rFunction func, rSubBlock block, inst_pos_t it, rRegister dst,
                           int offset) {
-    auto imm = create_imm(offset);
-    stack_imm_ptr->push(&imm->value);
+    auto imm = create_stack_imm(offset);
     auto load_ty = dst->isFloat() ? Instruction::Ty::FLW : Instruction::Ty::LD;
     return block->insert(it, std::make_unique<IInstruction>(load_ty, dst, "sp"_R, std::move(imm)));
 }
 
 static inst_pos_t store_at(rFunction func, rSubBlock block, inst_pos_t it, rRegister src,
                            int offset) {
-    auto imm = create_imm(offset);
-    stack_imm_ptr->push(&imm->value);
+    auto imm = create_stack_imm(offset);
     auto store_ty = src->isFloat() ? Instruction::Ty::FSW : Instruction::Ty::SD;
     return block->insert(it, std::make_unique<SInstruction>(store_ty, src, "sp"_R, std::move(imm)));
 }
 
-void register_alloca(rFunction function, std::stack<int *> &stack_imm) {
-    stack_imm_ptr = &stack_imm;
+void register_alloca(rFunction function) {
     // for X reg
     alloca_regs = XPhyRegister::gets(alloca_regs_pred);
     temp_regs = XPhyRegister::gets(temp_regs_pred);

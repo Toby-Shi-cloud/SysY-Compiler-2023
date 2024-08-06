@@ -11,7 +11,7 @@
 namespace backend::riscv {
 def(Immediate);
 def(IntImmediate);
-def(LabelImmediate);
+def(SplitImmediate);
 def(JoinImmediate);
 def(Address);
 

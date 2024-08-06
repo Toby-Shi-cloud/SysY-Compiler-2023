@@ -6,13 +6,14 @@
 #define COMPILER_RISCV_OPERAND_H
 
 #include <memory>
+#include <numeric>
 #include <set>
+#include <stack>
+#include <type_traits>
 #include <utility>
-#include <variant>
 #include <vector>
 #include "backend/operand.h"  // IWYU pragma: export
 #include "riscv/alias.h"      // IWYU pragma: export
-#include "util.h"
 
 namespace backend::riscv {
 
@@ -21,67 +22,60 @@ struct Immediate : Operand {
 };
 
 struct IntImmediate : Immediate {
+    static inline std::stack<rIntImmediate> stack_vals = {};
+    bool in_stack;
     int value;
-    explicit IntImmediate(int value) : value{value} {}
+    explicit IntImmediate(int value, bool in_stack = false) : value{value}, in_stack{in_stack} {
+        if (in_stack) stack_vals.push(this);
+    }
     std::ostream &output(std::ostream &os) const override { return os << value; }
     [[nodiscard]] pImmediate clone() const override {
-        return std::make_unique<IntImmediate>(value);
+        return std::make_unique<IntImmediate>(value, in_stack);
     }
 };
 
-struct LabelImmediate : Immediate {
-    std::variant<rLabel, pImmediate> label;
-    enum Partition { HI, LO, FULL } part;
-    LabelImmediate(rLabel label, Partition part) : label{label}, part{part} {}
-    LabelImmediate(pImmediate label, Partition part) : label{std::move(label)}, part{part} {}
+struct SplitImmediate : Immediate {
+    pImmediate origin;
+    enum Partition { HI, LO } part;
+    SplitImmediate(pImmediate origin, Partition part) : origin{std::move(origin)}, part{part} {}
 
     std::ostream &output(std::ostream &os) const override {
         using magic_enum::uppercase::operator<<;
-        os << "%" << part << "(";
-        visit([&os](auto &&lbl) { os << lbl; }, label);
-        return os << ")";
+        return os << "%" << part << "(" << origin << ")";
     }
 
     [[nodiscard]] pImmediate clone() const override {
-        return visit(
-            overloaded{
-                [this](rLabel lbl) { return std::make_unique<LabelImmediate>(lbl, part); },
-                [this](auto &imm) { return std::make_unique<LabelImmediate>(imm->clone(), part); }},
-            label);
+        return std::make_unique<SplitImmediate>(origin->clone(), part);
     }
 };
 
 struct JoinImmediate : Immediate {
-    std::vector<pImmediate> values;
-    explicit JoinImmediate(std::vector<pImmediate> values) : values{std::move(values)} {}
+    rLabel label;
+    std::vector<pIntImmediate> values;
 
-    [[nodiscard]] std::pair<rLabelImmediate, int> accumulate() const {
-        rLabelImmediate label = nullptr;
-        int acc = 0;
-        for (auto &&imm : values) {
-            if (auto lbl = dynamic_cast<rLabelImmediate>(imm.get())) {
-                assert(label == nullptr);
-                label = lbl;
-            } else if (auto val = dynamic_cast<rIntImmediate>(imm.get())) {
-                acc += val->value;
-            } else if (auto join = dynamic_cast<rJoinImmediate>(imm.get())) {
-                auto [l, a] = join->accumulate();
-                if (l != nullptr) {
-                    assert(label == nullptr);
-                    label = l;
-                }
-                acc += a;
-            } else {
-                __builtin_unreachable();
-            }
-        }
-        return {label, acc};
+    JoinImmediate(rLabel label, std::vector<pIntImmediate> values)
+        : label{label}, values{std::move(values)} {}
+
+    template <typename... Args>
+    explicit JoinImmediate(rLabel label, Args &&...args) : label{label} {
+        static_assert((std::is_same_v<Args, pIntImmediate &&> && ...),
+                      "args should be rvalue reference of pIntImmediate");
+        values.reserve(sizeof...(args));
+        (values.push_back(std::move(args)), ...);
+    }
+
+    inline explicit JoinImmediate(const pImmediate &other);
+    inline JoinImmediate(JoinImmediate &&o1, JoinImmediate &&o2);
+
+    [[nodiscard]] int accumulate() const {
+        return std::accumulate(values.begin(), values.end(), 0,
+                               [](int acc, auto &&imm) { return acc + imm->value; });
     }
 
     std::ostream &output(std::ostream &os) const override {
-        auto [lbl, acc] = accumulate();
-        if (lbl != nullptr) {
-            os << lbl;
+        auto acc = accumulate();
+        if (label != nullptr) {
+            os << label;
             if (acc) os << '+' << acc;
         } else {
             os << acc;
@@ -90,36 +84,53 @@ struct JoinImmediate : Immediate {
     }
 
     [[nodiscard]] pImmediate clone() const override {
-        std::vector<pImmediate> new_values;
+        std::vector<pIntImmediate> new_values;
         new_values.reserve(values.size());
-        for (auto &&value : values) new_values.push_back(value->clone());
-        return std::make_unique<JoinImmediate>(std::move(new_values));
+        for (auto &&value : values) new_values.push_back(std::make_unique<IntImmediate>(*value));
+        return std::make_unique<JoinImmediate>(label, std::move(new_values));
     }
 };
 
 inline pIntImmediate create_imm(int value) { return std::make_unique<IntImmediate>(value); }
-inline pLabelImmediate create_imm(rLabel label, LabelImmediate::Partition part) {
-    return std::make_unique<LabelImmediate>(label, part);
+inline pIntImmediate create_stack_imm(int value) {
+    return std::make_unique<IntImmediate>(value, true);
 }
-inline auto create_imm(rLabel label) { return create_imm(label, LabelImmediate::FULL); }
-inline auto create_imm_hi(rLabel label) { return create_imm(label, LabelImmediate::HI); }
-inline auto create_imm_lo(rLabel label) { return create_imm(label, LabelImmediate::LO); }
 inline pIntImmediate operator""_I(unsigned long long value) {
     return create_imm(static_cast<int>(value));
 }
+inline pIntImmediate operator""_IS(unsigned long long value) {
+    return create_stack_imm(static_cast<int>(value));
+}
 
-inline pJoinImmediate join_imm(pImmediate x, pImmediate y) {
-    if (auto join = dynamic_cast<rJoinImmediate>(x.get())) {
-        join->values.push_back(std::move(y));
-        (void)(join == x.release());  // release
-        return pJoinImmediate{join};
-    } else if (dynamic_cast<rJoinImmediate>(y.get())) {
-        return join_imm(std::move(y), std::move(x));
+inline pSplitImmediate create_imm(pImmediate imm, SplitImmediate::Partition part) {
+    return std::make_unique<SplitImmediate>(std::move(imm), part);
+}
+inline auto create_imm_hi(pImmediate imm) { return create_imm(std::move(imm), SplitImmediate::HI); }
+inline auto create_imm_lo(pImmediate imm) { return create_imm(std::move(imm), SplitImmediate::LO); }
+
+inline pJoinImmediate create_imm(rLabel label) { return std::make_unique<JoinImmediate>(label); }
+inline JoinImmediate::JoinImmediate(const pImmediate &other) : label{} {
+    if (auto i = dynamic_cast<IntImmediate *>(other.get())) {
+        values.push_back(std::make_unique<IntImmediate>(*i));
+    } else if (auto j = dynamic_cast<JoinImmediate *>(other.get())) {
+        auto new_u_ = j->clone();
+        auto new_ = static_cast<JoinImmediate *>(new_u_.get());  // NOLINT
+        label = new_->label;
+        values = std::move(new_->values);
     } else {
-        std::vector<pImmediate> vec;
-        vec.push_back(std::move(x)), vec.push_back(std::move(y));
-        return std::make_unique<JoinImmediate>(std::move(vec));
+        throw;
     }
+}
+inline JoinImmediate::JoinImmediate(JoinImmediate &&o1, JoinImmediate &&o2) {
+    label = o1.label == nullptr ? o2.label : o1.label;
+    values = std::move(o1.values);
+    for (auto &&value : o2.values) values.push_back(std::move(value));
+    decltype(o2.values)().swap(o2.values);
+}
+inline pJoinImmediate join_imm(const pImmediate &x, const pImmediate &y) {
+    auto x1 = JoinImmediate(x);
+    auto y1 = JoinImmediate(y);
+    return std::make_unique<JoinImmediate>(std::move(x1), std::move(y1));
 }
 
 struct Address : Operand {

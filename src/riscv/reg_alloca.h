@@ -60,7 +60,7 @@ struct Graph {
     return ret;
 }
 
-void register_alloca(rFunction function, std::stack<int *> &stack_imm);
+void register_alloca(rFunction function);
 void register_alloca_impl(rFunction function);
 void replace_register(rFunction function, const Graph &graph);
 void compute_blocks_info(rFunction function);

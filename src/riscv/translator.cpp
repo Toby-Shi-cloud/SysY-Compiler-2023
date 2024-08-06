@@ -173,8 +173,7 @@ void Translator::translateAllocaInst(const mir::Instruction::alloca_ *allocaInst
     auto alloca_size = allocaInst->type->size();
     assert(alloca_size % 4 == 0);
     curFunc->allocaSize += alloca_size;
-    auto imm = create_imm((int)curFunc->allocaSize);
-    stack_imm_pointers.push(&imm->value);
+    auto imm = create_stack_imm((int)curFunc->allocaSize);
     used_operands.push(std::make_unique<Address>("sp"_R, std::move(imm)));
     auto addr = used_operands.top().get();
     put(allocaInst, addr);
@@ -488,8 +487,7 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
                     reg, PhyRegister::get("a" + std::to_string(x_cnt - 1))));
             } else {
                 // lw %vr, x(sp)
-                auto offset = create_imm((int)use_stack);
-                stack_imm_pointers.push(&offset->value);
+                auto offset = create_stack_imm((int)use_stack);
                 curFunc->blocks.front()->push_back(std::make_unique<IInstruction>(
                     Instruction::Ty::LW, reg, "sp"_R, std::move(offset)));
                 use_stack += 8;
@@ -501,8 +499,7 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
                     reg, PhyRegister::get("fa" + std::to_string(f_cnt - 1))));
             } else {
                 // lw %vr, x(sp)
-                auto offset = create_imm((int)use_stack);
-                stack_imm_pointers.push(&offset->value);
+                auto offset = create_stack_imm((int)use_stack);
                 curFunc->blocks.front()->push_back(std::make_unique<IInstruction>(
                     Instruction::Ty::FLW, reg, "sp"_R, std::move(offset)));
                 use_stack += 8;
@@ -529,17 +526,17 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
     // reformat blocks & alloca registers
     assert((curFunc->allocName(), true));
     optimizeBeforeAlloc();
-    register_alloca(curFunc, stack_imm_pointers);
+    register_alloca(curFunc);
 
     // save registers before function & restore registers
     compute_func_start();
     compute_func_exit();
 
     // stack
-    while (!stack_imm_pointers.empty()) {
-        auto ptr = stack_imm_pointers.top();
-        stack_imm_pointers.pop();
-        *ptr += curFunc->stackOffset;
+    while (!IntImmediate::stack_vals.empty()) {
+        auto ptr = IntImmediate::stack_vals.top();
+        IntImmediate::stack_vals.pop();
+        ptr->value += curFunc->stackOffset;
     }
 
     optimizeAfterAlloc();
