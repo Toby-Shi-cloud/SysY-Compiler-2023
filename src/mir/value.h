@@ -26,6 +26,7 @@ class User;
 struct Use {
     Value *value;
     std::unordered_set<User *> users;
+    explicit Use(Value *value) : value(value) {}
 };
 
 using value_map_t = std::unordered_map<const Value *, Value *>;
@@ -49,7 +50,8 @@ class Value {
     std::string name;
 
  public:
-    Value(pType type, std::string name) : type(type), name(std::move(name)), use(new Use{this}) {}
+    Value(pType type, std::string name)
+        : type(type), name(std::move(name)), use(std::make_shared<Use>(this)) {}
     explicit Value(pType type) : Value(type, "<anonymous>") {}
     Value(const Value &value) : Value(value.type, value.name) {}
     Value(Value &&) = default;
@@ -129,7 +131,9 @@ class User : public Value {
     ~User() override {
         for (auto &operand : operands) {
             if (auto op = operand.lock()) {
+                assert(op.use_count() == 2);
                 op->users.erase(this);
+                if (op->value == this) continue;
                 if (auto counter = op->value->inlineRefCounter()) {
                     if (*counter == 0 && op->users.empty()) delete op->value;
                 }

@@ -4,6 +4,10 @@
 
 #include <queue>
 #include <stack>
+#include <unordered_map>
+#include "mir.h"
+#include "mir/derived_value.h"
+#include "mir/type.h"
 #include "opt/opt.h"
 #include "settings.h"
 
@@ -67,23 +71,51 @@ void Function::calcDF() const {
     dfs(bbs.front(), calc, dfs);
 }
 
-static void calcPhi(const Function *func, const Instruction::alloca_ *alloc) {
-    auto zero = getZero(alloc->type);
-    std::unordered_map<BasicBlock *, Value *> liveInV;  // live in value
-    std::unordered_map<BasicBlock *, Value *> defs;     // def value (live out value)
+using pcalloca = const Instruction::alloca_ *;
+using alloca_set = std::unordered_set<pcalloca>;
+using bb2val_t = std::unordered_map<BasicBlock *, Value *>;
 
-    // Step 1. calc defs
-    std::queue<BasicBlock *> W;  // store queue
+template <typename Func>
+static void deleteLoadStore(const Function *func, const alloca_set &allocas,
+                            std::unordered_map<pcalloca, Func> &find_v) {
+    std::unordered_map<Value *, Value *> modified;
+    const auto find_m = [&modified](Value *val, auto &&self) -> Value * {
+        if (modified.count(val)) return modified[val] = self(modified[val], self);
+        return val;
+    };
     for (auto bb : func->bbs) {
-        for (auto it = bb->instructions.rbegin(); it != bb->instructions.rend(); ++it) {
-            if (auto store = dynamic_cast<Instruction::store *>(*it);
-                store && store->getDest() == alloc) {
-                defs[bb] = store->getSrc();
-                W.push(bb);
-                break;
+        std::unordered_map<pcalloca, Value *> last_store;
+        auto it = bb->instructions.begin();
+        while (it != bb->instructions.end()) {
+            auto &inst = *it;
+            if (auto store = dynamic_cast<Instruction::store *>(inst);
+                store && allocas.count(dynamic_cast<pcalloca>(store->getDest()))) {
+                auto alloc = dynamic_cast<pcalloca>(store->getDest());
+                last_store[alloc] = store->getSrc();
+                it = bb->erase(store);
+            } else if (auto load = dynamic_cast<Instruction::load *>(inst);
+                       load && allocas.count(dynamic_cast<pcalloca>(load->getPointerOperand()))) {
+                auto alloc = dynamic_cast<pcalloca>(load->getPointerOperand());
+                auto &val = last_store[alloc];
+                if (val == nullptr) val = find_v.at(alloc)(bb);
+                auto new_val = find_m(val, find_m);
+                load->moveTo(new_val);
+                modified[load] = new_val;
+                it = bb->erase(load);
+            } else {
+                ++it;
             }
         }
     }
+}
+
+static auto calcPhi(const Function *func, pcalloca alloc, bb2val_t &defs) {
+    auto zero = getZero(alloc->type);
+    bb2val_t liveInV;  // live in value
+
+    // Step 1. calc defs
+    std::queue<BasicBlock *> W;  // store queue
+    for (auto &[bb, val] : defs) W.push(bb);
 
     // Step 2. mark phi
     std::unordered_set<BasicBlock *> F;  // should add phi
@@ -114,44 +146,53 @@ static void calcPhi(const Function *func, const Instruction::alloca_ *alloc) {
     }
 
     // Step 4. convert load & store
-    const auto find_v = [zero, &liveInV, &defs](BasicBlock *bb, auto &&self) -> Value * {
+    auto find_v = [zero, liveInV = std::move(liveInV), &defs](BasicBlock *bb,
+                                                              auto &&self) mutable -> Value * {
         if (liveInV.count(bb)) return liveInV[bb];
         if (bb->idom == nullptr) return liveInV[bb] = zero;
         if (defs.count(bb->idom)) return liveInV[bb] = defs[bb->idom];
         return liveInV[bb] = self(bb->idom, self);
     };
+    return [find_v = std::move(find_v)](BasicBlock *bb) mutable { return find_v(bb, find_v); };
+}
+
+// 如果这一步不统一做就是 O(n2) 的，统一做事 O(nlogn)
+static void calcPhi(const Function *func, const alloca_set &allocas) {
+    std::unordered_map<pcalloca, bb2val_t> defs;  // def value (live out value)
+
+    // Step 1. calc defs
     for (auto bb : func->bbs) {
-        Value *last_store = find_v(bb, find_v);
-        auto it = bb->instructions.begin();
-        while (it != bb->instructions.end()) {
-            auto &inst = *it;
-            if (auto store = dynamic_cast<Instruction::store *>(inst);
-                store && store->getDest() == alloc) {
-                last_store = store->getSrc();
-                it = bb->erase(store);
-            } else if (auto load = dynamic_cast<Instruction::load *>(inst);
-                       load && load->getPointerOperand() == alloc) {
-                assert(last_store);
-                load->moveTo(last_store);
-                it = bb->erase(load);
-            } else {
-                ++it;
+        for (auto it = bb->instructions.rbegin(); it != bb->instructions.rend(); ++it) {
+            if (auto store = dynamic_cast<Instruction::store *>(*it);
+                store && allocas.count(dynamic_cast<pcalloca>(store->getDest()))) {
+                auto alloc = dynamic_cast<pcalloca>(store->getDest());
+                auto &first_store = defs[alloc][bb];
+                if (first_store == nullptr) first_store = store->getSrc();
             }
         }
     }
+
+    using Func = decltype(calcPhi(func, *allocas.begin(), defs.begin()->second));
+    std::unordered_map<pcalloca, Func> find_v;
+    for (auto alloca : allocas) {
+        find_v.emplace(alloca, calcPhi(func, alloca, defs[alloca]));
+    }
+    deleteLoadStore(func, allocas, find_v);
 }
 
 void mem2reg(Function *func) {
     func->reCalcBBInfo();
+    alloca_set allocas;
     for (auto inst : func->bbs.front()->instructions) {
         if (auto alloc = dynamic_cast<Instruction::alloca_ *>(inst)) {
             if (alloc->type != Type::getI32Type() && alloc->type != Type::getFloatType()) continue;
-            calcPhi(func, alloc);
+            allocas.insert(alloc);
             opt_infos.mem_to_reg()++;
         } else {
             break;
         }
     }
+    calcPhi(func, allocas);
 }
 
 void clearDeadInst(const Function *func) {

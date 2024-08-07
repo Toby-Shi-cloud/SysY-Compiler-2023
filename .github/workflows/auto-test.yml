@@ -145,7 +145,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        type: [PERF]
+        type: [PERF, FINAL]
 
     steps:
       - uses: actions/checkout@v3

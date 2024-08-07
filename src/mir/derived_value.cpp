@@ -3,7 +3,6 @@
 //
 
 #include "mir/derived_value.h"
-#include <sstream>
 #include <unordered_map>
 #include "mir/instruction.h"
 
@@ -219,7 +218,7 @@ static char hex(int x) {
 }
 
 StringLiteral::StringLiteral(std::string value)
-    : Literal(Type::getStringType(value.length() + 1)), value(std::move(value)) {
+    : Literal(Type::getStringType((int)value.length() + 1)), value(std::move(value)) {
     std::string s = R"(c")";
     for (char c : this->value) {
         if (c < 0x20) {
