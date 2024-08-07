@@ -76,7 +76,7 @@ void register_alloca_impl(rFunction function) {
             assert(reg->isVirtual());
             function->allocaSize += 8;
             int offset = -static_cast<int>(function->allocaSize);
-            auto vir = function->newVirRegister();
+            auto vir = function->newVirRegister(reg->isFloat());
             while (!reg->useUsers.empty()) {
                 auto &&user = *reg->useUsers.begin();
                 load_at(function, user->parent, user->node, vir, offset);
