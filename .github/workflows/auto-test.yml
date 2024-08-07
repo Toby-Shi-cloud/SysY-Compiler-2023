@@ -61,11 +61,18 @@ jobs:
           rm -rf ../compiler2024-toby/src
           cp -r src ../compiler2024-toby
 
-      - name: Push to GitLab
+      - name: Test Conpile
         run: |
           cd ../compiler2024-toby
           ./path.sh
           ./compile.sh
+
+      - name: Commit and Push
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Working directory clean. Nothing to commit."
+            exit 0
+          fi
           git config user.name "github-action"
           git config user.email "github-action@github.com"
           git add .
@@ -120,7 +127,7 @@ jobs:
         run: |
           chmod +x ${{github.workspace}}/tests/*.sh
           chmod +x ${{github.workspace}}/tests/*.py
-          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-${{matrix.type}}-${{matrix.opt}}*
+          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-${{matrix.type}}-${{matrix.opt}}-*
 
       - name: Summary
         if: always()
