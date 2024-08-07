@@ -817,11 +817,6 @@ void Translator::compute_func_start() const {
             reg->isFloat() ? Instruction::Ty::FSW : Instruction::Ty::SD, reg, "sp"_R,
             create_imm(static_cast<int>(curFunc->stackOffset - ++cnt * 8))));
     }
-    if (curFunc->isMain) {  // set round-mode
-        startB->push_back(
-            std::make_unique<IInstruction>(Instruction::Ty::ADDIW, "x31"_R, "x0"_R, 0b010'00000_I));
-        startB->push_back(std::make_unique<FscsrInstruction>("x0"_R, "x31"_R));
-    }
     startB->push_back(std::make_unique<JumpInstruction>(first_block->label.get()));
 }
 

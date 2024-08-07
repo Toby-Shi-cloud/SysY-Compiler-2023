@@ -37,7 +37,7 @@ struct Instruction : InstructionBase {
         // float (RV64F)
         FCVT_L_S, FCVT_LU_S, FCVT_S_L, FCVT_S_LU,
         // useful pseudo instructions
-        CALL, RET, J, MV, FMV_S, FNEG_S, FSCSR,
+        CALL, RET, J, MV, FMV_S, FNEG_S, SEXT_W,
     } ty;
     // clang-format on
     friend constexpr bool floatOp(Ty ty) { return ty >= Ty::FLW && ty <= Ty::FCVT_S_LU; }
@@ -214,7 +214,7 @@ struct JInstruction : Instruction {
 };
 
 // rd = (T)rs
-// FCVT, FMV, etc
+// FCVT, FMV, SEXT, etc
 struct FpConvInstruction : Instruction {
     CLONE_DECL(FpConvInstruction);
     InstType getInstType() const override { return InstType::I; }
@@ -222,7 +222,10 @@ struct FpConvInstruction : Instruction {
     rRegister rd() const { return regDef[0]; }
     rRegister rs1() const { return regUse[0]; }
     std::ostream &output(std::ostream &os) const override {
-        return os << ty << '\t' << rd() << ", " << rs1();
+        os << ty << '\t' << rd() << ", " << rs1();
+        if (ty == Ty::FCVT_W_S || ty == Ty::FCVT_WU_S || ty == Ty::FCVT_L_S || ty == Ty::FCVT_LU_S)
+            os << ", rtz";  // round to zero
+        return os;
     }
 };
 
@@ -268,17 +271,6 @@ struct FnegInstruction : Instruction {
     CLONE_DECL(FnegInstruction);
     InstType getInstType() const override { return InstType::Pseudo; }
     FnegInstruction(rRegister rd, rRegister rs) : Instruction(Ty::FNEG_S, {rd}, {rs}) {}
-    rRegister rd() const { return regDef[0]; }
-    rRegister rs() const { return regUse[0]; }
-    std::ostream &output(std::ostream &os) const override {
-        return os << ty << '\t' << rd() << ", " << rs();
-    }
-};
-
-struct FscsrInstruction : Instruction {
-    CLONE_DECL(FscsrInstruction);
-    InstType getInstType() const override { return InstType::Pseudo; }
-    FscsrInstruction(rRegister rd, rRegister rs) : Instruction(Ty::FSCSR, {rd}, {rs}) {}
     rRegister rd() const { return regDef[0]; }
     rRegister rs() const { return regUse[0]; }
     std::ostream &output(std::ostream &os) const override {
