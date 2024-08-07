@@ -77,7 +77,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        type: [LLVM-O0, LLVM-O2, ASM]
+        type: [LLVM, ASM]
+        opt: [O0, O2]
 
     steps:
       - uses: actions/checkout@v3
@@ -98,7 +99,7 @@ jobs:
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
-        if: ${{ matrix.type == 'LLVM-O0' || matrix.type == 'LLVM-O2' }}
+        if: ${{ matrix.type == 'LLVM' }}
         with:
           version: "16.0"
 
@@ -119,12 +120,12 @@ jobs:
         run: |
           chmod +x ${{github.workspace}}/tests/*.sh
           chmod +x ${{github.workspace}}/tests/*.py
-          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-${{matrix.type}}-*
+          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-${{matrix.type}}-${{matrix.opt}}*
 
       - name: Summary
         if: always()
         run: |
-          echo "## Functional Test Summary (${{matrix.type}}):" >> $GITHUB_STEP_SUMMARY
+          echo "## Functional Test Summary (${{matrix.type}}-${{matrix.opt}}):" >> $GITHUB_STEP_SUMMARY
           echo "| Test Name | Passed | Failed |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
           cat ${{github.workspace}}/tests/functional.log >> $GITHUB_STEP_SUMMARY || true
