@@ -15,8 +15,24 @@ static inst_node_t arithmeticFolding(Instruction::add *binary) {
     return binary->node;
 }
 
+static inst_node_t arithmeticFolding(Instruction::fadd *binary) {
+    if (binary->getLhs() == getFloatLiteral(0))
+        return substitute(binary, binary->getRhs());  // 0 + x = x
+    if (binary->getRhs() == getFloatLiteral(0))
+        return substitute(binary, binary->getLhs());  // x + 0 = x
+    return binary->node;
+}
+
 static inst_node_t arithmeticFolding(Instruction::sub *binary) {
     if (binary->getRhs() == getIntegerLiteral(0))
+        return substitute(binary, binary->getLhs());  // x - 0 = x
+    if (binary->getLhs() == binary->getRhs())
+        return substitute(binary, getIntegerLiteral(0));  // x - x = 0
+    return binary->node;
+}
+
+static inst_node_t arithmeticFolding(Instruction::fsub *binary) {
+    if (binary->getRhs() == getFloatLiteral(0))
         return substitute(binary, binary->getLhs());  // x - 0 = x
     if (binary->getLhs() == binary->getRhs())
         return substitute(binary, getIntegerLiteral(0));  // x - x = 0
@@ -41,6 +57,12 @@ static inst_node_t arithmeticFolding(Instruction::mul *binary) {
         return substitute(binary, inst, new Instruction::sub(getIntegerLiteral(0), inst));
         // x * -2^n = -x << n
     }
+    return binary->node;
+}
+
+static inst_node_t arithmeticFolding(Instruction::fmul *binary) {
+    if (binary->getLhs() == getFloatLiteral(0) || binary->getRhs() == getFloatLiteral(0))
+        return substitute(binary, getFloatLiteral(0));  // 0 * x =
     return binary->node;
 }
 
@@ -77,6 +99,14 @@ static inst_node_t arithmeticFolding(Instruction::sdiv *binary) {
         return substitute(binary, inst, new Instruction::zext(Type::getI32Type(), inst));
         // x / INT32_MIN = x == INT32_MIN ? 1 : 0
     }
+    return binary->node;
+}
+
+static inst_node_t arithmeticFolding(Instruction::fdiv *binary) {
+    if (binary->getRhs() == getFloatLiteral(1))  // x / -1 = -x
+        return substitute(binary, binary->getLhs());
+    if (binary->getRhs() == getFloatLiteral(-1))  // x / -1 = -x
+        return substitute(binary, new Instruction::fneg(binary->getLhs()));
     return binary->node;
 }
 
@@ -162,6 +192,12 @@ inst_node_t constantFolding(Instruction::_binary_instruction<ty> *binary) {
     return opt_settings.using_arithmetic_folding ? arithmeticFolding(binary) : binary->node;
 }
 
+static inst_node_t constantFolding(Instruction::fneg *fneg) {
+    auto operand = dynamic_cast<FloatLiteral *>(fneg->getOperand());
+    if (!operand) return fneg->node;
+    return substitute(fneg, getFloatLiteral(-operand->value));
+}
+
 inst_node_t constantFolding(Instruction::load *load) {
     constexpr auto calc = [](Value *ptr, auto &&self) -> Literal *const * {
         if (auto var = dynamic_cast<GlobalVar *>(ptr))
@@ -194,12 +230,21 @@ inst_node_t constantFolding(Instruction::_conversion_instruction<ty> *conversion
     if (!literal) return conversion->node;
     auto i32 = dynamic_cast<IntegerLiteral *>(literal);
     auto i1 = dynamic_cast<BooleanLiteral *>(literal);
+    auto f32 = dynamic_cast<FloatLiteral *>(literal);
     if constexpr (ty == Instruction::TRUNC)  // assmue i32 -> i1
         return substitute(conversion, getBooleanLiteral(i32->value & 1));
     if constexpr (ty == Instruction::ZEXT)  // assmue i1 -> i32
         return substitute(conversion, getIntegerLiteral(i1->value ? 1 : 0));
     if constexpr (ty == Instruction::SEXT)  // assmue i1 -> i32
         return substitute(conversion, getIntegerLiteral(i1->value ? -1 : 0));
+    if constexpr (ty == Instruction::FPTOUI)
+        return substitute(conversion, getIntegerLiteral((unsigned)f32->value));
+    if constexpr (ty == Instruction::FPTOSI)
+        return substitute(conversion, getIntegerLiteral((int)f32->value));
+    if constexpr (ty == Instruction::UITOFP)
+        return substitute(conversion, getFloatLiteral((float)(unsigned)i32->value));
+    if constexpr (ty == Instruction::SITOFP)
+        return substitute(conversion, getFloatLiteral((float)i32->value));
     __builtin_unreachable();
 }
 
@@ -227,6 +272,44 @@ inst_node_t constantFolding(Instruction::icmp *icmp) {
             CASE(SGE) : return lhsv >= rhsv;
             CASE(SLT) : return lhsv < rhsv;
             CASE(SLE) : return lhsv <= rhsv;
+        }
+        __builtin_unreachable();
+#undef CASE
+    }();
+    return substitute(icmp, getBooleanLiteral(result));
+}
+
+inst_node_t constantFolding(Instruction::fcmp *icmp) {
+    using fcmp = Instruction::fcmp;
+    if (icmp->cond == fcmp::TRUE) return substitute(icmp, getBooleanLiteral(true));
+    if (icmp->cond == fcmp::FALSE) return substitute(icmp, getBooleanLiteral(false));
+    if (icmp->getLhs() == icmp->getRhs()) {
+        if (icmp->cond == fcmp::UEQ) return substitute(icmp, getBooleanLiteral(true));
+        if (icmp->cond == fcmp::ONE) return substitute(icmp, getBooleanLiteral(false));
+    }
+    auto lhsv = dynamic_cast<FloatLiteral *>(icmp->getLhs());
+    auto rhsv = dynamic_cast<FloatLiteral *>(icmp->getRhs());
+    if (!lhsv || !rhsv) return icmp->node;
+    auto lhs = lhsv->value, rhs = rhsv->value;
+    auto result = [&] {
+#define CASE(C) case Instruction::fcmp::C
+        switch (icmp->cond) {
+            CASE(FALSE) : return false;
+            CASE(OEQ) : return lhs == rhs;
+            CASE(OGT) : return lhs > rhs;
+            CASE(OGE) : return lhs >= rhs;
+            CASE(OLT) : return lhs < rhs;
+            CASE(OLE) : return lhs <= rhs;
+            CASE(ONE) : return lhs != rhs;
+            CASE(ORD) : return lhs == lhs && rhs == rhs;
+            CASE(UEQ) : return lhs == rhs || lhs != lhs || rhs != rhs;
+            CASE(UGT) : return lhs > rhs || lhs != lhs || rhs != rhs;
+            CASE(UGE) : return lhs >= rhs || lhs != lhs || rhs != rhs;
+            CASE(ULT) : return lhs < rhs || lhs != lhs || rhs != rhs;
+            CASE(ULE) : return lhs <= rhs || lhs != lhs || rhs != rhs;
+            CASE(UNE) : return lhs != rhs || lhs != lhs || rhs != rhs;
+            CASE(UNO) : return lhs != lhs || rhs != rhs;
+            CASE(TRUE) : return true;
         }
         __builtin_unreachable();
 #undef CASE
@@ -291,6 +374,12 @@ inst_node_t constantFolding(Instruction *inst) {
         CASE(SDIV, sdiv);
         CASE(UREM, urem);
         CASE(SREM, srem);
+        CASE(FADD, fadd);
+        CASE(FSUB, fsub);
+        CASE(FMUL, fmul);
+        CASE(FDIV, fdiv);
+        // CASE(FREM, frem);
+        CASE(FNEG, fneg);
         CASE(SHL, shl);
         CASE(LSHR, lshr);
         CASE(ASHR, ashr);
@@ -301,7 +390,12 @@ inst_node_t constantFolding(Instruction *inst) {
         CASE(TRUNC, trunc);
         CASE(ZEXT, zext);
         CASE(SEXT, sext);
+        CASE(FPTOUI, fptoui);
+        CASE(FPTOSI, fptosi);
+        CASE(UITOFP, uitofp);
+        CASE(SITOFP, sitofp);
         CASE(ICMP, icmp);
+        CASE(FCMP, fcmp);
         CASE(PHI, phi);
         CASE(SELECT, select);
         CASE(CALL, call);

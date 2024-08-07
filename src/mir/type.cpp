@@ -89,7 +89,7 @@ int Type::getFunctionParamCount() const {
 bool Type::convertableTo(pType other) const {
     if (this == other) return true;
     if (isIntegerTy() || isFloatTy()) return other->isIntegerTy() || other->isFloatTy();
-    if (isArrayTy() && other->isPointerTy()) return getArrayBase() == other->getPointerBase();
+    if ((isArrayTy() || isPointerTy()) && other->isPointerTy()) return true;
     return false;
 }
 

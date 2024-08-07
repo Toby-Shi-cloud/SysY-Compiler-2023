@@ -70,8 +70,12 @@ class TestRunner:
             with open(f"{self.test_dir}.perf.log", 'w') as f:
                 print("| TestName | Status | Time |", file=f)
                 print("| -------- | ------ | ---- |", file=f)
-                for args, res in zip(tasks, results):
-                    print(f"| {os.path.basename(args[0])} | {'ACCEPTED' if res[0] else res[1]} | {res[1].strip() if res[0] else ''} |", file=f)
+                performance = [(os.path.basename(args[0]),
+                                'ACCEPTED' if res[0] else res[1],
+                                res[1].strip().replace('\n', '<br>') if res[0] else '')
+                        for args, res in zip(tasks, results)]
+                for p in sorted(performance, key=lambda x: x[0]):
+                    print(f"| {p[0]} | {p[1]} | {p[2]} |", file=f)
         if len(results) - passed == 0:
             return
         results = map(lambda x: (os.path.basename(x[1][0]), x[0]), zip(results, tasks))

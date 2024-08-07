@@ -86,7 +86,7 @@ void calcPure(Function *func) {
     func->isPure = true;
     func->noPostEffect = true;
     for (auto &&arg : func->args)
-        if (!arg->type->isIntegerTy()) func->isPure = false;
+        if (!arg->type->isIntegerTy() && !arg->type->isFloatTy()) func->isPure = false;
     auto setAttr = [&func](auto &&inst) {
         auto rt = getRootValue(inst).first;
         if (dynamic_cast<const GlobalVar *>(rt)) func->noPostEffect = false;

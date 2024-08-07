@@ -6,8 +6,8 @@
 #define COMPILER_OPT_H
 
 #include <optional>
-#include "opt/functional.h"
-#include "opt/mem2reg.h"
+#include "opt/functional.h"  // IWYU pragma: export
+#include "opt/mem2reg.h"     // IWYU pragma: export
 
 namespace mir {
 inline auto substitute(Instruction *_old, Instruction *_new) {

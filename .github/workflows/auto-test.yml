@@ -22,11 +22,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Cache CMake
         id: cache-cmake
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{github.workspace}}/build
           key: ${{ runner.os }}-cmake-${{ github.sha }}
@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Clone from GitLab
         run: |
@@ -88,14 +88,14 @@ jobs:
         opt: [O0, O2]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           sparse-checkout: |
             tests
 
       - name: Restore Build Cache
         id: cache-cmake
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{github.workspace}}/build
           key: ${{ runner.os }}-cmake-${{ github.sha }}
@@ -148,14 +148,14 @@ jobs:
         type: [PERF, FINAL]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           sparse-checkout: |
             tests
 
       - name: Restore Build Cache
         id: cache-cmake
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{github.workspace}}/build
           key: ${{ runner.os }}-cmake-${{ github.sha }}

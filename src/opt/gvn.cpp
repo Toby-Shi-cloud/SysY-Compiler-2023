@@ -133,7 +133,8 @@ inline void globalVariableNumbering(BasicBlock *bb) {
             if (auto store = dynamic_cast<Instruction::store *>(other))
                 if (self || !irrelevant(getRootValue(other), root)) return store;
             if (auto call = dynamic_cast<Instruction::call *>(other))
-                if (!call->getFunction()->noPostEffect || inst->instrTy == Instruction::STORE)
+                if (!call->getFunction()->noPostEffect || inst->instrTy == Instruction::STORE ||
+                    inst->instrTy == Instruction::CALL)
                     return call;
         }
         return bb;
@@ -156,6 +157,8 @@ inline void globalVariableNumbering(BasicBlock *bb) {
         }
         if (auto icmp = dynamic_cast<Instruction::icmp *>(inst))
             values.push_back(getIntegerLiteral(icmp->cond));
+        if (auto fcmp = dynamic_cast<Instruction::fcmp *>(inst))
+            values.push_back(getIntegerLiteral(fcmp->cond));
         operator_t key = {inst->instrTy, std::move(values)};
         if (auto value = find(bb, key)) {
             opt_infos.global_variable_numbering()++;
