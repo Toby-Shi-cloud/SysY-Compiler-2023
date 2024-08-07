@@ -467,6 +467,8 @@ void Translator::translateMemsetInst(const mir::Instruction::memset *memsetInst)
 }
 
 void Translator::translateFunction(const mir::Function *mirFunction) {
+    decltype(used_operands){}.swap(used_operands);
+    IntImmediate::stack_vals.clear();
     const bool isMain = mirFunction->isMain();
     const bool isLeaf = mirFunction->isLeaf();
     const int retValue = mirFunction->retType->isVoidTy()      ? 0
@@ -551,7 +553,6 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
         ptr->value += curFunc->stackOffset;
         if (ptr->in_stack == 1) ptr->value -= (int)curFunc->shouldSave.size() * 8;
     }
-    IntImmediate::stack_vals.clear();
 
     // legalize
     auto sub_blk = all_sub_blocks(curFunc);
