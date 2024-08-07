@@ -74,7 +74,7 @@ class TestRunner:
                     print(f"| {os.path.basename(args[0])} | {'ACCEPTED' if res[0] else res[1]} | {res[1].strip() if res[0] else ''} |", file=f)
         if len(results) - passed == 0:
             return
-        results = map(lambda x: (os.path.basename(x[1][0])[:2], x[0]), zip(results, tasks))
+        results = map(lambda x: (os.path.basename(x[1][0]), x[0]), zip(results, tasks))
         results = sorted(results, key=lambda x: x[0])
         for idx, res in results:
             if res[0]: continue

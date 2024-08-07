@@ -141,11 +141,11 @@ jobs:
           echo '' >> $GITHUB_STEP_SUMMARY
 
   performance-test:
-    needs: compile
+    needs: functional-test
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        type: [PERF, FINAL]
+        type: [PERF]
 
     steps:
       - uses: actions/checkout@v3
@@ -168,10 +168,16 @@ jobs:
         run: docker pull ghcr.io/tobisc-v/sysy:riscv
 
       - name: Download Test Data
+        if: ${{ matrix.type == 'PERF' }}
         working-directory: ${{github.workspace}}/tests
         run: |
           wget https://github.com/Tobisc-V/sysy-testdata/releases/download/Compiler2022/performance.tar.gz
           tar -xzf performance.tar.gz
+
+      - name: Download Test Data
+        if: ${{ matrix.type == 'FINAL' }}
+        working-directory: ${{github.workspace}}/tests
+        run: |
           wget https://github.com/Tobisc-V/sysy-testdata/releases/download/Compiler2022/final_performance.tar.gz
           tar -xzf final_performance.tar.gz
 
@@ -186,8 +192,8 @@ jobs:
         if: ${{ matrix.type == 'FINAL' && always() }}
         working-directory: ${{github.workspace}}/tests
         run: |
-          mv hidden_performance.log performance.log || true
-          mv hidden_performance.perf.log performance.perf.log || true
+          mv final_performance.log performance.log || true
+          mv final_performance.perf.log performance.perf.log || true
 
       - name: Summary
         if: always()
