@@ -74,6 +74,17 @@ void register_alloca_impl(rFunction function) {
         // spill to memory
         for (auto reg : graph.spilled_regs) {
             assert(reg->isVirtual());
+            if (reg->defUsers.size() == 1) {
+                // 如果本来就是从内存里面读取的
+                auto def = dynamic_cast<rIInstruction>(*reg->defUsers.begin());
+                if (def && def->isLoad() && (def->rs1() == "x0"_R || def->rs1() == "sp"_R)) {
+                    for (auto &&user : reg->useUsers) {
+                        user->parent->insert(user->node, def->clone());
+                    }
+                    def->parent->erase(def->node);
+                    continue;
+                }
+            }
             function->allocaSize += 8;
             int offset = -static_cast<int>(function->allocaSize);
             auto vir = function->newVirRegister(reg->isFloat());
