@@ -393,7 +393,7 @@ void Translator::translatePhiInst(const mir::Instruction::phi *phiInst) {
     // Put a new virtual register to indicate the phi instruction,
     // and we will translate it later.
     if (oMap.count(phiInst)) return;
-    put(phiInst, curFunc->newVirRegister());
+    put(phiInst, curFunc->newVirRegister(phiInst->type->isFloatTy()));
 }
 
 // NOLINTNEXTLINE
@@ -713,7 +713,7 @@ rOperand Translator::translateOperand(const mir::Value *mirValue) {
 }
 
 void Translator::compute_phi(const mir::Function *mirFunction) {
-    using parallel_copy_t = std::vector<std::pair<rRegister, std::variant<rRegister, int>>>;
+    using parallel_copy_t = std::vector<std::pair<rRegister, std::variant<rRegister, int, float>>>;
     const auto phi2move = [this](const parallel_copy_t &pc) {
         using move_t = MoveInstruction;
         std::vector<pInstruction> instructions;
@@ -721,17 +721,19 @@ void Translator::compute_phi(const mir::Function *mirFunction) {
         std::unordered_map<rRegister, rRegister> map;
         std::unordered_map<rRegister, std::vector<rRegister>> edges;
         std::unordered_map<rRegister, int> loadImm;
+        std::unordered_map<rRegister, float> loadFImm;
         for (auto &[dst, src] : pc) {
-            if (std::holds_alternative<int>(src)) {
-                auto imm = std::get<int>(src);
-                loadImm[dst] = imm;
-            } else {
-                auto src_reg = std::get<rRegister>(src);
-                edges[dst].push_back(src_reg);
-                inDegree[dst];  // make sure dst in inDegree
-                inDegree[src_reg]++;
-                map[src_reg] = src_reg;
-            }
+            visit(overloaded{
+                      [&, dst = dst](rRegister reg) {
+                          edges[dst].push_back(reg);
+                          inDegree[dst];  // make sure dst in inDegree
+                          inDegree[reg]++;
+                          map[reg] = reg;
+                      },
+                      [&, dst = dst](int imm) { loadImm[dst] = imm; },
+                      [&, dst = dst](float imm) { loadFImm[dst] = imm; },
+                  },
+                  src);
         }
         std::queue<rRegister> queue;
         for (auto &[r, d] : inDegree)
@@ -752,13 +754,18 @@ void Translator::compute_phi(const mir::Function *mirFunction) {
             auto &[reg, _] =
                 *std::min_element(inDegree.begin(), inDegree.end(),
                                   [](auto &&x, auto &&y) { return x.second < y.second; });
-            auto vir = curFunc->newVirRegister();
+            auto vir = curFunc->newVirRegister(reg->isFloat());
             instructions.emplace_back(new move_t{vir, reg});
             map[reg] = vir;
             queue.push(reg);
         }
         for (auto &[dst, imm] : loadImm)
             for (auto &inst : translateImmAs(dst, imm)) instructions.push_back(std::move(inst));
+        for (auto &[dst, imm] : loadFImm) {
+            auto lbl = create_float_const(imm);
+            instructions.push_back(
+                std::make_unique<IInstruction>(Instruction::Ty::FLW, dst, "x0"_R, std::move(lbl)));
+        }
         return instructions;
     };
 
@@ -775,6 +782,8 @@ void Translator::compute_phi(const mir::Function *mirFunction) {
                 auto [value, block] = phi->getIncomingValue(i);
                 if (auto imm = dynamic_cast<mir::IntegerLiteral *>(value))
                     pcs[block].emplace_back(dst, imm->value);
+                else if (auto fimm = dynamic_cast<mir::FloatLiteral *>(value))
+                    pcs[block].emplace_back(dst, fimm->value);
                 else
                     pcs[block].emplace_back(dst, getRegister(value));
             }
