@@ -527,7 +527,10 @@ void Translator::translateFunction(const mir::Function *mirFunction) {
     std::priority_queue<std::pair<int, const mir::BasicBlock *>> worklist;
     mirFunction->reCalcBBInfo();
     mirFunction->calcDomDepth();
-    for (auto bb : mirFunction->bbs) worklist.emplace(-bb->dom_depth, bb);
+    auto bb_counter = 0, bb_size = (int)mirFunction->bbs.size();
+    for (auto bb : mirFunction->bbs) {
+        worklist.emplace(-bb->dom_depth * bb_size - bb_counter++, bb);
+    }
     while (!worklist.empty()) {
         auto bb = worklist.top().second;
         worklist.pop();
