@@ -130,12 +130,73 @@ jobs:
           ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-${{matrix.type}}-${{matrix.opt}}-*
 
       - name: Summary
-        if: always()
+        if: failure()
         run: |
           echo "## Functional Test Summary (${{matrix.type}}-${{matrix.opt}}):" >> $GITHUB_STEP_SUMMARY
           echo "| Test Name | Passed | Failed |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
           cat ${{github.workspace}}/tests/functional.log >> $GITHUB_STEP_SUMMARY || true
           cat ${{github.workspace}}/tests/hidden_functional.log >> $GITHUB_STEP_SUMMARY || true
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+
+  performance-test:
+    needs: compile
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        type: [PERF, FINAL]
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          sparse-checkout: |
+            tests
+
+      - name: Restore Build Cache
+        id: cache-cmake
+        uses: actions/cache@v3
+        with:
+          path: ${{github.workspace}}/build
+          key: ${{ runner.os }}-cmake-${{ github.sha }}
+
+      - name: If Cache Missed
+        if: steps.cache-cmake.outputs.cache-hit != 'true'
+        run: exit 1
+
+      - name: Pull RISC-V docker
+        run: docker pull ghcr.io/tobisc-v/sysy:riscv
+
+      - name: Download Test Data
+        working-directory: ${{github.workspace}}/tests
+        run: |
+          wget https://github.com/Tobisc-V/sysy-testdata/releases/download/Compiler2022/performance.tar.gz
+          tar -xzf performance.tar.gz
+          wget https://github.com/Tobisc-V/sysy-testdata/releases/download/Compiler2022/final_performance.tar.gz
+          tar -xzf final_performance.tar.gz
+
+      - name: Test
+        working-directory: ${{github.workspace}}/build
+        run: |
+          chmod +x ${{github.workspace}}/tests/*.sh
+          chmod +x ${{github.workspace}}/tests/*.py
+          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-${{matrix.type}}
+      
+      - name: Pre-Summary
+        if: ${{ matrix.type == 'FINAL' && always() }}
+        working-directory: ${{github.workspace}}/tests
+        run: |
+          mv hidden_performance.log performance.log || true
+          mv hidden_performance.perf.log performance.perf.log || true
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Performance Test Summary (${{matrix.type}}):" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Name | Passed | Failed |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+          cat ${{github.workspace}}/tests/performance.log >> $GITHUB_STEP_SUMMARY || true
+          echo '' >> $GITHUB_STEP_SUMMARY
+          cat ${{github.workspace}}/tests/performance.perf.log >> $GITHUB_STEP_SUMMARY || true
           echo '' >> $GITHUB_STEP_SUMMARY
           echo '' >> $GITHUB_STEP_SUMMARY

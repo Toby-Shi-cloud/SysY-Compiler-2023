@@ -39,3 +39,9 @@ add_test(NAME Functional-ASM-O2
 add_test(NAME Functional-ASM-O2-HIDDEN
         COMMAND ./auto_test.py asm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d hidden_functional -O2
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+add_test(NAME Functional-PERF
+        COMMAND ./auto_test.py asm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d performance -O2
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+add_test(NAME Functional-FINAL
+        COMMAND ./auto_test.py asm -s ${CMAKE_CURRENT_BINARY_DIR}/Compiler -d final_performance -O2
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
