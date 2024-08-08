@@ -108,6 +108,13 @@ inline std::optional<Value *> isUseless(const BasicBlock *bb, const Instruction:
     return std::nullopt;
 }
 
+inline bool isBarrier(const Instruction *inst) {
+    auto call = dynamic_cast<const Instruction::call *>(inst);
+    if (call == nullptr) return false;
+    return call->getFunction() == Function::starttime() ||
+           call->getFunction() == Function::stoptime();
+}
+
 inline void globalVariableNumbering(BasicBlock *bb) {
     std::unordered_map<Instruction *, inst_vector_t> edges;
     std::unordered_map<Instruction *, int> degrees;
@@ -140,8 +147,11 @@ inline void globalVariableNumbering(BasicBlock *bb) {
         return bb;
     };
 
+    std::vector<Instruction *> barriers;
     for (auto it = bb->beginner_end(); it != std::prev(bb->instructions.cend());) {
         auto inst = *it;
+        if (isBarrier(inst)) barriers.push_back(inst);
+        inst->barrier_num = barriers.size();
         auto values = inst->getOperands();
         if (auto _value = _isUseless(inst)) {
             opt_infos.global_variable_numbering()++;
@@ -175,13 +185,13 @@ inline void globalVariableNumbering(BasicBlock *bb) {
     }
 
     auto comp = [&](Instruction *x, Instruction *y) { return origin[x] > origin[y]; };
-    std::vector<Instruction *> result;
+    std::vector<std::vector<Instruction *>> results(barriers.size() + 1);
     std::set<Instruction *, decltype(comp)> candidates{comp};
     for (auto &&[inst, deg] : degrees)
         if (deg == 0) candidates.insert(inst);
     auto dfs = [&](Instruction *inst, auto &&self) -> void {
         candidates.erase(inst);
-        result.push_back(inst);
+        if (!isBarrier(inst)) results[inst->barrier_num].push_back(inst);
         for (auto &&v : edges[inst]) {
             degrees[v]--;
             if (degrees[v] == 0) candidates.insert(v);
@@ -189,9 +199,11 @@ inline void globalVariableNumbering(BasicBlock *bb) {
         if (!edges[inst].empty() && candidates.count(edges[inst][0])) self(edges[inst][0], self);
     };
     while (!candidates.empty()) dfs(*candidates.begin(), dfs);
-    for (auto &&inst : result) {
-        bb->instructions.erase(inst->node);
-        bb->insert(bb->beginner_end(), inst);
+    for (size_t i = 0; i < results.size(); i++) {
+        for (auto &&inst : results[i]) {
+            bb->instructions.erase(inst->node);
+            bb->insert(i == 0 ? bb->beginner_end() : std::next(barriers[i - 1]->node), inst);
+        }
     }
 }
 

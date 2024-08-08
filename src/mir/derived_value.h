@@ -281,6 +281,7 @@ struct Instruction : User {
 
     BasicBlock *parent = nullptr;
     inst_node_t node{};
+    size_t barrier_num{};
 
     virtual std::ostream &output(std::ostream &os) const = 0;
 
