@@ -69,7 +69,8 @@ jobs:
 
       - name: Commit and Push
         run: |
-          if [ -z "$(git status --porcelain)" ]; then
+          cd ../compiler2024-toby
+          if [ -z "$(git status -s)" ]; then
             echo "Working directory clean. Nothing to commit."
             exit 0
           fi
@@ -145,7 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        type: [PERF, FINAL]
+        type: [PERF]
 
     steps:
       - uses: actions/checkout@v4
