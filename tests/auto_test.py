@@ -42,7 +42,7 @@ class TestRunner:
             if obj_suffix == ".S": os.system(f"docker kill sysy-`basename {name}`")
             return False, 'Time Limit Exceeded'
         try:
-            subprocess.run(['diff', std_file, out_file], capture_output=True, check=True)
+            subprocess.run(['diff', '-Z', std_file, out_file], capture_output=True, check=True)
         except subprocess.CalledProcessError:
             return False, 'Wrong Answer '
         msg = subprocess.check_output(['tail', '-1', err_file]).decode() if self.perf else ''
