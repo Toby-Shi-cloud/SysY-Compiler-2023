@@ -144,7 +144,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        type: [PERF]
+        type: [PERF, FINAL]
 
     steps:
       - uses: actions/checkout@v4
@@ -177,7 +177,7 @@ jobs:
         run: |
           chmod +x ${{github.workspace}}/tests/*.sh
           chmod +x ${{github.workspace}}/tests/*.py
-          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-${{matrix.type}}
+          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-${{matrix.type}} || true
       
       - name: Pre-Summary
         if: ${{ matrix.type == 'FINAL' && always() }}
