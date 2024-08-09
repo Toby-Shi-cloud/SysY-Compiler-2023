@@ -5,8 +5,6 @@
 #include "riscv/reg_alloca.h"
 #include <algorithm>
 #include <functional>
-#include <queue>
-#include <stack>
 #include "backend/operand.h"
 #include "riscv/instruction.h"
 #include "riscv/operand.h"
@@ -362,7 +360,7 @@ void Graph::spill() {
 
 void Graph::select() {
     while (!vertex_stack.empty()) {
-        auto u = vertex_stack.top();
+        auto u = vertex_stack.front();
         vertex_stack.pop();
         auto avail = alloca_regs;
         for (auto v : u->edges) avail.erase(v->color);
