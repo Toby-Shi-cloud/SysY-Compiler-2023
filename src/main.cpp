@@ -11,7 +11,7 @@
 using namespace clipp;
 
 int main(int argc, char **argv) {
-    int opt_level = -1;
+    int opt_level = 0;
     bool llvm_ir = false, assembly = false, help = false;
     std::string infile, outfile = "a.out", arch = "riscv";
 
@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     }
 
     std::ifstream fin(infile);
-    if (opt_level >= 0) set_optimize_level(2, arch);
+    set_optimize_level(opt_level > 0 ? 2 : 0, arch);
     if (!fin) {
         std::cerr << "Error: cannot open file " << infile << std::endl;
         return 1;
