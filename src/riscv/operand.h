@@ -71,9 +71,10 @@ struct JoinImmediate : Immediate {
     inline explicit JoinImmediate(const pImmediate &other);
     inline JoinImmediate(JoinImmediate &&o1, JoinImmediate &&o2);
 
-    [[nodiscard]] int accumulate() const {
-        return std::accumulate(values.begin(), values.end(), 0,
-                               [](int acc, auto &&imm) { return acc + imm->value; });
+    [[nodiscard]] int accumulate(int stack = 0) const {
+        return std::accumulate(values.begin(), values.end(), 0, [stack](int acc, auto &&imm) {
+            return acc + imm->value + (imm->in_stack ? stack : 0);
+        });
     }
 
     std::ostream &output(std::ostream &os) const override {

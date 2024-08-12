@@ -3,7 +3,6 @@
 //
 
 #include "riscv/instruction.h"
-#include <algorithm>
 #include <iterator>
 #include <memory>
 #include "backend/operand.h"
@@ -14,28 +13,17 @@
 namespace backend::riscv {
 
 namespace {
-bool isLegalImm(rImmediate imm, int low, int high) {
+bool isLegalImm(rImmediate imm, int low, int high, int stack = 0) {
     if (auto i = dynamic_cast<rIntImmediate>(imm)) {
-        return low <= i->value && i->value <= high;
+        auto val = i->value + (i->in_stack ? stack : 0);
+        return low <= val && val <= high;
     } else if (auto s = dynamic_cast<rSplitImmediate>(imm)) {
         return true;
     } else if (auto j = dynamic_cast<rJoinImmediate>(imm)) {
-        auto value = j->accumulate();
+        auto value = j->accumulate(stack);
         return j->label == nullptr && low <= value && value <= high;
     } else {
         __builtin_unreachable();
-    }
-}
-
-bool maybeIllegalImm(rImmediate imm, int low, int high) {
-    if (!isLegalImm(imm, low, high)) return true;
-    if (auto i = dynamic_cast<rIntImmediate>(imm)) {
-        return i->in_stack;
-    } else if (auto j = dynamic_cast<rJoinImmediate>(imm)) {
-        return std::any_of(j->values.begin(), j->values.end(),
-                           [](auto &&i) { return i->in_stack; });
-    } else {
-        return false;
     }
 }
 
@@ -98,11 +86,15 @@ Instruction::Ty TyI2R(Instruction::Ty ty) {
 }  // namespace
 
 bool IInstruction::maybe_illegal() const {
-    return maybeIllegalImm(imm.get(), -2048, 2047);  //
+    auto func = parent->parent->parent;
+    auto size = func->allocaSize + func->argSize + 64 * 8;
+    return !isLegalImm(imm.get(), -2048, 2047, static_cast<int>(size));
 }
 
 bool SInstruction::maybe_illegal() const {
-    return maybeIllegalImm(imm.get(), -2048, 2047);  //
+    auto func = parent->parent->parent;
+    auto size = func->allocaSize + func->argSize + 64 * 8;
+    return !isLegalImm(imm.get(), -2048, 2047, static_cast<int>(size));
 }
 
 inst_node_t IInstruction::legalize() {

@@ -815,10 +815,9 @@ void Translator::compute_func_start() const {
     auto startB = new Block(curFunc);
     startB->node = curFunc->blocks.emplace(curFunc->blocks.begin(), startB);
 
-#define align(x) (((x) + 15) & ~15)
-    curFunc->stackOffset = align(
-        static_cast<int>(curFunc->allocaSize + curFunc->argSize + 8 * curFunc->shouldSave.size()));
-#undef align
+    curFunc->stackOffset =
+        static_cast<int>(curFunc->allocaSize + curFunc->argSize + 8 * curFunc->shouldSave.size());
+    curFunc->stackOffset = (curFunc->stackOffset + 15) & -16;
     // addiu $sp, $sp, -(allocaSize+argSize)
     if (curFunc->stackOffset)
         startB->push_back(std::make_unique<IInstruction>(Instruction::Ty::ADDI, "sp"_R, "sp"_R,
