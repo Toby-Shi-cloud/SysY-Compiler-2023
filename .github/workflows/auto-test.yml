@@ -15,7 +15,7 @@ on:
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
-  GH_TOKEN: ${{ github.token }}
+  GH_TOKEN: ${{github.token}}
 
 jobs:
   compile:
@@ -29,7 +29,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{github.workspace}}/build
-          key: ${{ runner.os }}-cmake-${{ github.sha }}
+          key: ${{runner.os}}-cmake-${{github.sha}}
 
       - name: Install LLVM and Clang
         if: steps.cache-cmake.outputs.cache-hit != 'true'
@@ -54,10 +54,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            src
 
       - name: Clone from GitLab
         run: |
-          git clone https://pat:${{ secrets.GITLABTOKEN }}@gitlab.eduxiji.net/T202410006203585/compiler2024-toby.git ../compiler2024-toby
+          git clone https://pat:${{secrets.GITLABTOKEN}}@gitlab.eduxiji.net/T202410006203585/compiler2024-toby.git ../compiler2024-toby
           rm -rf ../compiler2024-toby/src
           cp -r src ../compiler2024-toby
 
@@ -77,7 +80,7 @@ jobs:
           git config user.name "github-action"
           git config user.email "github-action@github.com"
           git add .
-          git commit -m "[actions]: auto update ${{ github.sha }}"
+          git commit -m "[actions]: auto update ${{github.sha}}"
           git push
 
   functional-test:
@@ -99,7 +102,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{github.workspace}}/build
-          key: ${{ runner.os }}-cmake-${{ github.sha }}
+          key: ${{runner.os}}-cmake-${{github.sha}}
 
       - name: If Cache Missed
         if: steps.cache-cmake.outputs.cache-hit != 'true'
@@ -137,14 +140,13 @@ jobs:
           cat ${{github.workspace}}/tests/functional.log >> $GITHUB_STEP_SUMMARY || true
           cat ${{github.workspace}}/tests/hidden_functional.log >> $GITHUB_STEP_SUMMARY || true
           echo '' >> $GITHUB_STEP_SUMMARY
-          echo '' >> $GITHUB_STEP_SUMMARY
 
   performance-test:
     needs: functional-test
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        type: [PERF, FINAL]
+        type: [1, 2]
 
     steps:
       - uses: actions/checkout@v4
@@ -157,7 +159,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{github.workspace}}/build
-          key: ${{ runner.os }}-cmake-${{ github.sha }}
+          key: ${{runner.os}}-cmake-${{github.sha}}
 
       - name: If Cache Missed
         if: steps.cache-cmake.outputs.cache-hit != 'true'
@@ -172,19 +174,27 @@ jobs:
           unzip testdata.zip
           mv testdata/* tests
 
+      - name: Cache Perf Result
+        uses: actions/cache@v4
+        with:
+          path: ${{github.workspace}}/tests/perf
+          key: ${{runner.os}}-perf-result-${{matrix.type}}
+          restore-keys: ${{runner.os}}-perf-result
+
       - name: Test
         working-directory: ${{github.workspace}}/build
         run: |
           chmod +x ${{github.workspace}}/tests/*.sh
           chmod +x ${{github.workspace}}/tests/*.py
-          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Functional-${{matrix.type}} || true
+          ctest -C ${{env.BUILD_TYPE}} --output-on-failure -R Performance-${{matrix.type}}
       
       - name: Pre-Summary
-        if: ${{ matrix.type == 'FINAL' && always() }}
+        if: always()
         working-directory: ${{github.workspace}}/tests
         run: |
           mv h_performance.log performance.log || true
-          mv h_performance.perf.log performance.perf.log || true
+          mv perf/h_performance.md perf/performance.md || true
+          sed -i 's/\\%/\\\\%/g' perf/performance.md || true
 
       - name: Summary
         if: always()
@@ -194,6 +204,5 @@ jobs:
           echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
           cat ${{github.workspace}}/tests/performance.log >> $GITHUB_STEP_SUMMARY || true
           echo '' >> $GITHUB_STEP_SUMMARY
-          cat ${{github.workspace}}/tests/performance.perf.log >> $GITHUB_STEP_SUMMARY || true
-          echo '' >> $GITHUB_STEP_SUMMARY
+          cat ${{github.workspace}}/tests/perf/performance.md >> $GITHUB_STEP_SUMMARY || true
           echo '' >> $GITHUB_STEP_SUMMARY

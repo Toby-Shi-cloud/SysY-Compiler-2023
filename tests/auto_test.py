@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, getopt
+import os, sys, getopt, csv, re
 import subprocess
 import multiprocessing
 
@@ -8,6 +8,41 @@ import multiprocessing
 def usage():
     print('Usage: ./auto_test.py <llvm/asm> [-O opt_level] [-s path_to_compiler] {-d test_suit}')
     exit(-1)
+
+
+def write_csv(path: str, title: list, data: list):
+    with open(path, "w") as f:
+        writer = csv.writer(f)
+        writer.writerow(title)
+        writer.writerows(data)
+
+
+def write_table(path: str, title: list, data: list):
+    with open(path, "w") as writer:
+        print("| " + " | ".join(title) + " |", file=writer)
+        print("|" + " --- |" * len(title), file=writer)
+        for line in data:
+            print("| " + " | ".join(line) + " |", file=writer)
+
+
+def read_csv(path: str):
+    with open(path, "r") as f:
+        reader = csv.reader(f)
+        title = next(reader)
+        return title, list(reader)
+
+
+def strptime(time_str: str):
+    pattern = re.compile(r"TOTAL: (\d+)H-(\d+)M-(\d+)S-(\d+)us")
+    match = pattern.match(time_str)
+    if match is None: return None
+    caps = match.groups()
+    return (int(caps[0]) * 3600 + int(caps[1]) * 60 + int(caps[2])) * 1000000 + int(caps[3])
+
+
+def strftime(time: int):
+    sec = time // 1000000
+    return f"{sec // 3600}H-{sec // 60 % 60}M-{sec % 60}S-{time % 1000000}us"
 
 
 class TestRunner:
@@ -62,20 +97,36 @@ class TestRunner:
         results = pool.map(self.run_test_wrap, tasks)
         pool.close()
         pool.join()
-        os.system("rm -r temp-*")
         passed = sum(map(lambda res: 1 if res[0] else 0, results))
         with open(f"{self.test_dir}.log", 'w') as f:
             print(f"| {self.test_dir} | {passed} | {len(results) - passed} |", file=f)
         if self.perf:
-            with open(f"{self.test_dir}.perf.log", 'w') as f:
-                print("| TestName | Status | Time |", file=f)
-                print("| -------- | ------ | ---- |", file=f)
-                performance = [(os.path.basename(args[0]),
-                                'ACCEPTED' if res[0] else res[1],
-                                res[1].strip().replace('\n', '<br>') if res[0] else '')
-                        for args, res in zip(tasks, results)]
-                for p in sorted(performance, key=lambda x: x[0]):
-                    print(f"| {p[0]} | {p[1]} | {p[2]} |", file=f)
+            if not os.path.exists("perf"): os.mkdir("perf")
+            csv_file = f"perf/{self.test_dir}.csv"
+            table_file = f"perf/{self.test_dir}.md"
+            performance = [(os.path.basename(args[0]),
+                            'ACCEPTED' if res[0] else res[1],
+                            res[1].strip().replace('\n', '<br>') if res[0] else '')
+                    for args, res in zip(tasks, results)]
+            performance.sort(key=lambda x: x[0])
+            this_time = [strptime(line[2]) for line in performance]
+            try:
+                last_time_raw = read_csv(csv_file)[1]
+                last_time_dict = {x[0]: strptime(x[1]) for x in last_time_raw}
+                last_time = [last_time_dict.get(x[0]) for x in performance]
+            except FileNotFoundError:
+                last_time = [None for _ in range(len(performance))]
+            increase = [(y - x) / x if x is not None and y is not None else None
+                        for x, y in zip(this_time, last_time)]
+            data = []
+            for (name, status, msg), time, last, inc in zip(performance, this_time, last_time, increase):
+                time = strftime(time) if time is not None else msg
+                last = strftime(last) if last is not None else ''
+                color = 'red' if inc is not None and inc < 0 else 'green'
+                inc = fr"${{\textsf{{\color{{{color}}}{inc*100:+.1f}\%}}}}$" if inc is not None else ''
+                data.append((name, status, time, last, inc, ))
+            write_table(table_file, ['TestName', 'Status', 'Time', 'LastTime', 'SpeedUp'], data)
+            write_csv(csv_file, ['TestName', 'Time'], [(x[0], x[2]) for x in performance])
         if len(results) - passed == 0:
             return
         results = map(lambda x: (os.path.basename(x[1][0]), x[0]), zip(results, tasks))
