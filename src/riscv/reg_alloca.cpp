@@ -172,7 +172,7 @@ void compute_instructions_info(rFunction function) {
 bool compute_instructions_info(rSubBlock block) {
     bool changed = false;
     for (auto it = block->instructions.rbegin(); it != block->instructions.rend(); ++it) {
-        auto &&inst = *it;
+        auto inst = it->get();
         auto suc = inst->next();
         auto s1 = inst->liveIn.size();
         auto s2 = inst->liveOut.size();
@@ -220,10 +220,19 @@ Graph::Graph(rFunction function) {
 
     for (auto &&block : all_sub_blocks(function)) {
         for (auto &&inst : *block) {
-            conflict(inst->liveIn, inst->liveIn);
-            conflict(inst->liveOut, inst->liveOut);
+            std::vector liveIn(inst->liveIn.begin(), inst->liveIn.end());
+            std::vector liveOut(inst->liveOut.begin(), inst->liveOut.end());
+            if (inst->maybe_illegal()) {
+                if (auto i = dynamic_cast<IInstruction *>(inst.get());
+                    i && i->rd() != i->rs1() && !i->rd()->isFloat())
+                    liveIn.push_back(i->rd());  // rd & rs 冲突，以便用于扩展指令
+                else
+                    liveIn.push_back("x31"_R);  // liveIn & x31 冲突，使用 x31 进行指令扩展
+            }
             if (inst->isFuncCall())
-                conflict(inst->liveOut, temp_regs), conflict(temp_regs, inst->liveOut);
+                liveOut.insert(liveOut.end(), temp_regs.begin(), temp_regs.end());
+            conflict(liveIn, liveIn);
+            conflict(liveOut, liveOut);
         }
     }
 

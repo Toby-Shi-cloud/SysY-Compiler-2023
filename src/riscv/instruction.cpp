@@ -3,6 +3,7 @@
 //
 
 #include "riscv/instruction.h"
+#include <algorithm>
 #include <iterator>
 #include <memory>
 #include "backend/operand.h"
@@ -23,6 +24,18 @@ bool isLegalImm(rImmediate imm, int low, int high) {
         return j->label == nullptr && low <= value && value <= high;
     } else {
         __builtin_unreachable();
+    }
+}
+
+bool maybeIllegalImm(rImmediate imm, int low, int high) {
+    if (!isLegalImm(imm, low, high)) return true;
+    if (auto i = dynamic_cast<rIntImmediate>(imm)) {
+        return i->in_stack;
+    } else if (auto j = dynamic_cast<rJoinImmediate>(imm)) {
+        return std::any_of(j->values.begin(), j->values.end(),
+                           [](auto &&i) { return i->in_stack; });
+    } else {
+        return false;
     }
 }
 
@@ -56,11 +69,11 @@ void splitAndPush(rImmediate imm, Func &&push, rRegister x31 = "x31"_R) {
 
 // split imm+reg to x31+lo and push to parent
 template <typename Func>
-pImmediate splitAndPush(rImmediate imm, rRegister reg, Func &&push) {
+pImmediate splitAndPush(rImmediate imm, rRegister reg, Func &&push, rRegister x31 = "x31"_R) {
     auto [hi, lo] = splitImm(imm);
-    push(std::make_unique<UInstruction>(Instruction::Ty::LUI, "x31"_R, std::move(hi)));
+    push(std::make_unique<UInstruction>(Instruction::Ty::LUI, x31, std::move(hi)));
     if (reg == "x0"_R) return std::move(lo);
-    push(std::make_unique<RInstruction>(Instruction::Ty::ADD, "x31"_R, "x31"_R, reg));
+    push(std::make_unique<RInstruction>(Instruction::Ty::ADD, x31, x31, reg));
     return std::move(lo);
 }
 
@@ -84,24 +97,35 @@ Instruction::Ty TyI2R(Instruction::Ty ty) {
 }
 }  // namespace
 
+bool IInstruction::maybe_illegal() const {
+    return maybeIllegalImm(imm.get(), -2048, 2047);  //
+}
+
+bool SInstruction::maybe_illegal() const {
+    return maybeIllegalImm(imm.get(), -2048, 2047);  //
+}
+
 inst_node_t IInstruction::legalize() {
     if (isLegalImm(imm.get(), -2048, 2047)) return std::next(node);
     const auto push = [this](pInstruction inst) { parent->insert(node, std::move(inst)); };
+    const auto temp = rd() == rs1() || rd()->isFloat() ? "x31"_R : rd();
+    assert(maybe_illegal());
     if (isLoad()) {
-        auto offset = splitAndPush(imm.get(), rs1(), push);
-        push(std::make_unique<IInstruction>(ty, rd(), "x31"_R, std::move(offset)));
-    } else if (rs1() == "x0"_R) {
+        auto offset = splitAndPush(imm.get(), rs1(), push, temp);
+        push(std::make_unique<IInstruction>(ty, rd(), temp, std::move(offset)));
+    } else if ((ty == Ty::ADDI || ty == Ty::ADDIW) && rs1() == "x0"_R) {
         splitAndPush(imm.get(), push, rd());
     } else {
-        splitAndPush(imm.get(), push);
+        splitAndPush(imm.get(), push, temp);
         auto new_ty = TyI2R(ty);
-        push(std::make_unique<RInstruction>(new_ty, rd(), rs1(), "x31"_R));
+        push(std::make_unique<RInstruction>(new_ty, rd(), rs1(), temp));
     }
     return parent->erase(node);
 }
 
 inst_node_t SInstruction::legalize() {
     if (isLegalImm(imm.get(), -2048, 2047)) return std::next(node);
+    assert(maybe_illegal());
     const auto push = [this](pInstruction inst) { parent->insert(node, std::move(inst)); };
     auto offset = splitAndPush(imm.get(), rs2(), push);
     push(std::make_unique<SInstruction>(ty, rs1(), "x31"_R, std::move(offset)));

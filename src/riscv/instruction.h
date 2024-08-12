@@ -122,6 +122,7 @@ struct IInstruction : Instruction {
     CLONE_DECL(IInstruction);
     InstType getInstType() const override { return InstType::I; }
     inst_node_t legalize() override;
+    bool maybe_illegal() const override;
 
     IInstruction(Ty ty, rRegister rd, rRegister rs1, pImmediate imm)
         : Instruction(ty, {rd}, {rs1}), imm{std::move(imm)} {}
@@ -143,6 +144,7 @@ struct SInstruction : Instruction {
     CLONE_DECL(SInstruction);
     InstType getInstType() const override { return InstType::S; }
     inst_node_t legalize() override;
+    bool maybe_illegal() const override;
 
     SInstruction(Ty ty, rRegister rs1, rRegister rs2, pImmediate imm)
         : Instruction(ty, {}, {rs1, rs2}), imm{std::move(imm)} {}

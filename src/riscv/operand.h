@@ -188,10 +188,10 @@ struct PhyRegister : Register {
 
 struct XPhyRegister final : PhyRegister {
     constexpr static const char *names[] = {
-        "zero", "ra", "sp",  "gp",  "tp", "t0", "t1", "t2",   //
-        "s0",   "s1", "a0",  "a1",  "a2", "a3", "a4", "a5",   //
-        "a6",   "a7", "s2",  "s3",  "s4", "s5", "s6", "s7",   //
-        "s8",   "s9", "s10", "s11", "t3", "t4", "t5", "x31",  //
+        "zero", "ra", "sp",  "gp",  "tp", "t0", "t1", "t2",  //
+        "s0",   "s1", "a0",  "a1",  "a2", "a3", "a4", "a5",  //
+        "a6",   "a7", "s2",  "s3",  "s4", "s5", "s6", "s7",  //
+        "s8",   "s9", "s10", "s11", "t3", "t4", "t5", "t6",  //
     };
     static inline const std::unordered_map<std::string, unsigned> name2id = [] {
         std::unordered_map<std::string, unsigned> name2id{};
@@ -210,8 +210,7 @@ struct XPhyRegister final : PhyRegister {
         return regs;
     }
 
-    // "x31" 用来作为伪指令的备用寄存器，所以从 temp 删掉了 （避免被错误的分配）
-    [[nodiscard]] bool isTemp() const final { return id >= 5 && id <= 7 || id >= 28 && id <= 30; }
+    [[nodiscard]] bool isTemp() const final { return id >= 5 && id <= 7 || id >= 28 && id <= 31; }
     [[nodiscard]] bool isSaved() const final { return id >= 8 && id <= 9 || id >= 18 && id <= 27; }
     bool isFloat() const override { return false; }
 
@@ -286,7 +285,7 @@ inline rPhyRegister PhyRegister::get(const std::string &name) {
     } else if (FIND(f, FPhyRegister::names)) {
         return FPhyRegister::get(f - FPhyRegister::names);
     } else {
-        return nullptr;
+        throw std::invalid_argument("Unknown register name: " + name);
     }
 #undef FIND
 }
