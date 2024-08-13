@@ -138,7 +138,7 @@ jobs:
           echo "| Test Name | Passed | Failed |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
           cat ${{github.workspace}}/tests/functional.log >> $GITHUB_STEP_SUMMARY || true
-          cat ${{github.workspace}}/tests/hidden_functional.log >> $GITHUB_STEP_SUMMARY || true
+          cat ${{github.workspace}}/tests/h_functional.log >> $GITHUB_STEP_SUMMARY || true
           echo '' >> $GITHUB_STEP_SUMMARY
 
   performance-test:
