@@ -33,8 +33,9 @@ def read_csv(path: str):
 
 
 def strptime(time_str: str):
-    pattern = re.compile(r"TOTAL: (\d+)H-(\d+)M-(\d+)S-(\d+)us")
-    match = pattern.match(time_str)
+    pos = 7 if time_str.startswith("TOTAL: ") else 0
+    pattern = re.compile(r"(\d+)H-(\d+)M-(\d+)S-(\d+)us")
+    match = pattern.match(time_str, pos)
     if match is None: return None
     caps = match.groups()
     return (int(caps[0]) * 3600 + int(caps[1]) * 60 + int(caps[2])) * 1000000 + int(caps[3])
