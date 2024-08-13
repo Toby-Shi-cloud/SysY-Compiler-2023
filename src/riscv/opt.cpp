@@ -203,7 +203,10 @@ rRegister process_mul(rBlock block, Instruction::Ty ty, rRegister reg, uint64_t 
         block->push_back(std::make_unique<RInstruction>(SUB, result, "x0"_R, result));
         return result;
     }
-    return nullptr;
+    auto temp = block->parent->newVirRegister(), dst = block->parent->newVirRegister();
+    block->push_back(std::make_unique<LiInstruction>(temp, mul));
+    block->push_back(std::make_unique<RInstruction>(ty, dst, reg, temp));
+    return dst;
 }
 
 rRegister process_div(rBlock block, rRegister reg, int32_t div) {

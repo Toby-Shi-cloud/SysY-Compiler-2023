@@ -102,31 +102,39 @@ class TestRunner:
             print(f"| {self.test_dir} | {passed} | {len(results) - passed} |", file=f)
         if self.perf:
             if not os.path.exists("perf"): os.mkdir("perf")
+            my_hash = subprocess.check_output(["/bin/sh", "-c", "git log --oneline -1 | awk '{print $1}'"]).decode().strip()
             csv_file = f"perf/{self.test_dir}.csv"
             table_file = f"perf/{self.test_dir}.md"
             performance = [(os.path.basename(args[0]),
-                            'ACCEPTED' if res[0] else res[1],
+                            'ACCEPTED' if res[0] else res[1].strip().replace('\n', '<br>'),
                             res[1].strip().replace('\n', '<br>') if res[0] else '')
                     for args, res in zip(tasks, results)]
             performance.sort(key=lambda x: x[0])
             this_time = [strptime(line[2]) for line in performance]
             try:
-                last_time_raw = read_csv(csv_file)[1]
-                last_time_dict = {x[0]: strptime(x[1]) for x in last_time_raw}
-                last_time = [last_time_dict.get(x[0]) for x in performance]
+                last_time_raw = read_csv(csv_file)
+                last_time_dict = {x[0]: strptime(x[1]) for x in last_time_raw[1]}
+                last_time_hash = {x[0]: x[2] for x in last_time_raw[1]} if len(last_time_raw[0]) == 3 else {}
+                last_time = [(last_time_dict.get(x[0]), last_time_hash.get(x[0])) for x in performance]
             except FileNotFoundError:
-                last_time = [None for _ in range(len(performance))]
+                last_time = [(None, None) for _ in range(len(performance))]
             increase = [(y - x) / x if x is not None and y is not None else None
-                        for x, y in zip(this_time, last_time)]
+                        for x, (y, _) in zip(this_time, last_time)]
             data = []
-            for (name, status, msg), time, last, inc in zip(performance, this_time, last_time, increase):
-                time = strftime(time) if time is not None else msg
-                last = strftime(last) if last is not None else ''
+            bests = []
+            for (name, status, msg), time_, (last_, that_hash), inc in zip(performance, this_time, last_time, increase):
+                if last_ is None: best = (time_, my_hash if time_ is not None else None)
+                elif time_ is None: best = (last_, that_hash)
+                elif last_ > time_: best = (time_, my_hash)
+                else: best = (last_, that_hash)
+                time = strftime(time_) if time_ is not None else msg
+                last = strftime(last_) if last_ is not None else ''
                 color = 'red' if inc is not None and inc < 0 else 'green'
                 inc = fr"${{\textsf{{\color{{{color}}}{inc*100:+.1f}\%}}}}$" if inc is not None else ''
-                data.append((name, status, time, last, inc, ))
-            write_table(table_file, ['TestName', 'Status', 'Time', 'LastTime', 'SpeedUp'], data)
-            write_csv(csv_file, ['TestName', 'Time'], [(x[0], x[2]) for x in performance])
+                data.append((name, status, time, last, that_hash or '', inc, ))
+                bests.append((name, strftime(best[0]) if best[0] is not None else '', best[1], ))
+            write_table(table_file, ['TestName', 'Status', 'Time', 'LastBest', 'BestHash', 'SpeedUp'], data)
+            write_csv(csv_file, ['TestName', 'Time', 'Hash'], bests)
         if len(results) - passed == 0:
             return
         results = map(lambda x: (os.path.basename(x[1][0]), x[0]), zip(results, tasks))

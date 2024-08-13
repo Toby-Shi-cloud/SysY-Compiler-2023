@@ -61,7 +61,7 @@ rRegister Translator::createBinaryInstHelperX(rRegister lhs, mir::Value *rhs) {
             curBlock->push_back(std::make_unique<IInstruction>(iTy, dst, lhs, create_imm(imm)));
             return dst;
         } else if constexpr (rTy == Instruction::Ty::MUL || rTy == Instruction::Ty::MULW) {
-            if (auto reg = process_mul(curBlock, rTy, lhs, literal->value)) return reg;
+            return process_mul(curBlock, rTy, lhs, literal->value);
         }
         if (!opt_settings.using_div2mul) goto normal;
         if constexpr (rTy == Instruction::Ty::DIVW)

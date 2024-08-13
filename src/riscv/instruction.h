@@ -287,7 +287,7 @@ struct LiInstruction : Instruction {
     LiInstruction(rRegister rd, uint64_t imm) : Instruction(Ty::LI, {rd}, {}), imm{imm} {}
     rRegister rd() const { return regDef[0]; }
     std::ostream &output(std::ostream &os) const override {
-        return os << ty << '\t' << rd() << ", " << imm;
+        return os << ty << '\t' << rd() << ", " << static_cast<int64_t>(imm);
     }
 };
 
