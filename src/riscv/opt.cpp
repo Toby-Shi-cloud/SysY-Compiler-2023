@@ -168,9 +168,9 @@ void process_mul_impl(rFunction func, kmap<uint64_t, std::unique_ptr<Node>> &map
         __builtin_unreachable();
     }
 }
-}  // namespace
 
-rRegister process_mul(rBlock block, Instruction::Ty ty, rRegister reg, uint64_t mul) {
+template <size_t Count>
+rRegister process_mul_impl(rBlock block, Instruction::Ty ty, rRegister reg, uint64_t mul) {
     if (ty == Ty::MULW) mul = static_cast<uint32_t>(mul);
     if (mul == 0) return "x0"_R;
     if (mul == 1) return reg;
@@ -183,12 +183,7 @@ rRegister process_mul(rBlock block, Instruction::Ty ty, rRegister reg, uint64_t 
         process_mul_impl<true>(func, map, mul);
     else
         __builtin_unreachable();
-    if (map.size() > 5) {
-        auto dst = func->newVirRegister();
-        block->push_back(std::make_unique<LiInstruction>(dst, mul));
-        block->push_back(std::make_unique<RInstruction>(ty, dst, reg, dst));
-        return dst;
-    } else {
+    if (map.size() <= Count) {
         auto dfs = [&map, &block](Node *node, auto &&self) -> void {
             if (node->inst != nullptr) block->push_back(std::move(node->inst));
             for (auto &x : node->suc)
@@ -197,6 +192,18 @@ rRegister process_mul(rBlock block, Instruction::Ty ty, rRegister reg, uint64_t 
         dfs(map[1].get(), dfs);
         return map[mul]->reg;
     }
+    return nullptr;
+}
+}  // namespace
+
+rRegister process_mul(rBlock block, Instruction::Ty ty, rRegister reg, uint64_t mul) {
+    if (auto result = process_mul_impl<5>(block, ty, reg, mul)) return result;
+    if (auto result = process_mul_impl<4>(block, ty, reg, -mul)) {
+        auto SUB = ty == Ty::MUL ? Ty::SUB : Ty::SUBW;
+        block->push_back(std::make_unique<RInstruction>(SUB, result, "x0"_R, result));
+        return result;
+    }
+    return nullptr;
 }
 
 rRegister process_div(rBlock block, rRegister reg, int32_t div) {
