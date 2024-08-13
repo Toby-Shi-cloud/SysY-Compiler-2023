@@ -114,7 +114,15 @@ void process_mul_impl(rFunction func, kmap<uint64_t, std::unique_ptr<Node>> &map
     if (map.count(mul)) return;
     auto &node_ = map[mul] = std::make_unique<Node>(func->newVirRegister());
     auto node = node_.get();
-    if (mul % 2 == 0) {
+    if ((mul & 0xFF) == mul && (mul >> 4) == (mul & 0xF)) {
+        process_mul_impl<X32>(func, map, mul & 0x0F);
+        process_mul_impl<X32>(func, map, mul & 0xF0);
+        auto &d1 = map[mul & 0x0F], &d2 = map[mul & 0xF0];
+        node->inst = std::make_unique<RInstruction>(ADD, node->reg, d1->reg, d2->reg);
+        d1->suc.push_back(node);
+        d2->suc.push_back(node);
+        node->degree = 2;
+    } else if (mul % 2 == 0) {
         int zcnt = __builtin_ctz(mul);
         process_mul_impl<X32>(func, map, mul >> zcnt);
         auto &dep = map[mul >> zcnt];
