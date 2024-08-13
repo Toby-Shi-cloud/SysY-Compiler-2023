@@ -51,8 +51,8 @@ template <Instruction::Ty rTy, Instruction::Ty iTy>
 rRegister Translator::createBinaryInstHelperX(rRegister lhs, mir::Value *rhs) {
     assert(rTy != Instruction::Ty::NOP);
     auto dst = curFunc->newVirRegister(floatOp(rTy));
-    if constexpr (iTy != Instruction::Ty::NOP) {
-        if (auto literal = dynamic_cast<mir::IntegerLiteral *>(rhs)) {
+    if (auto literal = dynamic_cast<mir::IntegerLiteral *>(rhs)) {
+        if constexpr (iTy != Instruction::Ty::NOP) {
             // rhs is immediate
             int imm = literal->value;
             if constexpr (rTy == Instruction::Ty::SUB || rTy == Instruction::Ty::SUBW)
@@ -60,8 +60,20 @@ rRegister Translator::createBinaryInstHelperX(rRegister lhs, mir::Value *rhs) {
             // imm >= -2048 && imm < 2048 这里不检查，合法化阶段自动搞
             curBlock->push_back(std::make_unique<IInstruction>(iTy, dst, lhs, create_imm(imm)));
             return dst;
+        } else if constexpr (rTy == Instruction::Ty::MUL || rTy == Instruction::Ty::MULW) {
+            return process_mul(curBlock, rTy, lhs, literal->value);
         }
+        if (!opt_settings.using_div2mul) goto normal;
+        if constexpr (rTy == Instruction::Ty::DIVW)
+            if (auto reg = process_div(curBlock, lhs, literal->value)) return reg;
+        if constexpr (rTy == Instruction::Ty::DIVUW)
+            if (auto reg = process_divu(curBlock, lhs, literal->value)) return reg;
+        if constexpr (rTy == Instruction::Ty::REMW)
+            if (auto reg = process_rem(curBlock, lhs, literal->value)) return reg;
+        if constexpr (rTy == Instruction::Ty::REMUW)
+            if (auto reg = process_remu(curBlock, lhs, literal->value)) return reg;
     }
+normal:
     auto rop = getRegister(rhs);
     curBlock->push_back(std::make_unique<RInstruction>(rTy, dst, lhs, rop));
     return dst;

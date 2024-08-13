@@ -37,7 +37,7 @@ struct Instruction : InstructionBase {
         // float (RV64F)
         FCVT_L_S, FCVT_LU_S, FCVT_S_L, FCVT_S_LU,
         // useful pseudo instructions
-        CALL, RET, J, MV, FMV_S, FNEG_S, SEXT_W,
+        CALL, RET, J, MV, FMV_S, FNEG_S, SEXT_W, ZEXT_W, LI,
     } ty;
     // clang-format on
     friend constexpr bool floatOp(Ty ty) { return ty >= Ty::FLW && ty <= Ty::FCVT_S_LU; }
@@ -277,6 +277,17 @@ struct FnegInstruction : Instruction {
     rRegister rs() const { return regUse[0]; }
     std::ostream &output(std::ostream &os) const override {
         return os << ty << '\t' << rd() << ", " << rs();
+    }
+};
+
+struct LiInstruction : Instruction {
+    uint64_t imm;
+    CLONE_DECL(LiInstruction);
+    InstType getInstType() const override { return InstType::Pseudo; }
+    LiInstruction(rRegister rd, uint64_t imm) : Instruction(Ty::LI, {rd}, {}), imm{imm} {}
+    rRegister rd() const { return regDef[0]; }
+    std::ostream &output(std::ostream &os) const override {
+        return os << ty << '\t' << rd() << ", " << imm;
     }
 };
 
