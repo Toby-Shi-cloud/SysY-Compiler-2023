@@ -106,7 +106,7 @@ struct Node {
 };
 
 template <bool X32>
-void process_mul_impl(rFunction func, kmap<uint64_t, std::unique_ptr<Node>> &map, uint32_t mul) {
+void process_mul_impl(rFunction func, kmap<uint64_t, std::unique_ptr<Node>> &map, uint64_t mul) {
     assert(mul > 0);
     constexpr Ty SLLI = X32 ? Ty::SLLIW : Ty::SLLI;
     constexpr Ty ADD = X32 ? Ty::ADDW : Ty::ADD;
@@ -123,7 +123,7 @@ void process_mul_impl(rFunction func, kmap<uint64_t, std::unique_ptr<Node>> &map
         d2->suc.push_back(node);
         node->degree = 2;
     } else if (mul % 2 == 0) {
-        int zcnt = __builtin_ctz(mul);
+        int zcnt = __builtin_ctzll(mul);
         process_mul_impl<X32>(func, map, mul >> zcnt);
         auto &dep = map[mul >> zcnt];
         node->inst = std::make_unique<IInstruction>(SLLI, node->reg, dep->reg, create_imm(zcnt));
@@ -135,7 +135,7 @@ void process_mul_impl(rFunction func, kmap<uint64_t, std::unique_ptr<Node>> &map
         dep->suc.push_back(node);
         node->degree = 1;
     } else if ((mul & 7) == 7) {
-        int ocnt = __builtin_ctz(mul + 1);
+        int ocnt = __builtin_ctzll(mul + 1);
         process_mul_impl<X32>(func, map, mul + 1);
         auto &dep = map[mul + 1], &ori = map[1];
         node->inst = std::make_unique<RInstruction>(SUB, node->reg, dep->reg, ori->reg);
@@ -171,6 +171,7 @@ void process_mul_impl(rFunction func, kmap<uint64_t, std::unique_ptr<Node>> &map
 }  // namespace
 
 rRegister process_mul(rBlock block, Instruction::Ty ty, rRegister reg, uint64_t mul) {
+    if (ty == Ty::MULW) mul = static_cast<uint32_t>(mul);
     if (mul == 0) return "x0"_R;
     if (mul == 1) return reg;
     auto func = block->parent;
