@@ -76,7 +76,7 @@ namespace mir {
     [[nodiscard]] int &field() { return (*this)[id]; } \
     [[nodiscard]] int field() const { return (*this)[id]; }
 
-inline struct OptInfos : std::array<int, 9> {
+inline struct OptInfos : std::array<int, 10> {
     DECLARE(mem_to_reg, 0)
     DECLARE(constant_folding, 1)
     DECLARE(global_variable_numbering, 2)
@@ -86,6 +86,7 @@ inline struct OptInfos : std::array<int, 9> {
     DECLARE(function_inline, 6)
     DECLARE(split_array, 7)
     DECLARE(inline_global_var, 8)
+    DECLARE(trail_recursion, 9)
 
     OptInfos operator+(const OptInfos &other) const {
         OptInfos res = {};
@@ -116,7 +117,8 @@ inline bool pretty_print(std::ostream &stream, const mir::OptInfos &value) {
     stream << str(merge_empty_block) << ", ";
     stream << str(function_inline) << ", ";
     stream << str(split_array) << ", ";
-    stream << str(inline_global_var);
+    stream << str(inline_global_var) << ", ";
+    stream << str(trail_recursion);
     stream << "}";
     return true;
 #undef str

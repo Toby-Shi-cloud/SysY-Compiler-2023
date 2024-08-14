@@ -17,6 +17,7 @@ static void basic_optimize(Function *func) {
     if (opt_settings.using_gvn) globalVariableNumbering(FUNC);
     if (opt_settings.using_block_merging) mergeEmptyBlock(FUNC);
     if (opt_settings.using_block_merging) connectBlocks(FUNC);
+    if (opt_settings.using_trailing_recursion_opt) trailRecursionOpt(FUNC);
     calcPure(FUNC);
 #undef FUNC
 }

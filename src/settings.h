@@ -23,6 +23,7 @@ inline struct OptSettings {
     bool using_inline_printer;
     bool using_array_splitting;
     bool using_inline_global_var;
+    bool using_trailing_recursion_opt;
 } opt_settings;
 
 inline void set_optimize_level(int level, const std::string &arch) {
@@ -40,6 +41,7 @@ inline void set_optimize_level(int level, const std::string &arch) {
         SET_(using_inline_printer, "mips");
         SET(using_array_splitting);
         SET(using_inline_global_var);
+        SET(using_trailing_recursion_opt);
         [[fallthrough]];
     case 1:
         SET_(using_select, "mips");

@@ -11,5 +11,7 @@ namespace mir {
 void functionInline(Function *func);
 void connectBlocks(Function *func);
 void calcPure(Function *func);
+BasicBlock *splitAndGetFront(Function *func);
+void trailRecursionOpt(Function *func);
 }  // namespace mir
 #endif  // COMPILER_FUNCTIONAL_H
