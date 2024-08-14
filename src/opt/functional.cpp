@@ -2,6 +2,7 @@
 // Created by toby on 2023/12/1.
 //
 
+#include <algorithm>
 #include <unordered_map>
 #include "opt/opt.h"
 
@@ -13,6 +14,12 @@ void functionInline(Function *func) {
              ++inst_it) {
             auto &&call = dynamic_cast<Instruction::call *>(*inst_it);
             if (!call || call->getFunction()->isRecursive() || call->getFunction()->isLibrary())
+                continue;
+            // 一些奇怪的不 inline 的条件
+            auto call_ops = call->getOperands();
+            if (call->getFunction()->instruction_size() > 100 &&
+                std::all_of(call_ops.begin() + 1, call_ops.end(),
+                            [](Value *arg) { return dynamic_cast<Literal *>(arg) == nullptr; }))
                 continue;
             // 1. clone function & replace args
             auto callee = call->getFunction()->clone();

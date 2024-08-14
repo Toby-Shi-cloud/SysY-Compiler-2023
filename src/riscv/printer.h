@@ -49,10 +49,11 @@ inline std::ostream &operator<<(std::ostream &os, const Module &module) {
            << *var;
     }
     // memset0
-    constexpr char memset0[] = (
+    static constexpr char memset0[] = (
 #include "riscv/memset0.asm"
     );
-    return os << memset0 << std::endl;
+    if (module.using_memset) os << memset0 << std::endl;
+    return os;
 }
 }  // namespace backend::riscv
 

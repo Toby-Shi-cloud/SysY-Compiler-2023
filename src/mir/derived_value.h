@@ -9,6 +9,7 @@
 #include <cmath>
 #include <iomanip>
 #include <list>
+#include <numeric>
 #include <set>
 #include <sstream>
 #include <unordered_set>
@@ -220,6 +221,13 @@ struct Function : Value {
     void splice(bb_pos_t position, Function *other, bb_pos_t first, bb_pos_t last) {
         for (auto it = first; it != last; ++it) (*it)->parent = this;
         bbs.splice(position, other->bbs, first, last);
+    }
+
+    [[nodiscard]] size_t instruction_size() const {
+        auto size = std::accumulate(bbs.begin(), bbs.end(), size_t{0}, [](size_t acc, auto bb) {
+            return acc + bb->instructions.size();
+        });
+        return size + exitBB->instructions.size();
     }
 
     [[nodiscard]] Function *clone() const;

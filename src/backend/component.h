@@ -83,7 +83,7 @@ inline std::ostream &operator<<(std::ostream &os, rInstructionBase inst) {
 
 /**
  * SubBlock is the unit to allocate registers. <br>
- * SubBlocks have no label. There is one and only one jump InstructionBase
+ * SubBlocks have no label. There is one and only one jump Instruction
  * (conditional jump to other block or unconditional jump to function)
  * at the end of every sub-block. Unconditional jump to other block or
  * function return jump is only allowed and must existed when then
@@ -120,11 +120,7 @@ struct SubBlock {
         return insert(p, pInstructionBase{inst});
     }
 
-    template <typename... Args>
-    auto erase(Args... args)
-        -> decltype(instructions.erase(std::forward<decltype(args)>(args)...)) {
-        return instructions.erase(std::forward<decltype(args)>(args)...);
-    }
+    inst_node_t erase(inst_pos_t pos) { return instructions.erase(pos); }
 
     std::ostream &output(std::ostream &os, bool skip_last = false) const {
         for (auto &inst : instructions) {
@@ -268,6 +264,7 @@ struct GlobalVar {
 };
 
 struct Module {
+    bool using_memset = false;
     pFunction main;
     std::vector<pFunction> functions;
     std::vector<pGlobalVar> globalVars;
@@ -285,9 +282,11 @@ inline std::ostream &operator<<(std::ostream &os, const SubBlock &block) {
 
 inline std::ostream &operator<<(std::ostream &os, const Block &block) {
     if (!block.label->name.empty()) os << block.label << ":" << "\n";
-    for (auto &sub : block.subBlocks)
+    for (auto &sub : block.subBlocks) {
+        if (sub->empty()) continue;  // This is accutally a bug!!! Don't throw, debug need this!
         sub->output(os, &sub == &block.subBlocks.back() && block.nextLabel() &&
                             block.backInst()->getJumpLabel() == block.nextLabel());
+    }
     return os;
 }
 

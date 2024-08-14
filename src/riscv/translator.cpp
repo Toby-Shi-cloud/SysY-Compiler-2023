@@ -476,6 +476,7 @@ void Translator::translateMemsetInst(const mir::Instruction::memset *memsetInst)
     auto ptr = addr2reg(addr);
     curBlock->push_back(std::make_unique<MoveInstruction>("a0"_R, ptr));
     curBlock->push_back(std::make_unique<CallInstruction>(getLibLabel("@sysy.memset0")));
+    assemblyModule->using_memset = true;
 }
 
 void Translator::translateFunction(const mir::Function *mirFunction) {

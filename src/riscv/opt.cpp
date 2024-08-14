@@ -49,6 +49,7 @@ void clearDeadCode(rFunction function) {
                 changed = true;
             }
             for (auto &inst : dead) block->erase(inst->node);
+            if (block->empty()) block->parent->subBlocks.erase(block->node);
         }
     }
 }
