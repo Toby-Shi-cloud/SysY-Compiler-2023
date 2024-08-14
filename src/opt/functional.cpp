@@ -144,25 +144,7 @@ BasicBlock *splitAndGetFront(Function *func) {
 }
 
 void trailRecursionOpt(Function *func) {
-    auto begin_bb = [func] {
-        // lazy compute
-        static auto bb = splitAndGetFront(func);
-        return bb;
-    };
-    auto arg2phi = [func, &begin_bb] {
-        // lazy compute
-        static auto vec = [func, &begin_bb] {
-            std::vector<std::pair<Value *, Instruction::phi *>> arg2phi;
-            for (auto it = begin_bb()->instructions.begin(); it != begin_bb()->phi_end(); ++it) {
-                auto phi = dynamic_cast<Instruction::phi *>(*it);
-                auto value = phi->getIncomingValue(func->bbs.front());
-                arg2phi.emplace_back(value.first, phi);
-                phi->eraseIncomingValue(value.second);
-            }
-            return arg2phi;
-        }();
-        return &vec;
-    };
+    std::vector<std::tuple<Instruction::ret *, Instruction::call *>> candidates;
     for (auto block : func->bbs) {
         if (block->instructions.size() < 2) continue;
         auto it = block->instructions.end();
@@ -172,12 +154,28 @@ void trailRecursionOpt(Function *func) {
         if (!call || call->getFunction() != func) continue;
         if (!func->retType->isVoidTy() && ret->getReturnValue() != call) continue;
         // could optimize...
+        candidates.emplace_back(ret, call);
+    }
+    if (candidates.empty()) return;
+
+    opt_infos.trail_recursion() += (int)candidates.size();
+    auto begin_bb = splitAndGetFront(func);
+    std::vector<std::pair<Value *, Instruction::phi *>> arg2phi;
+    for (auto it = begin_bb->instructions.begin(); it != begin_bb->phi_end(); ++it) {
+        auto phi = dynamic_cast<Instruction::phi *>(*it);
+        auto value = phi->getIncomingValue(func->bbs.front());
+        arg2phi.emplace_back(value.first, phi);
+    }
+    for (auto [ret, call] : candidates) {
+        auto block = ret->parent;
         std::unordered_map<Value *, Value *> arg2val;
+        // 先删掉，之后加回来
+        for (auto [_, phi] : arg2phi) phi->eraseIncomingValue(func->bbs.front());
         for (auto arg : func->args) {
             if (!arg->isUsed()) continue;
             auto phi = new Instruction::phi(arg->type);
-            arg2phi()->emplace_back(arg, phi);
-            begin_bb()->insert(begin_bb()->phi_end(), phi);
+            arg2phi.emplace_back(arg, phi);
+            begin_bb->insert(begin_bb->phi_end(), phi);
             arg->moveTo(phi);
         }
         for (int i = 0; i < call->getNumArgs(); i++) {
@@ -185,7 +183,7 @@ void trailRecursionOpt(Function *func) {
             auto val = call->getArg(i);
             arg2val.emplace(arg, val);
         }
-        for (auto &[val, phi] : *arg2phi()) {
+        for (auto &[val, phi] : arg2phi) {
             phi->addIncomingValue({val, func->bbs.front()});
             if (auto it = arg2val.find(val); it != arg2val.end()) {
                 phi->addIncomingValue({it->second, block});
@@ -195,7 +193,7 @@ void trailRecursionOpt(Function *func) {
         }
         block->erase(ret);
         block->erase(call);
-        block->push_back(new Instruction::br(begin_bb()));
+        block->push_back(new Instruction::br(begin_bb));
     }
 }
 }  // namespace mir
