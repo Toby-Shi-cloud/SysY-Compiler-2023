@@ -11,6 +11,9 @@ namespace backend::riscv {
 // Clear instructions that are translated but not used
 void clearDeadCode(rFunction function);
 
+// Merge empty blocks (only jump...)
+void mergeBlocks(rFunction function);
+
 // Relocate all blocks to reduce the number of jumps
 void relocateBlock(rFunction function);
 

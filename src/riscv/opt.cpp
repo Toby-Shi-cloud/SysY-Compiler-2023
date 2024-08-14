@@ -4,10 +4,21 @@
 
 #include "riscv/opt.h"
 #include <memory>
+#include <queue>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
+#include "backend/operand.h"
 #include "riscv/instruction.h"
 #include "riscv/operand.h"
 #include "riscv/reg_alloca.h"
+#include "settings.h"
+
+#define CONTINUE(expr) \
+    ({                 \
+        expr;          \
+        continue;      \
+    })
 
 namespace backend::riscv {
 void clearDeadCode(rFunction function) {
@@ -51,6 +62,60 @@ void clearDeadCode(rFunction function) {
             for (auto &inst : dead) block->erase(inst->node);
             if (block->empty()) block->parent->subBlocks.erase(block->node);
         }
+    }
+}
+
+void mergeBlocks(rFunction function) {
+    // collect users
+    std::unordered_map<rBlock, std::unordered_set<rInstructionBase>> block2users;
+    for (auto sub : all_sub_blocks(function)) {
+        auto inst = sub->back();
+        if (auto label = inst->getJumpLabel();
+            label && std::holds_alternative<rBlock>(label->parent))
+            block2users[std::get<rBlock>(label->parent)].insert(inst);
+    }
+    // delete block which only instructions is jump
+    for (auto it = std::next(function->begin()); it != function->end();) {
+        auto block = it->get();
+        auto target = block->backInst()->getJumpLabel();
+        auto &users = block2users[block];
+        if (!users.empty() && block->instruction_size() != 1) CONTINUE(++it);
+        for (auto user : users) user->setJumpLabel(target);
+        block2users[std::get<rBlock>(target->parent)].insert(users.begin(), users.end());
+        block2users[std::get<rBlock>(target->parent)].erase(block->backInst());
+        block2users.erase(block);
+        it = function->blocks.erase(it);
+    }
+    if (!opt_settings.using_block_merging) return;
+    // collect has branch
+    std::unordered_set<rBlock> has_branch;
+    for (auto &[block, vec] : block2users)
+        for (auto &inst : vec)
+            if (dynamic_cast<JumpInstruction *>(inst) == nullptr) has_branch.insert(block);
+    // copy blocks avoid jump
+    using HeapT = std::pair<size_t, rBlock>;
+    std::priority_queue<HeapT, std::vector<HeapT>, std::greater<>> heap;
+    for (auto &block : *function) heap.emplace(block->instruction_size(), block.get());
+    while (!heap.empty()) {
+        auto [size, block] = heap.top();
+        heap.pop();
+        if (block->instruction_size() != size) continue;
+        std::vector<JumpInstruction *> jumps;
+        for (auto &b : *function)
+            if (auto jump = dynamic_cast<JumpInstruction *>(b->backInst());
+                jump && jump->label == block->label.get())
+                jumps.push_back(jump);
+        if (jumps.empty() || has_branch.count(block) && size > 8) continue;
+        for (auto jump : jumps) {
+            auto subBlock = jump->parent;
+            auto topBlock = subBlock->parent;
+            subBlock->erase(jump->node);
+            if (subBlock->empty()) topBlock->subBlocks.erase(subBlock->node);
+            for (auto &s : block->subBlocks)
+                for (auto &inst : *s) topBlock->push_back(inst->clone());
+            heap.emplace(topBlock->instruction_size(), topBlock);
+        }
+        if (!has_branch.count(block)) function->blocks.erase(block->node);
     }
 }
 

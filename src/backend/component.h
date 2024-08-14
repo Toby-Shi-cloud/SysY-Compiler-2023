@@ -6,6 +6,7 @@
 #define COMPILER_BACKEND_COMPONENT_H
 
 #include <list>
+#include <numeric>
 #include <ostream>
 #include <set>
 #include <unordered_set>
@@ -180,6 +181,12 @@ struct Block {
     [[nodiscard]] rLabel nextLabel() const;
     void clearBlockInfo() const;
     void computePreSuc() const;
+
+    [[nodiscard]] size_t instruction_size() const {
+        return std::accumulate(
+            subBlocks.begin(), subBlocks.end(), size_t{0},
+            [](size_t acc, auto &sub) { return acc + sub->instructions.size(); });
+    }
 
     [[nodiscard]] rBlock getJumpTo() const {
         if (empty()) return nullptr;

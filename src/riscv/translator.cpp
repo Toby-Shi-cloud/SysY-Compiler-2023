@@ -859,11 +859,14 @@ void Translator::compute_func_exit() const {
     curFunc->exitB->push_back(std::make_unique<RetInstruction>());
 }
 
-void Translator::optimizeBeforeAlloc() const {  // TODO opt
+void Translator::optimizeBeforeAlloc() const {
     clearDeadCode(curFunc);
+    mergeBlocks(curFunc);
 }
 
-void Translator::optimizeAfterAlloc() const {  // TODO opt
+void Translator::optimizeAfterAlloc() const {
+    clearDeadCode(curFunc);
+    mergeBlocks(curFunc);
     if (opt_settings.using_block_relocation) relocateBlock(curFunc);
 }
 }  // namespace backend::riscv
