@@ -179,7 +179,7 @@ jobs:
         with:
           path: ${{github.workspace}}/tests/perf
           key: ${{runner.os}}-perf-result-${{matrix.type}}-${{github.sha}}
-          restore-keys: ${{runner.os}}-perf-result-${{matrix.type}}
+          restore-keys: ${{runner.os}}-perf-result-${{matrix.type}}-
 
       - name: Test
         working-directory: ${{github.workspace}}/build
