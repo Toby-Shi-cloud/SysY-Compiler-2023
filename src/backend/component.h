@@ -12,6 +12,7 @@
 #include <unordered_set>
 #include <vector>
 #include "backend/operand.h"
+#include "dbg.h"
 
 namespace backend {
 // InstructionBase
@@ -301,6 +302,12 @@ inline std::ostream &operator<<(std::ostream &os, const Function &func) {
     func.allocName();
     os << func.label << ":" << "\n";
     for (auto &block : func) os << *block;
+    size_t counter = 0;
+    for (auto &block : func)
+        for (auto &sub : block->subBlocks)
+            if (sub->back()->getJumpLabel() == func.exitB->label.get()) counter++;
+    counter -= func.blocks.back()->backInst()->getJumpLabel() == func.exitB->label.get() ? 1 : 0;
+    if (counter == 0) func.exitB->label->name = "";
     os << *func.exitB;
     return os;
 }
