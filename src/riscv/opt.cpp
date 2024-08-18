@@ -89,9 +89,14 @@ void mergeBlocks(rFunction function) {
     if (!opt_settings.using_block_merging) return;
     // collect has branch
     std::unordered_set<rBlock> has_branch;
-    for (auto &[block, vec] : block2users)
-        for (auto &inst : vec)
-            if (dynamic_cast<JumpInstruction *>(inst) == nullptr) has_branch.insert(block);
+    for (auto &[block, vec] : block2users) {
+        for (auto &inst : vec) {
+            if (dynamic_cast<JumpInstruction *>(inst) == nullptr) {
+                has_branch.insert(block);
+                break;
+            }
+        }
+    }
     // copy blocks avoid jump
     using HeapT = std::pair<size_t, rBlock>;
     std::priority_queue<HeapT, std::vector<HeapT>, std::greater<>> heap;
@@ -105,17 +110,20 @@ void mergeBlocks(rFunction function) {
             if (auto jump = dynamic_cast<JumpInstruction *>(b->backInst());
                 jump && jump->label == block->label.get())
                 jumps.push_back(jump);
-        if (jumps.empty() || has_branch.count(block) && size > 8) continue;
+        if ((jumps.size() > 1 || has_branch.count(block)) && size > 8) continue;
+        bool no_erase = block->node == function->begin();
         for (auto jump : jumps) {
+            if (jump->parent->parent == block) CONTINUE(no_erase = true);
             auto subBlock = jump->parent;
             auto topBlock = subBlock->parent;
             subBlock->erase(jump->node);
-            if (subBlock->empty()) topBlock->subBlocks.erase(subBlock->node);
+            if (subBlock->empty() && topBlock->subBlocks.size() > 1)
+                topBlock->subBlocks.erase(subBlock->node);
             for (auto &s : block->subBlocks)
                 for (auto &inst : *s) topBlock->push_back(inst->clone());
             heap.emplace(topBlock->instruction_size(), topBlock);
         }
-        if (!has_branch.count(block)) function->blocks.erase(block->node);
+        if (!has_branch.count(block) && !no_erase) function->blocks.erase(block->node);
     }
 }
 
