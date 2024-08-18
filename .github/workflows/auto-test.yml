@@ -29,7 +29,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{github.workspace}}/build
-          key: ${{runner.os}}-cmake-${{github.sha}}
+          key: ${{runner.os}}-cmake-${{hashFiles('src/**')}}
 
       - name: Install LLVM and Clang
         if: steps.cache-cmake.outputs.cache-hit != 'true'
@@ -54,9 +54,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            src
 
       - name: Clone from GitLab
         run: |
@@ -68,6 +65,10 @@ jobs:
         run: |
           cd ../compiler2024-toby
           ./path.sh
+          if [ -z "$(git status -s)" ]; then
+            echo "Working directory clean. Nothing to commit."
+            exit 0
+          fi
           ./compile.sh
 
       - name: Commit and Push
@@ -93,16 +94,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            tests
 
       - name: Restore Build Cache
         id: cache-cmake
         uses: actions/cache@v4
         with:
           path: ${{github.workspace}}/build
-          key: ${{runner.os}}-cmake-${{github.sha}}
+          key: ${{runner.os}}-cmake-${{hashFiles('src/**')}}
 
       - name: If Cache Missed
         if: steps.cache-cmake.outputs.cache-hit != 'true'
@@ -150,16 +148,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            tests
 
       - name: Restore Build Cache
         id: cache-cmake
         uses: actions/cache@v4
         with:
           path: ${{github.workspace}}/build
-          key: ${{runner.os}}-cmake-${{github.sha}}
+          key: ${{runner.os}}-cmake-${{hashFiles('src/**')}}
 
       - name: If Cache Missed
         if: steps.cache-cmake.outputs.cache-hit != 'true'
