@@ -3,24 +3,51 @@
 // Constant Folding
 //
 
+#include "mir.h"
 #include "opt/opt.h"
 #include "settings.h"
 
 namespace mir {
 namespace {
 inst_node_t arithmeticFolding(Instruction::add *binary) {
-    if (binary->getLhs() == getIntegerLiteral(0))
-        return substitute(binary, binary->getRhs());  // 0 + x = x
     if (binary->getRhs() == getIntegerLiteral(0))
         return substitute(binary, binary->getLhs());  // x + 0 = x
+    if (auto rhs = dynamic_cast<IntegerLiteral *>(binary->getRhs())) {
+        if (auto lhs_add = dynamic_cast<Instruction::add *>(binary->getLhs())) {
+            if (auto lhs_rhs = dynamic_cast<IntegerLiteral *>(lhs_add->getRhs())) {
+                return substitute(
+                    binary, new Instruction::add(lhs_add->getLhs(),
+                                                 getIntegerLiteral(lhs_rhs->value + rhs->value)));
+            }  // (x + a) + b = x + (a + b)
+        } else if (auto lhs_sub = dynamic_cast<Instruction::sub *>(binary->getLhs())) {
+            if (auto lhs_lhs = dynamic_cast<IntegerLiteral *>(lhs_sub->getLhs())) {
+                return substitute(
+                    binary, new Instruction::sub(getIntegerLiteral(lhs_lhs->value + rhs->value),
+                                                 lhs_sub->getRhs()));
+            }  // (a - x) + b = (a + b) - x
+        }
+    }
     return binary->node;
 }
 
 inst_node_t arithmeticFolding(Instruction::fadd *binary) {
-    if (binary->getLhs() == getFloatLiteral(0))
-        return substitute(binary, binary->getRhs());  // 0 + x = x
     if (binary->getRhs() == getFloatLiteral(0))
         return substitute(binary, binary->getLhs());  // x + 0 = x
+    if (auto rhs = dynamic_cast<FloatLiteral *>(binary->getRhs())) {
+        if (auto lhs_add = dynamic_cast<Instruction::fadd *>(binary->getLhs())) {
+            if (auto lhs_rhs = dynamic_cast<FloatLiteral *>(lhs_add->getRhs())) {
+                return substitute(
+                    binary, new Instruction::fadd(lhs_add->getLhs(),
+                                                  getFloatLiteral(lhs_rhs->value + rhs->value)));
+            }  // (x + a) + b = x + (a + b)
+        } else if (auto lhs_sub = dynamic_cast<Instruction::fsub *>(binary->getLhs())) {
+            if (auto lhs_lhs = dynamic_cast<FloatLiteral *>(lhs_sub->getLhs())) {
+                return substitute(
+                    binary, new Instruction::fsub(getFloatLiteral(lhs_lhs->value + rhs->value),
+                                                  lhs_sub->getRhs()));
+            }  // (a - x) + b = (a + b) - x
+        }
+    }
     return binary->node;
 }
 
@@ -29,6 +56,24 @@ inst_node_t arithmeticFolding(Instruction::sub *binary) {
         return substitute(binary, binary->getLhs());  // x - 0 = x
     if (binary->getLhs() == binary->getRhs())
         return substitute(binary, getIntegerLiteral(0));  // x - x = 0
+    if (auto rhs = dynamic_cast<IntegerLiteral *>(binary->getRhs())) {
+        return substitute(binary,
+                          new Instruction::add(binary->getLhs(), getIntegerLiteral(-rhs->value)));
+    } else if (auto lhs = dynamic_cast<IntegerLiteral *>(binary->getLhs())) {
+        if (auto rhs_add = dynamic_cast<Instruction::add *>(binary->getRhs())) {
+            if (auto rhs_rhs = dynamic_cast<IntegerLiteral *>(rhs_add->getRhs())) {
+                return substitute(
+                    binary, new Instruction::sub(getIntegerLiteral(lhs->value - rhs_rhs->value),
+                                                 rhs_add->getLhs()));
+            }  // a - (x + b) = (a - b) - x
+        } else if (auto rhs_sub = dynamic_cast<Instruction::sub *>(binary->getRhs())) {
+            if (auto rhs_lhs = dynamic_cast<IntegerLiteral *>(rhs_sub->getLhs())) {
+                return substitute(
+                    binary, new Instruction::add(getIntegerLiteral(lhs->value - rhs_lhs->value),
+                                                 rhs_sub->getRhs()));
+            }  // a - (b - x) = (a - b) + x
+        }
+    }
     return binary->node;
 }
 
@@ -36,7 +81,25 @@ inst_node_t arithmeticFolding(Instruction::fsub *binary) {
     if (binary->getRhs() == getFloatLiteral(0))
         return substitute(binary, binary->getLhs());  // x - 0 = x
     if (binary->getLhs() == binary->getRhs())
-        return substitute(binary, getIntegerLiteral(0));  // x - x = 0
+        return substitute(binary, getFloatLiteral(0));  // x - x = 0
+    if (auto rhs = dynamic_cast<FloatLiteral *>(binary->getRhs())) {
+        return substitute(binary,
+                          new Instruction::fadd(binary->getLhs(), getFloatLiteral(-rhs->value)));
+    } else if (auto lhs = dynamic_cast<FloatLiteral *>(binary->getLhs())) {
+        if (auto rhs_add = dynamic_cast<Instruction::fadd *>(binary->getRhs())) {
+            if (auto rhs_rhs = dynamic_cast<FloatLiteral *>(rhs_add->getRhs())) {
+                return substitute(
+                    binary, new Instruction::fsub(getFloatLiteral(lhs->value - rhs_rhs->value),
+                                                  rhs_add->getLhs()));
+            }  // a - (x + b) = (a - b) - x
+        } else if (auto rhs_sub = dynamic_cast<Instruction::fsub *>(binary->getRhs())) {
+            if (auto rhs_lhs = dynamic_cast<FloatLiteral *>(rhs_sub->getLhs())) {
+                return substitute(
+                    binary, new Instruction::fadd(getFloatLiteral(lhs->value - rhs_lhs->value),
+                                                  rhs_sub->getRhs()));
+            }  // a - (b - x) = (a - b) + x
+        }
+    }
     return binary->node;
 }
 
@@ -58,12 +121,30 @@ inst_node_t arithmeticFolding(Instruction::mul *binary) {
         return substitute(binary, inst, new Instruction::sub(getIntegerLiteral(0), inst));
         // x * -2^n = -x << n
     }
+    if (auto rhs = dynamic_cast<IntegerLiteral *>(binary->getRhs())) {
+        if (auto lhs_mul = dynamic_cast<Instruction::mul *>(binary->getLhs())) {
+            if (auto lhs_rhs = dynamic_cast<IntegerLiteral *>(lhs_mul->getRhs())) {
+                return substitute(
+                    binary, new Instruction::mul(lhs_mul->getLhs(),
+                                                 getIntegerLiteral(lhs_rhs->value * rhs->value)));
+            }  // (x * a) * b = x * (a * b)
+        }
+    }
     return binary->node;
 }
 
 inst_node_t arithmeticFolding(Instruction::fmul *binary) {
     if (binary->getLhs() == getFloatLiteral(0) || binary->getRhs() == getFloatLiteral(0))
-        return substitute(binary, getFloatLiteral(0));  // 0 * x =
+        return substitute(binary, getFloatLiteral(0));  // 0 * x = 0
+    if (auto rhs = dynamic_cast<FloatLiteral *>(binary->getRhs())) {
+        if (auto lhs_mul = dynamic_cast<Instruction::fmul *>(binary->getLhs())) {
+            if (auto lhs_rhs = dynamic_cast<FloatLiteral *>(lhs_mul->getRhs())) {
+                return substitute(
+                    binary, new Instruction::fmul(lhs_mul->getLhs(),
+                                                  getFloatLiteral(lhs_rhs->value * rhs->value)));
+            }  // (x * a) * b = x * (a * b)
+        }
+    }
     return binary->node;
 }
 
@@ -192,7 +273,8 @@ inst_node_t constantFolding(Instruction::_binary_instruction<ty> *binary) {
     auto lhs = dynamic_cast<Literal *>(binary->getLhs());
     auto rhs = dynamic_cast<Literal *>(binary->getRhs());
     if constexpr (ty == Instruction::ADD || ty == Instruction::MUL || ty == Instruction::AND ||
-                  ty == Instruction::OR || ty == Instruction::XOR) {
+                  ty == Instruction::OR || ty == Instruction::XOR || ty == Instruction::FADD ||
+                  ty == Instruction::FMUL) {
         if (lhs && !rhs) {
             using T = std::remove_pointer_t<decltype(binary)>;
             return substitute(binary, new T(binary->getRhs(), lhs));

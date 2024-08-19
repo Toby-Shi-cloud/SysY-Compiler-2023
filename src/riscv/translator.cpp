@@ -6,7 +6,6 @@
 #include <list>
 #include <memory>
 #include <queue>
-#include <sstream>
 #include <unordered_map>
 #include <variant>
 
@@ -938,6 +937,7 @@ void Translator::compute_func_exit() const {
 void Translator::optimizeBeforeAlloc() const {
     clearDeadCode(curFunc);
     mergeBlocks(curFunc);
+    clearDeadCode(curFunc);
 }
 
 void Translator::optimizeAfterAlloc() const {

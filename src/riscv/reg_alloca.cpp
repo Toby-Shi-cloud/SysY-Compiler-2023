@@ -64,14 +64,15 @@ void register_alloca(rFunction function) {
     register_alloca_impl(function);
 }
 
-void spill_as_fp(rFunction func, Graph &graph, std::unordered_set<rRegister> &has_spilled_regs) {
+void spill_as_fp(rFunction func, const Graph &graph,
+                 std::unordered_set<rRegister> &has_spilled_regs) {
     for (auto &[reg, fp] : graph.spill_as_fp) {
         assert(reg->isVirtual() && !reg->isFloat() && !has_spilled_regs.count(reg));
         has_spilled_regs.insert(reg);
         for (auto &user : reg->useUsers) {
-            if (user->node != user->parent->begin() &&
-                reg->defUsers.count(std::prev(user->node)->get()))
-                continue;
+            // if (user->node != user->parent->begin() &&
+            //     reg->defUsers.count(std::prev(user->node)->get()))
+            //     continue;
             user->parent->insert(
                 user->node, std::make_unique<FpConvInstruction>(Instruction::Ty::FMV_X_D, reg, fp));
         }
