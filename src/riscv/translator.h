@@ -38,24 +38,17 @@ inline std::list<pInstruction> translateImmAs(rRegister reg, int imm) {
 }
 
 class Translator : public TranslatorBase {
-    // 生成的浮点常量
-    std::unordered_map<float, rGlobalVar> float_const;
     // 使用到的但是没有被其他指令持有的
     std::stack<pOperand> used_operands;
     // 库函数 Label
     std::unordered_map<std::string, pLabel> lib_labels;
 
-    auto create_float_const(float value) {
-        auto &var = float_const[value];
-        if (var == nullptr) {
-            auto raw = *reinterpret_cast<int *>(&value);
-            auto name = ".LC" + std::to_string(float_const.size());
-            auto gvar = std::make_unique<GlobalVar>(std::move(name), true, false, true, 4,
-                                                    std::vector{std::make_pair(raw, 1)});
-            var = gvar.get();
-            assemblyModule->globalVars.push_back(std::move(gvar));
-        }
-        return create_imm(var->label.get());
+    void load_float_const(rRegister dst, float value) {
+        auto temp = curFunc->newVirRegister();
+        for (auto &inst : translateImmAs(temp, *reinterpret_cast<int *>(&value)))
+            curBlock->push_back(std::move(inst));
+        curBlock->push_back(
+            std::make_unique<FpConvInstruction>(Instruction::Ty::FMV_W_X, dst, temp));
     }
 
     rAddress newAddress(rRegister base, pImmediate offset) {

@@ -728,11 +728,9 @@ rOperand Translator::translateOperand(const mir::Value *mirValue) {
         if (imm == mir::getFloatLiteral(.0f)) {
             curBlock->push_back(
                 std::make_unique<FpConvInstruction>(Instruction::Ty::FMV_W_X, reg, "x0"_R));
-            return reg;
+        } else {
+            load_float_const(reg, imm->value);
         }
-        auto label = create_float_const(imm->value);
-        curBlock->push_back(
-            std::make_unique<IInstruction>(Instruction::Ty::FLW, reg, "x0"_R, std::move(label)));
         return reg;
     }
     if (auto op = oMap.find(mirValue); op != oMap.end()) return op->second;
@@ -745,13 +743,15 @@ rOperand Translator::translateOperand(const mir::Value *mirValue) {
 
 void Translator::compute_phi(const mir::Function *mirFunction) {
     using parallel_copy_t =
-        std::vector<std::pair<rRegister, std::variant<rRegister, pInstruction>>>;
+        std::vector<std::pair<rRegister, std::variant<rRegister, float, int, pInstruction>>>;
     const auto phi2move = [this](const parallel_copy_t &pc) {
         using move_t = MoveInstruction;
         std::vector<pInstruction> instructions;
         std::unordered_map<rRegister, size_t> inDegree;
         std::unordered_map<rRegister, rRegister> map;
         std::unordered_map<rRegister, std::vector<rRegister>> edges;
+        std::unordered_map<rRegister, int> loadInt;
+        std::unordered_map<rRegister, float> loadFloat;
         std::unordered_map<rRegister, rInstruction> loadInst;
         for (auto &[dst, src] : pc) {
             visit(overloaded{
@@ -761,6 +761,8 @@ void Translator::compute_phi(const mir::Function *mirFunction) {
                           inDegree[reg]++;
                           map[reg] = reg;
                       },
+                      [&, dst = dst](int v) { loadInt[dst] = v; },
+                      [&, dst = dst](float v) { loadFloat[dst] = v; },
                       [&, dst = dst](const pInstruction &inst) { loadInst[dst] = inst.get(); },
                   },
                   src);
@@ -789,6 +791,16 @@ void Translator::compute_phi(const mir::Function *mirFunction) {
             map[reg] = vir;
             queue.push(reg);
         }
+        for (auto &[dst, v] : loadInt) {
+            for (auto &inst : translateImmAs(dst, v)) instructions.push_back(std::move(inst));
+        }
+        for (auto &[dst, v] : loadFloat) {
+            auto temp = curFunc->newVirRegister();
+            for (auto &inst : translateImmAs(temp, *reinterpret_cast<int *>(&v)))
+                instructions.push_back(std::move(inst));
+            instructions.push_back(
+                std::make_unique<FpConvInstruction>(Instruction::Ty::FMV_W_X, dst, temp));
+        }
         for (auto &[dst, inst] : loadInst) {
             instructions.push_back(inst->clone_as<Instruction>());
         }
@@ -807,13 +819,9 @@ void Translator::compute_phi(const mir::Function *mirFunction) {
             for (int i = 0; i < phi->getNumIncomingValues(); ++i) {
                 auto [value, block] = phi->getIncomingValue(i);
                 if (auto imm = dynamic_cast<mir::IntegerLiteral *>(value)) {
-                    pcs[block].emplace_back(
-                        dst, std::make_unique<IInstruction>(Instruction::Ty::ADDIW, dst, "x0"_R,
-                                                            create_imm(imm->value)));
+                    pcs[block].emplace_back(dst, imm->value);
                 } else if (auto fimm = dynamic_cast<mir::FloatLiteral *>(value)) {
-                    pcs[block].emplace_back(
-                        dst, std::make_unique<IInstruction>(Instruction::Ty::FLW, dst, "x0"_R,
-                                                            create_float_const(fimm->value)));
+                    pcs[block].emplace_back(dst, fimm->value);
                 } else {
                     auto result = translateOperand(value);
                     if (auto reg = dynamic_cast<rRegister>(result)) {
