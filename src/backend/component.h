@@ -6,6 +6,7 @@
 #define COMPILER_BACKEND_COMPONENT_H
 
 #include <list>
+#include <memory>
 #include <numeric>
 #include <ostream>
 #include <set>
@@ -61,14 +62,28 @@ struct InstructionBase {
     [[nodiscard]] virtual pInstructionBase clone() const = 0;
 
     template <typename T>
-    [[nodiscard]] T clone_as() const {
+    [[nodiscard]] std::unique_ptr<T> clone_as() const {
         auto ptr = clone().release();
-        auto inst = dynamic_cast<T>(ptr);
+        auto inst = dynamic_cast<T *>(ptr);
+        assert(inst != nullptr);
         if (inst == nullptr) delete ptr;
-        return inst;
+        return std::unique_ptr<T>(inst);
     }
 
     [[nodiscard]] rInstructionBase next() const;
+};
+
+struct CommentInstruction : InstructionBase {
+    std::string comment;
+    explicit CommentInstruction(std::string comment) : comment(std::move(comment)) {}
+    bool isJumpBranch() const override { return false; }
+    bool isFuncCall() const override { return false; }
+    void setJumpLabel(rLabel) override {}
+    rLabel getJumpLabel() const override { return nullptr; }
+    std::ostream &output(std::ostream &os) const override { return os << "# " << comment; }
+    [[nodiscard]] pInstructionBase clone() const override {
+        return std::make_unique<CommentInstruction>(comment);
+    }
 };
 
 inline std::ostream &operator<<(std::ostream &os, const InstructionBase &inst) {

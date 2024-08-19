@@ -17,7 +17,7 @@ void functionInline(Function *func) {
                 continue;
             // 一些奇怪的不 inline 的条件
             auto call_ops = call->getOperands();
-            if (call->getFunction()->instruction_size() > 100 &&
+            if (call->getFunction()->instruction_size() > 200 &&
                 std::all_of(call_ops.begin() + 1, call_ops.end(),
                             [](Value *arg) { return dynamic_cast<Literal *>(arg) == nullptr; }))
                 continue;

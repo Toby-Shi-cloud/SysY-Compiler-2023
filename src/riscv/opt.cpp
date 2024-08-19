@@ -43,7 +43,7 @@ void clearDeadCode(rFunction function) {
             };
             for (auto it = block->instructions.rbegin(); it != block->instructions.rend(); ++it) {
                 auto inst = dynamic_cast<Instruction *>(it->get());
-                assert(inst != nullptr);
+                if (inst == nullptr) continue;
                 if (inst->isJumpBranch() || inst->isStore()) {
                     earseDef(inst);
                     addUsed(inst);
