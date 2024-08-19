@@ -5,7 +5,7 @@
 #ifndef COMPILER_RISCV_REG_ALLOCA_H
 #define COMPILER_RISCV_REG_ALLOCA_H
 
-#include <queue>
+#include <stack>
 #include <unordered_map>
 #include <unordered_set>
 #include "riscv/instruction.h"
@@ -37,9 +37,10 @@ struct Graph {
     using Vertex = std::unique_ptr<VertexInfo>;
     std::vector<Vertex> vertexes_pool;
     std::unordered_set<VertexInfo *> vertexes;
-    std::queue<VertexInfo *> vertex_stack;
+    std::stack<VertexInfo *> vertex_stack;
     std::unordered_map<rRegister, VertexInfo *> reg2vertex;
     std::unordered_set<rRegister> spilled_regs;
+    std::unordered_map<rRegister, rFPhyRegister> spill_as_fp;
 
     explicit Graph(rFunction function);
     VertexInfo *get_vertex(rRegister reg);
@@ -50,7 +51,7 @@ struct Graph {
     void simplify();
     void coalesce();
     void spill();
-    void select();
+    void select(const std::unordered_set<rRegister> &has_spilled_regs);
 };
 
 [[nodiscard]] inline auto all_sub_blocks(rFunction function) {

@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     }
 
     std::ifstream fin(infile);
-    set_optimize_level(opt_level > 0 ? 2 : 0, arch);
+    set_optimize_level(opt_level > 0 ? 3 : 0, arch);
     if (!fin) {
         std::cerr << "Error: cannot open file " << infile << std::endl;
         return 1;

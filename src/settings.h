@@ -24,6 +24,7 @@ inline struct OptSettings {
     bool using_array_splitting;
     bool using_inline_global_var;
     bool using_trailing_recursion_opt;
+    bool using_spill_to_freg;
 } opt_settings;
 
 inline void set_optimize_level(int level, const std::string &arch) {
@@ -31,7 +32,9 @@ inline void set_optimize_level(int level, const std::string &arch) {
 #define SET_(f, t) (arch == (t)) && (SET(f))
     opt_settings = {};
     switch (level) {
-    case 3: [[fallthrough]];
+    case 3:
+        SET_(using_spill_to_freg, "riscv");
+        [[fallthrough]];
     case 2:
         SET_(using_gp, "mips");
         SET(using_gvn);

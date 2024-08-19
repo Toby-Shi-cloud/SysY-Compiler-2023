@@ -36,11 +36,13 @@ struct Instruction : InstructionBase {
         FCLASS_S, FCVT_S_W, FCVT_S_WU, FMV_W_X,
         // float (RV64F)
         FCVT_L_S, FCVT_LU_S, FCVT_S_L, FCVT_S_LU,
+        // float (RV32D + RV64D)
+        FLD, FSD, FMV_X_D, FMV_D_X,
         // useful pseudo instructions
         CALL, RET, J, MV, FMV_S, FNEG_S, SEXT_W, ZEXT_W, LI,
     } ty;
     // clang-format on
-    friend constexpr bool floatOp(Ty ty) { return ty >= Ty::FLW && ty <= Ty::FCVT_S_LU; }
+    friend constexpr bool floatOp(Ty ty) { return ty >= Ty::FLW && ty <= Ty::FMV_D_X; }
 
     enum class InstType { R, I, S, B, U, J, Pseudo };
     virtual InstType getInstType() const = 0;
@@ -71,10 +73,10 @@ struct Instruction : InstructionBase {
     }
 
     [[nodiscard]] bool isStore() const {
-        return ty >= Ty::SB && ty <= Ty::SW || ty == Ty::SD || ty == Ty::FSW;
+        return ty >= Ty::SB && ty <= Ty::SW || ty == Ty::SD || ty == Ty::FSW || ty == Ty::FSD;
     }
     [[nodiscard]] bool isLoad() const {
-        return ty >= Ty::LB && ty <= Ty::LHU || ty == Ty::LWU || ty == Ty::LD | ty == Ty::FLW;
+        return ty >= Ty::LB && ty <= Ty::LHU || ty == Ty::LWU || ty == Ty::LD | ty == Ty::FLW || ty == Ty::FLD;
     }
 
     [[nodiscard]] rLabel getJumpLabel() const override { return nullptr; }

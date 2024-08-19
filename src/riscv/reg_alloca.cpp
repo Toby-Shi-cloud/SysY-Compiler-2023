@@ -5,9 +5,13 @@
 #include "riscv/reg_alloca.h"
 #include <algorithm>
 #include <functional>
+#include <memory>
+#include <queue>
+#include <unordered_set>
 #include "backend/operand.h"
 #include "riscv/instruction.h"
 #include "riscv/operand.h"
+#include "settings.h"
 
 namespace backend::riscv {
 
@@ -30,31 +34,51 @@ constexpr auto should_color_precond = [](rRegister r) {
 static inst_pos_t load_at(rFunction func, rSubBlock block, inst_pos_t it, rRegister dst,
                           int offset) {
     auto imm = create_stack_imm(offset);
-    auto load_ty = dst->isFloat() ? Instruction::Ty::FLW : Instruction::Ty::LD;
+    auto load_ty = dst->isFloat() ? Instruction::Ty::FLD : Instruction::Ty::LD;
     return block->insert(it, std::make_unique<IInstruction>(load_ty, dst, "sp"_R, std::move(imm)));
 }
 
 static inst_pos_t store_at(rFunction func, rSubBlock block, inst_pos_t it, rRegister src,
                            int offset) {
     auto imm = create_stack_imm(offset);
-    auto store_ty = src->isFloat() ? Instruction::Ty::FSW : Instruction::Ty::SD;
+    auto store_ty = src->isFloat() ? Instruction::Ty::FSD : Instruction::Ty::SD;
     return block->insert(it, std::make_unique<SInstruction>(store_ty, src, "sp"_R, std::move(imm)));
 }
 
 void register_alloca(rFunction function) {
-    // for X reg
-    alloca_regs = XPhyRegister::gets(alloca_regs_pred);
-    temp_regs = XPhyRegister::gets(temp_regs_pred);
-    should_color = [](rRegister r) { return !r->isFloat() && should_color_precond(r); };
-    register_alloca_impl(function);
     // for F reg
     alloca_regs = FPhyRegister::gets(alloca_regs_pred);
     temp_regs = FPhyRegister::gets(temp_regs_pred);
     should_color = [](rRegister r) { return r->isFloat() && should_color_precond(r); };
     register_alloca_impl(function);
+    // for X reg
+    alloca_regs = opt_settings.using_spill_to_freg ? PhyRegister::gets(alloca_regs_pred)
+                                                   : XPhyRegister::gets(alloca_regs_pred);
+    temp_regs = XPhyRegister::gets(temp_regs_pred);
+    should_color = opt_settings.using_spill_to_freg
+                       ? [](rRegister r) { return r->isFloat() || should_color_precond(r); }
+                       : [](rRegister r) { return !r->isFloat() && should_color_precond(r); };
+    register_alloca_impl(function);
+}
+
+void spill_as_fp(rFunction func, Graph &graph, std::unordered_set<rRegister> &has_spilled_regs) {
+    for (auto &[reg, fp] : graph.spill_as_fp) {
+        assert(reg->isVirtual() && !reg->isFloat() && !has_spilled_regs.count(reg));
+        has_spilled_regs.insert(reg);
+        for (auto &user : reg->useUsers) {
+            user->parent->insert(
+                user->node, std::make_unique<FpConvInstruction>(Instruction::Ty::FMV_X_D, reg, fp));
+        }
+        for (auto &defer : reg->defUsers) {
+            defer->parent->insert(std::next(defer->node), std::make_unique<FpConvInstruction>(
+                                                              Instruction::Ty::FMV_D_X, fp, reg));
+        }
+        if (fp->isSaved()) func->shouldSave.insert(fp);
+    }
 }
 
 void register_alloca_impl(rFunction function) {
+    std::unordered_set<rRegister> has_spilled_regs;
     for (;;) {
         compute_blocks_info(function);
         compute_instructions_info(function);
@@ -67,11 +91,16 @@ void register_alloca_impl(rFunction function) {
             }
             graph.spill();
         }
-        graph.select();
+        graph.select(has_spilled_regs);
+        if (!graph.spill_as_fp.empty()) {
+            spill_as_fp(function, graph, has_spilled_regs);
+            continue;
+        }
         if (graph.spilled_regs.empty()) return replace_register(function, graph);
         // spill to memory
         for (auto reg : graph.spilled_regs) {
-            assert(reg->isVirtual());
+            assert(reg->isVirtual() && !has_spilled_regs.count(reg));
+            has_spilled_regs.insert(reg);
             if (reg->defUsers.size() == 1) {
                 // 如果本来就是从内存里面读取的
                 auto def = dynamic_cast<rIInstruction>(*reg->defUsers.begin());
@@ -85,18 +114,10 @@ void register_alloca_impl(rFunction function) {
             }
             function->allocaSize += 8;
             int offset = -static_cast<int>(function->allocaSize);
-            auto vir = function->newVirRegister(reg->isFloat());
-            while (!reg->useUsers.empty()) {
-                auto &&user = *reg->useUsers.begin();
-                load_at(function, user->parent, user->node, vir, offset);
-                reg->swapUseIn(vir, user);
-            }
-            while (!reg->defUsers.empty()) {
-                auto &&defer = *reg->defUsers.begin();
-                auto it = defer->node;
-                store_at(function, defer->parent, ++it, vir, offset);
-                reg->swapDefIn(vir, defer);
-            }
+            for (auto &user : reg->useUsers)
+                load_at(function, user->parent, user->node, reg, offset);
+            for (auto &defer : reg->defUsers)
+                store_at(function, defer->parent, std::next(defer->node), reg, offset);
         }
     }
 }
@@ -367,16 +388,28 @@ void Graph::spill() {
     }
 }
 
-void Graph::select() {
-    while (!vertex_stack.empty()) {
-        auto u = vertex_stack.front();
-        vertex_stack.pop();
+void Graph::select(const std::unordered_set<rRegister> &has_spilled_regs) {
+    const auto select_impl = [this](VertexInfo *u) {
+        if (u->color != nullptr) return;
         auto avail = alloca_regs;
         for (auto v : u->edges) avail.erase(v->color);
-        if (avail.empty())
+        if (avail.empty()) {
             spilled_regs.insert(u->regs.begin(), u->regs.end());
-        else
+        } else {
             u->color = *avail.begin();
+            for (auto reg : u->regs) {
+                if (reg->isFloat()) continue;
+                if (auto fp = dynamic_cast<rFPhyRegister>(u->color)) spill_as_fp.emplace(reg, fp);
+            }
+        }
+    };
+    for (auto &reg : has_spilled_regs) {
+        select_impl(reg2vertex[reg]);
+    }
+    while (!vertex_stack.empty()) {
+        auto u = vertex_stack.top();
+        vertex_stack.pop();
+        select_impl(u);
     }
 }
 }  // namespace backend::riscv

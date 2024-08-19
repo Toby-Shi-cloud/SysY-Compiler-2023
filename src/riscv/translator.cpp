@@ -895,7 +895,7 @@ void Translator::compute_func_start() const {
             }
         }
         startB->push_back(std::make_unique<SInstruction>(
-            reg->isFloat() ? Instruction::Ty::FSW : Instruction::Ty::SD, reg,
+            reg->isFloat() ? Instruction::Ty::FSD : Instruction::Ty::SD, reg,
             now_t6 == 0 ? "sp"_R : "x31"_R, create_imm(now_offset)));
     }
     startB->push_back(std::make_unique<JumpInstruction>(first_block->label.get()));
@@ -925,7 +925,7 @@ void Translator::compute_func_exit() const {
             }
         }
         curFunc->exitB->push_back(std::make_unique<IInstruction>(
-            reg->isFloat() ? Instruction::Ty::FLW : Instruction::Ty::LD, reg,
+            reg->isFloat() ? Instruction::Ty::FLD : Instruction::Ty::LD, reg,
             now_t6 == 0 ? "sp"_R : "x31"_R, create_imm(now_offset)));
     }
     if (curFunc->stackOffset)
