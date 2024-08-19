@@ -7,7 +7,8 @@
 #include "settings.h"
 
 namespace mir {
-static inst_node_t arithmeticFolding(Instruction::add *binary) {
+namespace {
+inst_node_t arithmeticFolding(Instruction::add *binary) {
     if (binary->getLhs() == getIntegerLiteral(0))
         return substitute(binary, binary->getRhs());  // 0 + x = x
     if (binary->getRhs() == getIntegerLiteral(0))
@@ -15,7 +16,7 @@ static inst_node_t arithmeticFolding(Instruction::add *binary) {
     return binary->node;
 }
 
-static inst_node_t arithmeticFolding(Instruction::fadd *binary) {
+inst_node_t arithmeticFolding(Instruction::fadd *binary) {
     if (binary->getLhs() == getFloatLiteral(0))
         return substitute(binary, binary->getRhs());  // 0 + x = x
     if (binary->getRhs() == getFloatLiteral(0))
@@ -23,7 +24,7 @@ static inst_node_t arithmeticFolding(Instruction::fadd *binary) {
     return binary->node;
 }
 
-static inst_node_t arithmeticFolding(Instruction::sub *binary) {
+inst_node_t arithmeticFolding(Instruction::sub *binary) {
     if (binary->getRhs() == getIntegerLiteral(0))
         return substitute(binary, binary->getLhs());  // x - 0 = x
     if (binary->getLhs() == binary->getRhs())
@@ -31,7 +32,7 @@ static inst_node_t arithmeticFolding(Instruction::sub *binary) {
     return binary->node;
 }
 
-static inst_node_t arithmeticFolding(Instruction::fsub *binary) {
+inst_node_t arithmeticFolding(Instruction::fsub *binary) {
     if (binary->getRhs() == getFloatLiteral(0))
         return substitute(binary, binary->getLhs());  // x - 0 = x
     if (binary->getLhs() == binary->getRhs())
@@ -39,7 +40,7 @@ static inst_node_t arithmeticFolding(Instruction::fsub *binary) {
     return binary->node;
 }
 
-static inst_node_t arithmeticFolding(Instruction::mul *binary) {
+inst_node_t arithmeticFolding(Instruction::mul *binary) {
     // if binary->getLhs() is a constant, constantFolding will swap lhs and rhs
     if (binary->getRhs() == getIntegerLiteral(0))
         return substitute(binary, getIntegerLiteral(0));  // 0 * x = 0
@@ -60,7 +61,7 @@ static inst_node_t arithmeticFolding(Instruction::mul *binary) {
     return binary->node;
 }
 
-static inst_node_t arithmeticFolding(Instruction::fmul *binary) {
+inst_node_t arithmeticFolding(Instruction::fmul *binary) {
     if (binary->getLhs() == getFloatLiteral(0) || binary->getRhs() == getFloatLiteral(0))
         return substitute(binary, getFloatLiteral(0));  // 0 * x =
     return binary->node;
@@ -76,7 +77,7 @@ constexpr auto arithmeticFoldingDiv = [](auto binary) {
     return binary->node;
 };
 
-static inst_node_t arithmeticFolding(Instruction::udiv *binary) {
+inst_node_t arithmeticFolding(Instruction::udiv *binary) {
     if (auto ret = arithmeticFoldingDiv(binary); ret != binary->node) return ret;
     if (auto rhs = dynamic_cast<IntegerLiteral *>(binary->getRhs());
         rhs && __builtin_popcount(rhs->value) == 1) {
@@ -88,7 +89,7 @@ static inst_node_t arithmeticFolding(Instruction::udiv *binary) {
     return binary->node;
 }
 
-static inst_node_t arithmeticFolding(Instruction::sdiv *binary) {
+inst_node_t arithmeticFolding(Instruction::sdiv *binary) {
     if (auto ret = arithmeticFoldingDiv(binary); ret != binary->node) return ret;
     if (binary->getRhs() == getIntegerLiteral(-1))
         return substitute(
@@ -102,7 +103,7 @@ static inst_node_t arithmeticFolding(Instruction::sdiv *binary) {
     return binary->node;
 }
 
-static inst_node_t arithmeticFolding(Instruction::fdiv *binary) {
+inst_node_t arithmeticFolding(Instruction::fdiv *binary) {
     if (binary->getRhs() == getFloatLiteral(1))  // x / -1 = -x
         return substitute(binary, binary->getLhs());
     if (binary->getRhs() == getFloatLiteral(-1))  // x / -1 = -x
@@ -120,7 +121,7 @@ constexpr auto arithmeticFoldingRem = [](auto binary) {
     return binary->node;
 };
 
-static inst_node_t arithmeticFolding(Instruction::urem *binary) {
+inst_node_t arithmeticFolding(Instruction::urem *binary) {
     if (auto ret = arithmeticFoldingRem(binary); ret != binary->node) return ret;
     if (auto rhs = dynamic_cast<IntegerLiteral *>(binary->getRhs());
         rhs && __builtin_popcount(rhs->value) == 1) {
@@ -131,7 +132,7 @@ static inst_node_t arithmeticFolding(Instruction::urem *binary) {
     return binary->node;
 }
 
-static inst_node_t arithmeticFolding(Instruction::srem *binary) {
+inst_node_t arithmeticFolding(Instruction::srem *binary) {
     if (auto ret = arithmeticFoldingRem(binary); ret != binary->node) return ret;
     if (auto rhs = dynamic_cast<IntegerLiteral *>(binary->getRhs());
         rhs && rhs->value < 0 && rhs->value != -rhs->value) {
@@ -142,8 +143,16 @@ static inst_node_t arithmeticFolding(Instruction::srem *binary) {
     return binary->node;
 }
 
+inst_node_t arithmeticFolding(Instruction::frem *binary) {
+    if (binary->getLhs() == getFloatLiteral(0))
+        return substitute(binary, getFloatLiteral(0));  // 0 % x = 0
+    if (binary->getLhs() == binary->getRhs())
+        return substitute(binary, getFloatLiteral(0));  // x % x = 0
+    return binary->node;
+}
+
 template <Instruction::InstrTy ty>
-static inst_node_t arithmeticFolding(Instruction::_binary_instruction<ty> *binary) {
+inst_node_t arithmeticFolding(Instruction::_binary_instruction<ty> *binary) {
     // SHL, LSHR, ASHR, AND, OR, XOR
     static_assert(ty >= Instruction::SHL && ty <= Instruction::XOR);
     if (binary->getRhs() == getIntegerLiteral(0)) {
@@ -164,6 +173,7 @@ static inst_node_t arithmeticFolding(Instruction::_binary_instruction<ty> *binar
     }
     return binary->node;
 }
+}  // namespace
 
 inst_node_t constantFolding(Instruction::br *br) {
     if (!br->hasCondition()) return br->node;
@@ -378,7 +388,7 @@ inst_node_t constantFolding(Instruction *inst) {
         CASE(FSUB, fsub);
         CASE(FMUL, fmul);
         CASE(FDIV, fdiv);
-        // CASE(FREM, frem);
+        CASE(FREM, frem);
         CASE(FNEG, fneg);
         CASE(SHL, shl);
         CASE(LSHR, lshr);

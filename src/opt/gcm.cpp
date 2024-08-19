@@ -7,6 +7,7 @@
 #include "opt/opt.h"
 
 namespace mir {
+// 对每一条回边进行计算，计算出 bb 的循环嵌套深度
 void Function::calcLoopNest() const {
     constexpr auto calc = [](BasicBlock *head, BasicBlock *tail) {
         std::unordered_set<BasicBlock *> visited{head, tail};
@@ -29,6 +30,7 @@ void Function::calcLoopNest() const {
             if (bb->dominators.count(suc)) calc(suc, bb);
 }
 
+// bb 依赖深度
 void Function::calcDomDepth() const {
     std::stack<BasicBlock *> stack;
     for (auto bb : bbs) {
