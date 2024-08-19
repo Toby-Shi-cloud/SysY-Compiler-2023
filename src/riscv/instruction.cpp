@@ -88,6 +88,8 @@ Instruction::Ty TyI2R(Instruction::Ty ty) {
 bool IInstruction::maybe_illegal() const {
     auto func = parent->parent->parent;
     auto size = func->allocaSize + func->argSize + 64 * 8;
+    if (ty == Instruction::Ty::ADDI || ty == Instruction::Ty::ADDIW)
+        return !isLegalImm(imm.get(), -2048 * 2, 2047 * 2, static_cast<int>(size));
     return !isLegalImm(imm.get(), -2048, 2047, static_cast<int>(size));
 }
 
@@ -100,6 +102,17 @@ bool SInstruction::maybe_illegal() const {
 inst_node_t IInstruction::legalize() {
     if (isLegalImm(imm.get(), -2048, 2047)) return std::next(node);
     const auto push = [this](pInstruction inst) { parent->insert(node, std::move(inst)); };
+    if (ty == Instruction::Ty::ADDI || ty == Instruction::Ty::ADDIW) {
+        if (isLegalImm(imm.get(), 2048, 2047 * 2)) {
+            push(std::make_unique<IInstruction>(ty, rd(), rs1(), create_imm(2047)));
+            push(std::make_unique<IInstruction>(ty, rd(), rd(), join_imm(imm, create_imm(-2047))));
+            return parent->erase(node);
+        } else if (isLegalImm(imm.get(), -2048 * 2, -2049)) {
+            push(std::make_unique<IInstruction>(ty, rd(), rs1(), create_imm(-2048)));
+            push(std::make_unique<IInstruction>(ty, rd(), rd(), join_imm(imm, create_imm(2048))));
+            return parent->erase(node);
+        }
+    }
     const auto temp = rd() == rs1() || rd()->isFloat() ? "x31"_R : rd();
     assert(maybe_illegal());
     if (isLoad()) {
