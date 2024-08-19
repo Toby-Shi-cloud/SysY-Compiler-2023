@@ -52,12 +52,15 @@ void register_alloca(rFunction function) {
     should_color = [](rRegister r) { return r->isFloat() && should_color_precond(r); };
     register_alloca_impl(function);
     // for X reg
-    alloca_regs = opt_settings.using_spill_to_freg ? PhyRegister::gets(alloca_regs_pred)
-                                                   : XPhyRegister::gets(alloca_regs_pred);
-    temp_regs = XPhyRegister::gets(temp_regs_pred);
-    should_color = opt_settings.using_spill_to_freg
-                       ? [](rRegister r) { return r->isFloat() || should_color_precond(r); }
-                       : [](rRegister r) { return !r->isFloat() && should_color_precond(r); };
+    if (opt_settings.using_spill_to_freg) {
+        alloca_regs = PhyRegister::gets(alloca_regs_pred);
+        temp_regs = PhyRegister::gets(temp_regs_pred);
+        should_color = [](rRegister r) { return r->isFloat() || should_color_precond(r); };
+    } else {
+        alloca_regs = XPhyRegister::gets(alloca_regs_pred);
+        temp_regs = XPhyRegister::gets(temp_regs_pred);
+        should_color = [](rRegister r) { return !r->isFloat() && should_color_precond(r); };
+    }
     register_alloca_impl(function);
 }
 
@@ -66,6 +69,9 @@ void spill_as_fp(rFunction func, Graph &graph, std::unordered_set<rRegister> &ha
         assert(reg->isVirtual() && !reg->isFloat() && !has_spilled_regs.count(reg));
         has_spilled_regs.insert(reg);
         for (auto &user : reg->useUsers) {
+            if (user->node != user->parent->begin() &&
+                reg->defUsers.count(std::prev(user->node)->get()))
+                continue;
             user->parent->insert(
                 user->node, std::make_unique<FpConvInstruction>(Instruction::Ty::FMV_X_D, reg, fp));
         }
@@ -114,8 +120,12 @@ void register_alloca_impl(rFunction function) {
             }
             function->allocaSize += 8;
             int offset = -static_cast<int>(function->allocaSize);
-            for (auto &user : reg->useUsers)
+            for (auto &user : reg->useUsers) {
+                if (user->node != user->parent->begin() &&
+                    reg->defUsers.count(std::prev(user->node)->get()))
+                    continue;
                 load_at(function, user->parent, user->node, reg, offset);
+            }
             for (auto &defer : reg->defUsers)
                 store_at(function, defer->parent, std::next(defer->node), reg, offset);
         }
