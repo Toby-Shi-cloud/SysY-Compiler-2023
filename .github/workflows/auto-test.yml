@@ -58,8 +58,9 @@ jobs:
       - name: Clone from GitLab
         run: |
           git clone https://pat:${{secrets.GITLABTOKEN}}@gitlab.eduxiji.net/T202410006203585/compiler2024-toby.git ../compiler2024-toby
-          rm -rf ../compiler2024-toby/src
+          rm -rf ../compiler2024-toby/src ../compiler2024-toby/README.md
           cp -r src ../compiler2024-toby
+          cp doc/Design.md ../compiler2024-toby/README.md
 
       - name: Test Conpile
         run: |

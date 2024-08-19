@@ -1,89 +1,53 @@
-# SysY 2023 编译器设计文档
+# SysY 2023~2024 编译器设计文档
 
-## 参考编译器介绍
+本项目地址：https://github.com/Toby-Shi-cloud/SysY-Compiler-2023
+SysY Compiler Project 2023 by Toby Shi.
 
-本编译器在设计时，主要参考了 [LLVM-Clang](https://clang.llvm.org/) 的设计。
-LLVM-Clang 是一个 C 系列编译器，其优秀的设计和实现都是业界公认的。
-当然 Clang 的完善程度自然不是我这个小编译器可以比拟的，但是我还是希望能够借鉴一些 Clang 的设计思想。
+## 第三方依赖
 
-### 总体结构
-
-[LLVM](https://github.com/llvm/llvm-project) 编译器是一个庞大的项目，总体上来说，它由以下几个主要子项目组成：
-1. clang - clang 是 LLVM 的前端，负责将 C 系列语言翻译成 LLVM IR。
-2. opt - opt 是 LLVM 的优化器，负责对 LLVM IR 进行各种优化。
-3. llc - llc 是 LLVM 的后端，负责将 LLVM IR 翻译成目标机器的汇编代码。
-4. lld - lld 是 LLVM 的链接器，负责链接多个目标代码生成可执行文件。
-5. lldb - lldb 是 LLVM 的调试器，负责调试可执行文件。
-6. libc - libc 是 LLVM 的 C 标准库实现，负责提供 C 标准库的各种函数实现。
-7. ...
-
-### 接口设计
-
-LLVM 的各个子项目之间的接口设计非常清晰，每个子项目都有自己的接口，而且接口之间的依赖关系也非常清晰。
-每个子项目既可以单独调用，也可以整体使用。
-LLVM 的设计将高内聚、低耦合的思想发挥到了极致。
-
-### 文件组织
-
-LLVM 代码在 [GitHub](https://github.com/llvm/llvm-project) 上开源，其代码文件组织简单但高效又清晰，是非常优雅的设计。
-
-LLVM 项目根目录下是其各个子项目目录，每个子项目大多都由 `cmake`, `docs`, `examples`, `include`, `lib`, `test`, `unittests` 等目录组成。
+- "clipp" 用于命令行参数解析
+- "dbg.h" 用于 debug
+- "magic_enum" 用于枚举反射
 
 ## 编译器总体设计
 
 ### 总体结构
 
 参考 LLVM 的设计，本编译器也计划分为以下几个子项目：
-1. 前端 - 负责将 SysY 语言 (C 语言子集) 翻译成 IR。为了方便测试，我计划直接采用 LLVM IR 作为中间表示。
+
+1. 前端 - 负责将 SysY 语言 (C 语言子集) 翻译成 IR。为了方便测试，我采用了 LLVM IR 作为中间表示。
 2. 优化器 - 负责对 IR 进行各种优化。
-3. 后端 - 负责将 IR 翻译成目标机器的汇编代码 (mips)。
-
-### 接口设计
-
-参考 LLVM 的设计，本编译器也计划分离各个子项目，使他们既可以单独使用也可以整体调用。
+3. 后端 - 负责将 IR 翻译成目标机器的汇编代码 (riscv-64gc)。
 
 ### 文件组织
 
-参考 LLVM 的设计，本编译器的文件结构如下：
+本编译器的源代码文件结构如下：
+
 ```
 .
-├── cmake-build-* (build directory)
-│   └── ...
-├── lib (library directory)
-│   └── ...
-├── doc (document directory)
-│   ├── Design.md
-│   └── SysY2023.g4
-├── src (source code directory)
-│   ├── backend
+├── src
+│   ├── backend // 体系架构无关的后端框架
 │   │   ├── translator.h
-│   │   ├── reg_alloca.h
 │   │   └── ...
-│   ├── frontend
+│   ├── frontend // 前端
 │   │   ├── lexer.h
 │   │   ├── parser.h
 │   │   ├── visitor.h
 │   │   └── ...
-│   ├── mips
-│   │   ├── operand.h
-│   │   ├── instruction.h
-│   │   ├── component.h
+│   ├── mips // mips 后端，不过该后端目前仅停留在无浮点数的版本
 │   │   └── ...
-│   ├── mir
+│   ├── mir // 中间代码
 │   │   ├── type.h
 │   │   ├── value.h
 │   │   ├── derived_value.h
 │   │   ├── instruction.h
 │   │   └── ...
-│   ├── opt
+│   ├── opt // 中端优化
 │   │   └── ...
-│   ├── dbg.h
-│   ├── enum.h
-│   └── main.cpp
-├── tests (test files directory)
+│   ├── riscv // riscv 后端，大赛版本
+│   │   └── ...
+│   ├── main.cpp
 │   └── ...
-├── CMakeLists.txt
-├── LICENSE
 ├── README.md
 └── ...
 ```
@@ -95,6 +59,7 @@ namespace `frontend::lexer`
 ### Token 设计
 
 Token 包含如下信息：
+
 ```cpp
 struct Token {
     token_type_t type;
@@ -107,6 +72,7 @@ struct Token {
 ### Lexer 设计
 
 Lexer 类主要包含以下接口：
+
 ```cpp
 class Lexer {
 public:
@@ -119,16 +85,16 @@ public:
 ```
 
 Lexer 类主要实现方案如下：
+
 ```cpp
 class Lexer {
 private:
     std::optional<Token> next_token_impl(); // 返回下一个 Token
     void next_token_skip_whitespaces(); // 跳过空白字符
     bool next_token_skip_comment(); // 跳过注释
-    std::optional<Token> next_token_try_word(); // 尝试解析关键字和运算符
+    std::optional<Token> next_token_try_operator(); // 尝试解析运算符
     std::optional<Token> next_token_try_number(); // 尝试解析数字
-    std::optional<Token> next_token_try_string(); // 尝试解析字符串
-    std::optional<Token> next_token_try_identifier(); // 尝试解析标识符
+    std::optional<Token> next_token_try_identifier(); // 尝试解析标识符/关键字
     Token next_token_error_token(); // 解析错误时返回的 Token
 };
 ```
@@ -147,6 +113,7 @@ namespace `frontend::parser`
 namespace `frontend::grammar`
 
 仅分为了常规语法节点和终结符语法节点两种，定义如下：
+
 ```cpp
 struct GrammarNode {
     const grammar_type_t type;
@@ -164,11 +131,13 @@ using pTerminalNode = std::unique_ptr<TerminalNode>;
 ### AST 生成器
 
 AST 生成器，其本质是一个函数，接受一个 Parser 作为参数，返回语法节点链表。定义如下：
+
 ```cpp
 using generator_t = std::function<optGrammarNodeList(SysYParser *)>;
 ```
 
 支持下面 4 个操作符重载：
+
 ```cpp
 generator_t operator+(const generator_t &one, const generator_t &other); // 串联
 generator_t operator|(const generator_t &one, const generator_t &other); // 选择
@@ -179,30 +148,42 @@ generator_t operator*(const generator_t &gen, _many); // 若干
 ### SysYParser
 
 SysYParser 类主要有以下方法：
+
 ```cpp
 class SysYParser {
     template<lexer::token_type_t type>
     inline static auto generator() -> generator_t; // 生成一个匹配指定 Token 类型的 generator
-    
+
     template<grammar_type_t type>
     inline static auto generator() -> generator_t; // 生成一个匹配指定语法类型的 generator
-    
+
     inline pGrammarNode grammarNode(grammar_type_t type, const generator_t &gen); // 生成一个语法节点
-    
+
     template<grammar_type_t>
     pGrammarNode parse_impl(); // 解析指定语法类型的语法节点
-    
-public:
+
+ public:
     void parse(); // 解析整个程序
 };
 ```
 
-## 错误处理设计 & 中间代码生成设计
+在上面的架构前提下，我的 Parser 可以直接使用声明式写法，示例如下：
+
+```cpp
+// <ReturnStmt> ::= "return" <Exp> ";"
+template <>
+pGrammarNode SysYParser::parse_impl<ReturnStmt>() {
+    auto gen = generator<RETURNTK>() + generator<Exp>() * OPTION + generator<SEMICN>();
+    return grammarNode(ReturnStmt, gen);
+}
+```
+
+## 中间代码生成设计
 
 - namespace `frontend::visitor`
 - namespace `mir`
 
-我的错误处理和中间代码生成均主要在 visitor 中实现。
+中间代码生成均主要在 visitor 中实现。
 
 ### visitor 方法设计
 
@@ -225,6 +206,7 @@ return_type visit(const GrammarNode &node);
 ### 符号表设计
 
 符号表是一个栈，每个栈内拥有一个 `std::unordered_map` 是从符号名到符号信息的映射。
+
 > 由于 C++ 的栈不支持遍历，所以这里直接使用了 `std::deque` 来实现栈。
 
 这个符号表仅服务于 `visitor`，在 `visitor` 生成中间代码后，符号表信息将转移至 `mir::Value` 之间的相互引用关系中。
@@ -235,7 +217,7 @@ return_type visit(const GrammarNode &node);
 
 在中间代码中，我为每个指令都建立了一个类，这样可以方便优化和访问。
 
-为了简化中间代码生成的难度，我在大多数时候使用了 LLVM IR 的 opaque pointer (模糊指针)，避免了一些不必要的 `bitcast` 或 `getelementptr` 这样的指针变换和计算指令。
+为了简化中间代码生成的难度，我使用了 LLVM IR 的 opaque pointer (模糊指针)，避免了一些不必要的 `bitcast` 或 `getelementptr` 这样的指针变换和计算指令。
 
 ## 代码生成设计
 
@@ -245,27 +227,51 @@ return_type visit(const GrammarNode &node);
 生成最终的 mips 代码的难度其实并不如想象中的那么简单，主要是 LLVM IR 的设计和 mips 的设计并非总是一一对应的，有些部分必须要进行一些转换。
 因此我设计的后端先将 LLVM IR 转换成含有虚拟寄存器的 mips 代码，随后再通过寄存器分配将虚拟寄存器转换成物理寄存器。
 
-### mips 代码设计
+### 后端代码设计
 
-翻译过程和 visitor 的设计类似，为不同的 ir 指令设计了不同的方法，也为不同种类的 mips 指令设计了不同的类，方便分别处理和优化。
+在架构无关的后端中，主要设计了 `Operand` 及其派生类，以及众多 `Component` 类，包括：
 
-mips 相关的类设计时使用了 `std::unique_ptr` 表示所有权，避免了内存释放相关问题。对于那些不具有所有权的指针，则使用了裸指针。
+```cpp
+// Operands
+struct Operand; // 任何操作数，包括常量，寄存器，标签等
+struct Register; // 寄存器基类
+struct VirRegister; // 虚拟寄存器
+struct Label; // 标签
+// Components
+struct InstructionBase; // 指令基类
+struct SubBlock; // 不带标签，中途不跳转的基本块
+struct Block; // 带标签，由 SubBlock 组成
+struct Function; // 函数
+struct GlobalVar; // 全局变量
+struct Module; // 整个汇编模块
+```
 
-mips 代码主要分为 3 个部分：
-- 可以用作操作数的 `operand`
-- 保存信息和结构的 `component`
-- 代表指令的 `instruction`
+另外设计了一个翻译器基类，用于表达架构无关的基础代码。
+
+### riscv 后端设计
+
+`Operand` 部分额外新增了物理寄存器相关类，立即数相关类。
+`Instruction` 则增加了各式各样的 riscv 指令（指令按照 R, I, S, B, U, J 分别派生，另外额外派生常用伪指令类）。
+`Translator` 针对所有中端用到的 IR 进行了翻译。
 
 ### 寄存器分配设计
 
-最初对于寄存器分配，我采用了简单的贪心算法：
-1. 计算 Block 的 liveIn 和 liveOut，根据此建立冲突图。（没有使用更好的定义链分析建图）
-2. 随后在图上进行 DFS 染色，遇到无法染色的节点则分配内存，可以染色则分配寄存器。（没有进行更严格的图着色的优化）
-3. 分配好跨 Block 使用的虚拟寄存器后，再进行 Block 内的寄存器分配。
-4. 局部寄存器分配方案则更加暴力，对于遍历到的暂未分配的虚拟寄存器，直接分配一个物理寄存器（如果有），否则分配内存。当然如果这是一个虚拟寄存器在 Block 中的最后一次使用，则可以释放其占有的物理寄存器资源。
+目前的版本采用全局图着色算法：
 
-之后，出于更好的寄存器分配需要，我实现了用途更为广泛的全局图着色算法：
 1. 计算 Block 的 liveIn 和 liveOut。
 2. 根据 Block 的 liveIn 和 liveOut 依次计算各个指令的 liveIn 和 liveOut。
 3. 根据指令的 liveIn 和 liveOut 建立冲突图。（考虑到从 SSA 翻译过来的 mips 指令绝大多数仍然是 SSA，所以不需要使用定义链分析）
 4. 使用图着色算法进行寄存器分配。（包括：simplify、coalesce、freeze、spill、select）
+
+## 主要优化
+
+主要做到的优化：
+
+1. mem2reg 将不需要地址的变量尽可能优化到寄存器中。
+2. constant-folding 常量折叠。尽可能增加编译器常数计算。
+3. gcm/gvn 全局值移动和全局值编号。尽可能减少重复计算，并把不需要在循环中的代码提到循环外。
+4. div-mul-opt 尽可能使用移位代替乘除法。将除法转换为乘法。尽可能减少除法指令。
+5. function-inline 内联函数。
+6. constexpr 尽可能将函数转换为 constexpr 函数（即能在编译期计算的函数要在编译期计算）。
+7. array-spilt 将实际不需要使用到数组地址的数组拆分，然后优化到寄存器中。
+8. tail-recusive-opt 尾递归优化。尾递归可以优化为循环，减少栈消耗。
