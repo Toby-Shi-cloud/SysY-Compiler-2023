@@ -808,7 +808,7 @@ void Translator::compute_phi(const mir::Function *mirFunction) {
                 auto [value, block] = phi->getIncomingValue(i);
                 if (auto imm = dynamic_cast<mir::IntegerLiteral *>(value)) {
                     pcs[block].emplace_back(
-                        dst, std::make_unique<IInstruction>(Instruction::Ty::ADDI, dst, "x0"_R,
+                        dst, std::make_unique<IInstruction>(Instruction::Ty::ADDIW, dst, "x0"_R,
                                                             create_imm(imm->value)));
                 } else if (auto fimm = dynamic_cast<mir::FloatLiteral *>(value)) {
                     pcs[block].emplace_back(
@@ -864,21 +864,61 @@ void Translator::compute_func_start() const {
         startB->push_back(std::make_unique<IInstruction>(Instruction::Ty::ADDI, "sp"_R, "sp"_R,
                                                          create_imm(-curFunc->stackOffset)));
     // save registers
-    int cnt = 0;
+    int now_t6 = 0, now_offset = curFunc->stackOffset - 8;
+    if (now_offset >= 2048) {
+        now_t6 = now_offset >> 12;
+        now_offset %= 4096;
+        if (now_offset >= 2048) now_t6++, now_offset -= 4096;
+        startB->push_back(
+            std::make_unique<UInstruction>(Instruction::Ty::LUI, "x31"_R, create_imm(now_t6)));
+        startB->push_back(
+            std::make_unique<RInstruction>(Instruction::Ty::ADD, "x31"_R, "x31"_R, "sp"_R));
+    }
+    now_offset += 8;
     for (auto reg : curFunc->shouldSave) {
+        now_offset -= 8;
+        if (now_offset < -2048) {
+            now_t6--, now_offset += 4096;
+            if (now_t6) {
+                startB->push_back(std::make_unique<UInstruction>(Instruction::Ty::LUI, "x31"_R,
+                                                                 create_imm(now_t6)));
+                startB->push_back(
+                    std::make_unique<RInstruction>(Instruction::Ty::ADD, "x31"_R, "x31"_R, "sp"_R));
+            }
+        }
         startB->push_back(std::make_unique<SInstruction>(
-            reg->isFloat() ? Instruction::Ty::FSW : Instruction::Ty::SD, reg, "sp"_R,
-            create_imm(static_cast<int>(curFunc->stackOffset - ++cnt * 8))));
+            reg->isFloat() ? Instruction::Ty::FSW : Instruction::Ty::SD, reg,
+            now_t6 == 0 ? "sp"_R : "x31"_R, create_imm(now_offset)));
     }
     startB->push_back(std::make_unique<JumpInstruction>(first_block->label.get()));
 }
 
 void Translator::compute_func_exit() const {
-    int cnt = 0;
+    int now_t6 = 0, now_offset = curFunc->stackOffset - 8;
+    if (now_offset >= 2048) {  // small-opt: 复用 t6=(xxx+sp)
+        now_t6 = now_offset >> 12;
+        now_offset %= 4096;
+        if (now_offset >= 2048) now_t6++, now_offset -= 4096;
+        curFunc->exitB->push_back(
+            std::make_unique<UInstruction>(Instruction::Ty::LUI, "x31"_R, create_imm(now_t6)));
+        curFunc->exitB->push_back(
+            std::make_unique<RInstruction>(Instruction::Ty::ADD, "x31"_R, "x31"_R, "sp"_R));
+    }
+    now_offset += 8;
     for (auto reg : curFunc->shouldSave) {
+        now_offset -= 8;
+        if (now_offset < -2048) {
+            now_t6--, now_offset += 4096;
+            if (now_t6) {
+                curFunc->exitB->push_back(std::make_unique<UInstruction>(
+                    Instruction::Ty::LUI, "x31"_R, create_imm(now_t6)));
+                curFunc->exitB->push_back(
+                    std::make_unique<RInstruction>(Instruction::Ty::ADD, "x31"_R, "x31"_R, "sp"_R));
+            }
+        }
         curFunc->exitB->push_back(std::make_unique<IInstruction>(
-            reg->isFloat() ? Instruction::Ty::FLW : Instruction::Ty::LD, reg, "sp"_R,
-            create_imm(static_cast<int>(curFunc->stackOffset - ++cnt * 8))));
+            reg->isFloat() ? Instruction::Ty::FLW : Instruction::Ty::LD, reg,
+            now_t6 == 0 ? "sp"_R : "x31"_R, create_imm(now_offset)));
     }
     if (curFunc->stackOffset)
         curFunc->exitB->push_back(std::make_unique<IInstruction>(
