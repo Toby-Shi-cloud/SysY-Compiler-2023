@@ -269,17 +269,7 @@ void Translator::translateGetPtrInst(const mir::Instruction::getelementptr *getP
 void Translator::translateConversionInst(const mir::Instruction::trunc *truncInst) {
     // assume i32 -> i1
     auto reg = getRegister(truncInst->getValueOperand());
-    if (truncInst->type == mir::Type::getI1Type()) {
-        auto dst = curFunc->newVirRegister();
-        curBlock->push_back(
-            std::make_unique<RInstruction>(Instruction::Ty::SLTU, dst, "x0"_R, reg));
-        put(truncInst, dst);
-    } else if (truncInst->type == mir::Type::getI32Type()) {
-        put(truncInst, reg);
-    } else {
-        dbg(truncInst);
-        TODO("impossible trunc!");
-    }
+    put(truncInst, reg);
 }
 
 void Translator::translateConversionInst(const mir::Instruction::zext *zextInst) {
