@@ -6,7 +6,7 @@
 #include "settings.h"
 
 namespace mir {
-static void basic_optimize(Function *func, Manager &manager) {
+static void basic_optimize(Function *func) {
 // this macro is used to allocName for values when debug mod enabled.
 #define FUNC (assert((func->allocName(), true)), func)
     if (opt_settings.using_mem2reg) mem2reg(FUNC);
@@ -18,7 +18,7 @@ static void basic_optimize(Function *func, Manager &manager) {
     if (opt_settings.using_block_merging) mergeEmptyBlock(FUNC);
     if (opt_settings.using_block_merging) connectBlocks(FUNC);
     if (opt_settings.using_trailing_recursion_opt) trailRecursionOpt(FUNC);
-    if (opt_settings.using_x64) usingX64(FUNC, manager);
+    if (opt_settings.using_x64) usingX64(FUNC);
     calcPure(FUNC);
 #undef FUNC
 }
@@ -30,8 +30,7 @@ void Manager::optimize() {
     opt_infos = {1};
     while (opt_infos != OptInfos{}) {
         opt_infos = {};
-        auto funcs = functions;  // copied
-        for (auto func : funcs) basic_optimize(func, *this);
+        for_each_func(basic_optimize);
         clearUnused();
         if (opt_settings.using_array_splitting) spiltArray(*this), clearUnused();
         if (opt_settings.using_inline_global_var) inlineGlobalVar(*this), clearUnused();

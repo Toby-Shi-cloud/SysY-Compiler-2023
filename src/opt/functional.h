@@ -13,6 +13,6 @@ void connectBlocks(Function *func);
 void calcPure(Function *func);
 BasicBlock *splitAndGetFront(Function *func);
 void trailRecursionOpt(Function *func);
-void usingX64(Function *func, Manager &manager);
+void usingX64(Function *func);
 }  // namespace mir
 #endif  // COMPILER_FUNCTIONAL_H

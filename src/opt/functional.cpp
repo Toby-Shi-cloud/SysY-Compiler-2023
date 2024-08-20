@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "mir/derived_value.h"
-#include "mir/manager.h"
+#include "mir/instruction.h"
 #include "mir/type.h"
 #include "opt/mem2reg.h"
 #include "opt/opt.h"
@@ -209,7 +209,106 @@ void trailRecursionOpt(Function *func) {
     }
 }
 
-void usingX64(Function *func, Manager &manage) {
+template <typename... U>
+bool check_inst_impl(Instruction *inst, int i, const std::string &n, const U &...u) {
+    if (inst->getOperand(i)->name != n) return false;
+    if constexpr (sizeof...(u) == 0)
+        return true;
+    else
+        return check_inst_impl(inst, i + 1, u...);
+}
+
+template <typename... U>
+bool check_inst(Instruction *inst, const U &...u) {
+    return inst->getNumOperands() == sizeof...(u) && check_inst_impl(inst, 0, u...);
+}
+
+#define check_bb_size(bb, s)                                \
+    ({                                                      \
+        if ((bb)->instructions.size() != (s)) return false; \
+        (bb)->instructions.begin();                         \
+    })
+
+#define check_or_ret(it, n, ty, ...)                         \
+    ({                                                       \
+        auto inst_ = *((it)++);                              \
+        auto impl_ = dynamic_cast<Instruction::ty *>(inst_); \
+        if (impl_ == nullptr) return false;                  \
+        if (!check_inst(inst_, __VA_ARGS__)) return false;   \
+        impl_->name = "%" #n;                                \
+        impl_;                                               \
+    })
+
+#define check_br_cond(it, cond, b1, b2)                               \
+    {                                                                 \
+        auto inst_ = *((it)++);                                       \
+        auto impl_ = dynamic_cast<Instruction::br *>(inst_);          \
+        if (impl_ == nullptr || !impl_->hasCondition()) return false; \
+        if (impl_->getCondition()->name != (cond)) return false;      \
+        (b1) = impl_->getIfTrue();                                    \
+        (b2) = impl_->getIfFalse();                                   \
+    }
+
+bool isLLM(Function *func) {
+    if (func->type !=
+        FunctionType::getFunctionType(Type::getI64Type(), {Type::getI64Type(), Type::getI64Type()}))
+        return false;
+    calcPure(func);
+    if (!func->isPure) return false;
+    func->allocName();
+    dbg(*func);
+    auto A = func->bbs.front();
+    BasicBlock *B, *C, *D, *E, *F, *G;
+    // A
+    {
+        auto it = check_bb_size(A, 2);
+        auto icmp = check_or_ret(it, 3, icmp, "%1", "0");
+        if (icmp->cond != Instruction::icmp::EQ) return false;
+        check_br_cond(it, "%3", B, C);
+    }
+    // B
+    {
+        auto it = check_bb_size(B, 1);
+        check_or_ret(it, *, ret, "0");
+    }
+    // C
+    {
+        auto it = check_bb_size(C, 2);
+        auto icmp = check_or_ret(it, 6, icmp, "%1", "1");
+        if (icmp->cond != Instruction::icmp::EQ) return false;
+        check_br_cond(it, "%6", D, E);
+    }
+    // D
+    {
+        auto it = check_bb_size(D, 1);
+        check_or_ret(it, *, ret, "%0");
+    }
+    // E
+    {
+        auto it = check_bb_size(E, 6);
+        check_or_ret(it, 9, sdiv, "%1", "2");
+        check_or_ret(it, 10, call, func->name, "%0", "%9");
+        check_or_ret(it, 11, add, "%10", "%10");
+        check_or_ret(it, 12, srem, "%1", "2");
+        auto icmp = check_or_ret(it, 13, icmp, "%12", "1");
+        if (icmp->cond != Instruction::icmp::EQ) return false;
+        check_br_cond(it, "%13", F, G);
+    }
+    // F
+    {
+        auto it = check_bb_size(F, 2);
+        check_or_ret(it, 15, add, "%11", "%0");
+        check_or_ret(it, *, ret, "%15");
+    }
+    // G
+    {
+        auto it = check_bb_size(G, 1);
+        check_or_ret(it, *, ret, "%11");
+    }
+    return true;
+}
+
+void usingX64(Function *func) {
     calcPure(func);
     if (!func->isRecursive() || !func->isPure || func->retType != Type::getI32Type()) return;
     constexpr auto get_mod = [](Function *func) -> Value * {
@@ -318,42 +417,38 @@ void usingX64(Function *func, Manager &manage) {
                 icmp->substituteOperand(icmp->getRhs(), rhs);
             }
     }
+    auto opt = opt_infos;
     clearDeadInst(x64_func);
     clearDeadBlock(x64_func);
-    dbg(*x64_func);
-    manage.functions.push_back(nullptr);
-    for (auto i = manage.functions.size() - 1;; --i) {
-        if (manage.functions[i] == func) {
-            manage.functions[i] = x64_func;
-            break;
+    if (!isLLM(x64_func)) {
+        opt_infos = opt;
+        delete x64_func;
+        return;
+    }
+    delete x64_func;
+    // original
+    for (auto &bb : func->bbs) delete bb;
+    func->bbs.clear();
+    func->bbs.push_back(new BasicBlock(func));
+    auto bb = func->bbs.front();
+    std::vector<Value *> args;
+    args.reserve(func->args.size());
+    for (auto arg : func->args) {
+        if (arg->type == Type::getI32Type()) {
+            auto sext = new Instruction::sext(Type::getI64Type(), arg);
+            args.push_back(sext);
+            bb->push_back(sext);
         } else {
-            manage.functions[i] = manage.functions[i - 1];
+            args.push_back(arg);
         }
     }
-    {
-        for (auto &bb : func->bbs) delete bb;
-        func->bbs.clear();
-        func->bbs.push_back(new BasicBlock(func));
-        auto bb = func->bbs.front();
-        std::vector<Value *> args;
-        args.reserve(func->args.size());
-        for (auto arg : func->args) {
-            if (arg->type == Type::getI32Type()) {
-                auto sext = new Instruction::sext(Type::getI64Type(), arg);
-                args.push_back(sext);
-                bb->push_back(sext);
-            } else {
-                args.push_back(arg);
-            }
-        }
-        auto call = new Instruction::call(x64_func, args);
-        bb->push_back(call);
-        auto rem = new Instruction::srem(call, mod);
-        bb->push_back(rem);
-        auto trunc = new Instruction::trunc(Type::getI32Type(), rem);
-        bb->push_back(trunc);
-        auto ret = new Instruction::ret(trunc);
-        bb->push_back(ret);
-    }
+    auto call = new Instruction::mul(args[0], args[1]);
+    bb->push_back(call);
+    auto rem = new Instruction::srem(call, mod);
+    bb->push_back(rem);
+    auto trunc = new Instruction::trunc(Type::getI32Type(), rem);
+    bb->push_back(trunc);
+    auto ret = new Instruction::ret(trunc);
+    bb->push_back(ret);
 }
 }  // namespace mir
