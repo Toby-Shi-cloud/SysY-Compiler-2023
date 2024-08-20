@@ -13,7 +13,7 @@ Function *Function::getint() {
 }
 
 Function *Function::getch() {
-    const static Function _f(FunctionType::getFunctionType(Type::getI8Type(), {}), "getch");
+    const static Function _f(FunctionType::getFunctionType(Type::getI32Type(), {}), "getch");
     return const_cast<Function *>(&_f);
 }
 

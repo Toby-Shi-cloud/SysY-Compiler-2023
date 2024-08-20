@@ -277,6 +277,7 @@ void Translator::translateConversionInst(const mir::Instruction::trunc *truncIns
     } else if (truncInst->type == mir::Type::getI32Type()) {
         put(truncInst, reg);
     } else {
+        dbg(truncInst);
         TODO("impossible trunc!");
     }
 }
@@ -286,12 +287,13 @@ void Translator::translateConversionInst(const mir::Instruction::zext *zextInst)
     auto src_ty = zextInst->getValueOperand()->type;
     if (src_ty == mir::Type::getI1Type()) {
         put(zextInst, oMap[zextInst->getValueOperand()]);
-    } else if (src_ty == mir::Type::getI32Type()) {
+    } else if (src_ty == mir::Type::getI32Type() || src_ty == mir::Type::getI8Type()) {
         auto reg = getRegister(zextInst->getValueOperand());
         auto dst = curFunc->newVirRegister();
         curBlock->push_back(std::make_unique<FpConvInstruction>(Instruction::Ty::ZEXT_W, dst, reg));
         put(zextInst, dst);
     } else {
+        dbg(zextInst);
         TODO("impossible zext!");
     }
 }
@@ -303,9 +305,10 @@ void Translator::translateConversionInst(const mir::Instruction::sext *sextInst)
     auto dst = curFunc->newVirRegister();
     if (src_ty == mir::Type::getI1Type()) {
         curBlock->push_back(std::make_unique<RInstruction>(Instruction::Ty::SUB, dst, "x0"_R, reg));
-    } else if (src_ty == mir::Type::getI32Type()) {
+    } else if (src_ty == mir::Type::getI32Type() || src_ty == mir::Type::getI8Type()) {
         curBlock->push_back(std::make_unique<FpConvInstruction>(Instruction::Ty::SEXT_W, dst, reg));
     } else {
+        dbg(sextInst);
         TODO("impossible sext!");
     }
     put(sextInst, dst);
