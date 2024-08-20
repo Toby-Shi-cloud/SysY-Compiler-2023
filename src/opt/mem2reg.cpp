@@ -202,8 +202,12 @@ void clearDeadInst(const Function *func) {
         for (auto bb : func->bbs) {
             auto it = bb->instructions.begin();
             while (it != bb->instructions.end()) {
-                if (auto inst = *it; inst->isValue() && !inst->isUsed() && !inst->isTerminator() &&
-                                     !inst->isCall()) {
+                if (auto inst = *it; inst->isValue() && !inst->isUsed() && !inst->isTerminator()) {
+                    if (auto call = dynamic_cast<Instruction::call *>(inst);
+                        call && !call->getFunction()->isPure) {
+                        ++it;
+                        continue;
+                    }
                     opt_infos.clear_dead_inst()++;
                     changed = true;
                     it = bb->erase(inst);

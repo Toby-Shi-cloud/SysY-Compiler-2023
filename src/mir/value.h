@@ -46,7 +46,7 @@ class Value {
     std::shared_ptr<Use> use;
 
  public:
-    const pType type;
+    pType type;
     std::string name;
 
  public:

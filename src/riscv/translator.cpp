@@ -183,7 +183,9 @@ void Translator::translateBranchInst(const mir::Instruction::br *brInst) {
 template <mir::Instruction::InstrTy ty>
 void Translator::translateBinaryInst(const mir::Instruction::_binary_instruction<ty> *binInst) {
     auto lhs = getRegister(binInst->getLhs());
-    auto reg = translateBinaryInstHelper<ty, 32>(lhs, binInst->getRhs());
+    auto reg = binInst->type == mir::Type::getI64Type()
+                   ? translateBinaryInstHelper<ty, 64>(lhs, binInst->getRhs())
+                   : translateBinaryInstHelper<ty, 32>(lhs, binInst->getRhs());
     put(binInst, reg);
 }
 
@@ -267,23 +269,46 @@ void Translator::translateGetPtrInst(const mir::Instruction::getelementptr *getP
 void Translator::translateConversionInst(const mir::Instruction::trunc *truncInst) {
     // assume i32 -> i1
     auto reg = getRegister(truncInst->getValueOperand());
-    auto dst = curFunc->newVirRegister();
-    curBlock->push_back(std::make_unique<MoveInstruction>(dst, reg));
-    curBlock->push_back(std::make_unique<RInstruction>(Instruction::Ty::SLTU, dst, "x0"_R, reg));
-    put(truncInst, reg);
+    if (truncInst->type == mir::Type::getI1Type()) {
+        auto dst = curFunc->newVirRegister();
+        curBlock->push_back(
+            std::make_unique<RInstruction>(Instruction::Ty::SLTU, dst, "x0"_R, reg));
+        put(truncInst, dst);
+    } else if (truncInst->type == mir::Type::getI32Type()) {
+        put(truncInst, reg);
+    } else {
+        TODO("impossible trunc!");
+    }
 }
 
 void Translator::translateConversionInst(const mir::Instruction::zext *zextInst) {
     // assume i1 -> i32
-    put(zextInst, oMap[zextInst->getValueOperand()]);
+    auto src_ty = zextInst->getValueOperand()->type;
+    if (src_ty == mir::Type::getI1Type()) {
+        put(zextInst, oMap[zextInst->getValueOperand()]);
+    } else if (src_ty == mir::Type::getI32Type()) {
+        auto reg = getRegister(zextInst->getValueOperand());
+        auto dst = curFunc->newVirRegister();
+        curBlock->push_back(std::make_unique<FpConvInstruction>(Instruction::Ty::ZEXT_W, dst, reg));
+        put(zextInst, dst);
+    } else {
+        TODO("impossible zext!");
+    }
 }
 
 void Translator::translateConversionInst(const mir::Instruction::sext *sextInst) {
     // assume i1 -> i32
+    auto src_ty = sextInst->getValueOperand()->type;
     auto reg = getRegister(sextInst->getValueOperand());
     auto dst = curFunc->newVirRegister();
-    curBlock->push_back(std::make_unique<RInstruction>(Instruction::Ty::SUB, dst, "x0"_R, reg));
-    put(sextInst, reg);
+    if (src_ty == mir::Type::getI1Type()) {
+        curBlock->push_back(std::make_unique<RInstruction>(Instruction::Ty::SUB, dst, "x0"_R, reg));
+    } else if (src_ty == mir::Type::getI32Type()) {
+        curBlock->push_back(std::make_unique<FpConvInstruction>(Instruction::Ty::SEXT_W, dst, reg));
+    } else {
+        TODO("impossible sext!");
+    }
+    put(sextInst, dst);
 }
 
 template <mir::Instruction::InstrTy ty>

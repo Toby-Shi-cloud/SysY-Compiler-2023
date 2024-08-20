@@ -199,6 +199,12 @@ void GlobalVar::initialize() {
     if (auto counter = this->init->inlineRefCounter()) ++*counter;
 }
 
+Int64Literal *Int64Literal::get(int value) {
+    static std::unordered_map<int, Int64Literal *> integerPool;
+    if (integerPool[value] == nullptr) integerPool[value] = new Int64Literal(value);
+    return integerPool[value];
+}
+
 IntegerLiteral *getIntegerLiteral(int value) {
     static std::unordered_map<int, IntegerLiteral *> integerPool;
     if (integerPool[value] == nullptr) integerPool[value] = new IntegerLiteral(value);

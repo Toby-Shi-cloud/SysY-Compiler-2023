@@ -25,6 +25,7 @@ inline struct OptSettings {
     bool using_inline_global_var;
     bool using_trailing_recursion_opt;
     bool using_spill_to_freg;
+    bool using_x64;
 } opt_settings;
 
 inline void set_optimize_level(int level, const std::string &arch) {
@@ -34,6 +35,7 @@ inline void set_optimize_level(int level, const std::string &arch) {
     switch (level) {
     case 3:
         SET_(using_spill_to_freg, "riscv");
+        SET_(using_x64, "riscv");
         [[fallthrough]];
     case 2:
         SET_(using_gp, "mips");

@@ -4,6 +4,11 @@
 
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
+#include "mir/derived_value.h"
+#include "mir/manager.h"
+#include "mir/type.h"
+#include "opt/mem2reg.h"
 #include "opt/opt.h"
 
 namespace mir {
@@ -201,6 +206,154 @@ void trailRecursionOpt(Function *func) {
         block->erase(ret);
         block->erase(call);
         block->push_back(new Instruction::br(begin_bb));
+    }
+}
+
+void usingX64(Function *func, Manager &manage) {
+    calcPure(func);
+    if (!func->isRecursive() || !func->isPure || func->retType != Type::getI32Type()) return;
+    constexpr auto get_mod = [](Function *func) -> Value * {
+        Value *mod = nullptr;
+        for (auto bb : func->bbs) {
+            auto ret = dynamic_cast<Instruction::ret *>(bb->instructions.back());
+            if (!ret) continue;
+            auto val = ret->getReturnValue();
+            if (dynamic_cast<IntegerLiteral *>(val) || dynamic_cast<Argument *>(val)) {
+                // ok
+            } else if (auto r = dynamic_cast<Instruction::srem *>(val)) {
+                if (mod == nullptr)
+                    mod = r->getRhs();
+                else if (mod != r->getRhs())
+                    return nullptr;
+            } else {
+                return nullptr;
+            }
+        }
+        return mod;
+    };
+    if (get_mod(func) == nullptr) return;
+    // func could be translate to x64 ver
+    auto x64_func = func->clone();
+    x64_func->name = func->name + ".x64";
+    auto mod = get_mod(x64_func);
+    std::unordered_map<Value *, Value *> mapped;  // x32 -> x64
+    // change args
+    for (auto &arg : x64_func->args)
+        if (arg->type == Type::getI32Type()) {
+            auto _new = new Argument(Type::getI64Type(), x64_func);
+            auto bb = x64_func->bbs.front();
+            auto _trunc = new Instruction::trunc(Type::getI32Type(), _new);
+            arg->moveTo(_trunc);
+            bb->insert(bb->beginner_end(), _trunc);
+            delete arg;
+            arg = _new;
+            mapped[_trunc] = _new;
+        }
+    x64_func->retType = Type::getI64Type();
+    std::vector<pType> arg_ty;
+    arg_ty.reserve(x64_func->args.size());
+    for (auto arg : x64_func->args) arg_ty.push_back(arg->type);
+    x64_func->type = FunctionType::getFunctionType(x64_func->retType, std::move(arg_ty));
+    // dfs
+    const auto dfs = [&](Value *value, Instruction *fa, auto &&self) -> Value * {
+        if (value->type == Type::getI64Type()) return value;
+        assert(value->type == Type::getI32Type());
+        auto &result = mapped[value];
+        if (result) {
+            return result;
+        } else if (auto rem = dynamic_cast<Instruction::srem *>(value)) {
+            auto lhs = self(rem->getLhs(), rem, self), rhs = self(rem->getRhs(), rem, self);
+            if (rhs == mod) {
+                return result = lhs;
+            } else {
+                auto _new = new Instruction::srem(lhs, rhs);
+                rem->parent->insert(rem->node, _new);
+                return result = _new;
+            }
+        } else if (auto inst = dynamic_cast<Instruction *>(value);
+                   inst && inst->instrTy >= Instruction::ADD &&
+                   inst->instrTy <= Instruction::SREM) {
+            auto lhs = self(inst->getOperand(0), inst, self);
+            auto rhs = self(inst->getOperand(1), inst, self);
+            auto _new = inst->clone();
+            _new->substituteOperand(inst->getOperand(0), lhs);
+            _new->substituteOperand(inst->getOperand(1), rhs);
+            _new->type = Type::getI64Type();
+            inst->parent->insert(inst->node, _new);
+            return result = _new;
+
+        } else if (auto lit = dynamic_cast<IntegerLiteral *>(value)) {
+            return result = Int64Literal::get(lit->value);
+        } else if (auto call = dynamic_cast<Instruction::call *>(value);
+                   call && call->getFunction() == func) {
+            std::vector<Value *> args;
+            args.reserve(call->getNumArgs());
+            for (int i = 0; i < call->getNumArgs(); i++) {
+                auto arg = call->getArg(i);
+                if (arg->type == Type::getI32Type())
+                    args.push_back(self(arg, call, self));
+                else
+                    args.push_back(arg);
+            }
+            auto _ncall = new Instruction::call(x64_func, args);
+            call->parent->insert(call->node, _ncall);
+            return result = _ncall;
+        }
+        auto _new = new Instruction::sext(Type::getI64Type(), value);
+        fa->parent->insert(fa->node, _new);
+        return result = _new;
+    };
+    // mod
+    mod = dfs(mod, dynamic_cast<Instruction *>(mod), dfs);
+    for (auto bb : x64_func->bbs) {
+        if (auto ret = dynamic_cast<Instruction::ret *>(bb->instructions.back())) {
+            auto _new = dfs(ret->getReturnValue(), ret, dfs);
+            ret->substituteOperand(ret->getReturnValue(), _new);
+        } else if (auto br = dynamic_cast<Instruction::br *>(bb->instructions.back());
+                   br && br->hasCondition())
+            if (auto icmp = dynamic_cast<Instruction::icmp *>(br->getCondition())) {
+                auto lhs = dfs(icmp->getLhs(), icmp, dfs);
+                auto rhs = dfs(icmp->getRhs(), icmp, dfs);
+                icmp->substituteOperand(icmp->getLhs(), lhs);
+                icmp->substituteOperand(icmp->getRhs(), rhs);
+            }
+    }
+    clearDeadInst(x64_func);
+    clearDeadBlock(x64_func);
+    dbg(*x64_func);
+    manage.functions.push_back(nullptr);
+    for (auto i = manage.functions.size() - 1;; --i) {
+        if (manage.functions[i] == func) {
+            manage.functions[i] = x64_func;
+            break;
+        } else {
+            manage.functions[i] = manage.functions[i - 1];
+        }
+    }
+    {
+        for (auto &bb : func->bbs) delete bb;
+        func->bbs.clear();
+        func->bbs.push_back(new BasicBlock(func));
+        auto bb = func->bbs.front();
+        std::vector<Value *> args;
+        args.reserve(func->args.size());
+        for (auto arg : func->args) {
+            if (arg->type == Type::getI32Type()) {
+                auto sext = new Instruction::sext(Type::getI64Type(), arg);
+                args.push_back(sext);
+                bb->push_back(sext);
+            } else {
+                args.push_back(arg);
+            }
+        }
+        auto call = new Instruction::call(x64_func, args);
+        bb->push_back(call);
+        auto rem = new Instruction::srem(call, mod);
+        bb->push_back(rem);
+        auto trunc = new Instruction::trunc(Type::getI32Type(), rem);
+        bb->push_back(trunc);
+        auto ret = new Instruction::ret(trunc);
+        bb->push_back(ret);
     }
 }
 }  // namespace mir

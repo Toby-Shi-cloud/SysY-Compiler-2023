@@ -403,6 +403,15 @@ struct IntegerLiteral : Literal {
     explicit IntegerLiteral(unsigned value) : IntegerLiteral(static_cast<int>(value)) {}
 
     [[nodiscard]] inline calculate_t getValue() const override { return value; }
+
+ protected:
+    IntegerLiteral(pType ty, int value) : Literal(ty, std::to_string(value)), value(value) {}
+};
+
+struct Int64Literal : IntegerLiteral {
+    explicit Int64Literal(int value) : IntegerLiteral(Type::getI64Type(), value) {}
+
+    static Int64Literal *get(int value);
 };
 
 IntegerLiteral *getIntegerLiteral(int value);
